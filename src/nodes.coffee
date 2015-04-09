@@ -1413,6 +1413,7 @@ exports.Code = class Code extends Base
     delete o.isExistentialEquals
     params = []
     exprs  = []
+    uses   = []
     for param in @params when param not instanceof Expansion
       o.scope.parameter param.asReference o
     for param in @params when param.splat or param instanceof Expansion
@@ -1421,6 +1422,18 @@ exports.Code = class Code extends Base
       splats = new Assign new Value(new Arr(p.asReference o for p in @params)),
                           new Value new Literal 'arguments'
       break
+    for param in @params
+      if 0 is param.name.value.indexOf 'USE'
+        param.uses = yes
+
+        uses.unshift((
+          param
+           .name
+           .value
+           .substr 3
+           .split '_$'
+           .slice 1 )... )
+        # console.log uses
     for param in @params
       if param.isComplex()
         val = ref = param.asReference o
@@ -1432,7 +1445,7 @@ exports.Code = class Code extends Base
           lit = new Literal ref.name.value + ' == null'
           val = new Assign new Value(param.name), param.value, '='
           exprs.push new If lit, val
-      params.push ref unless splats
+      params.push ref unless splats or param.uses
     wasEmpty = @body.isEmpty()
     exprs.unshift splats if splats
     @body.expressions.unshift exprs... if exprs.length
@@ -1447,14 +1460,20 @@ exports.Code = class Code extends Base
     @body.makeReturn() unless wasEmpty or @noReturn
     code = 'function'
     code += '*' if @isGenerator
-    code += ' ' + @name.name.value # if @ctor
+    if @name?.name?.value
+      code += ' ' + @name.name.value # if @ctor
     code += '('
     answer = [@makeCode(code)]
     # console.log params
     for p, i in params
       if i then answer.push @makeCode ", "
       answer.push p...
-    answer.push @makeCode ') {'
+    answer.push @makeCode ') '
+    if uses.length
+      answer.push @makeCode 'uses ('
+      answer.push @makeCode ["$#{ use }" for use in uses].join ', '
+      answer.push @makeCode ')'
+    answer.push @makeCode ' {'
     answer = answer.concat(@makeCode("\n"), @body.compileWithDeclarations(o), @makeCode("\n#{@tab}")) unless @body.isEmpty()
     answer.push @makeCode '}'
 
