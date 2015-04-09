@@ -1438,6 +1438,7 @@ exports.Code = class Code extends Base
     @body.expressions.unshift exprs... if exprs.length
     for p, i in params
       params[i] = p.compileToFragments o
+      # console.log params[i]
       o.scope.parameter fragmentsToText params[i]
     uniqs = []
     @eachParamName (name, node) ->
@@ -1449,6 +1450,7 @@ exports.Code = class Code extends Base
     code += ' ' + @name.name.value # if @ctor
     code += '('
     answer = [@makeCode(code)]
+    # console.log params
     for p, i in params
       if i then answer.push @makeCode ", "
       answer.push p...
@@ -1480,7 +1482,14 @@ exports.Param = class Param extends Base
   children: ['name', 'value']
 
   compileToFragments: (o) ->
-    @name.compileToFragments o, LEVEL_LIST
+    if 0 is @name.value.indexOf 'WRAP'
+      @name.value = @name.value.substr 5
+      # console.log [@name.makeCode( 'Wrap ' ),
+      #  (@name.compileToFragments o, LEVEL_LIST)...]
+      [@name.makeCode( 'Wrap ' ),
+       (@name.compileToFragments o, LEVEL_LIST)...]
+    else
+      @name.compileToFragments o, LEVEL_LIST
 
   asReference: (o) ->
     return @reference if @reference
