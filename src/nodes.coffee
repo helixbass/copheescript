@@ -298,7 +298,8 @@ exports.Block = class Block extends Base
         fragments = node.compileToFragments o
         unless node.isStatement o
           fragments.unshift @makeCode "#{@tab}"
-          fragments.push @makeCode ";"
+          unless @expressions[0] instanceof Class or @expressions[0] instanceof Assign and @expressions[0].value instanceof Code
+            fragments.push @makeCode ";"
         compiledNodes.push fragments
       else
         compiledNodes.push node.compileToFragments o, LEVEL_LIST
@@ -338,7 +339,7 @@ exports.Block = class Block extends Base
       @expressions = rest
     fragments = @compileWithDeclarations o
     return fragments if o.bare
-    [].concat prelude, @makeCode("(function() {\n"), fragments, @makeCode("\n}).call(this);\n")
+    [].concat prelude, @makeCode("<?php defined('SYSPATH') or die('No direct script access.');\n"), fragments
 
   # Compile the expressions body for the contents of a function, with
   # declarations of all inner variables pushed up to the top.
@@ -406,9 +407,9 @@ exports.Literal = class Literal extends Base
 
   compileNode: (o) ->
     code = if @value is 'this'
-      if o.scope.method?.bound then o.scope.method.context else @value
-    else if @value.reserved
-      "\"#{@value}\""
+      if o.scope.method?.bound then o.scope.method.context else '$this'
+    # else if @value.reserved
+    #   "\"#{@value}\""
     else
       @value
     answer = if @isStatement() then "#{@tab}#{code};" else code
@@ -766,11 +767,11 @@ exports.Access = class Access extends Base
 
   compileToFragments: (o) ->
     name = @name.compileToFragments o
-    if IDENTIFIER.test fragmentsToText name
-      name.unshift @makeCode "."
-    else
-      name.unshift @makeCode "["
-      name.push @makeCode "]"
+    # if IDENTIFIER.test fragmentsToText name
+    name.unshift @makeCode "->"
+    # else
+    #   name.unshift @makeCode "["
+    #   name.push @makeCode "]"
     name
 
   isComplex: NO
@@ -938,7 +939,7 @@ exports.Obj = class Obj extends Base
     if hasDynamic
       oref = o.scope.freeVariable 'obj'
       answer.push @makeCode "(\n#{idt}#{oref} = "
-    answer.push @makeCode "{#{if props.length is 0 or dynamicIndex is 0 then '}' else '\n'}"
+    answer.push @makeCode "[#{if props.length is 0 or dynamicIndex is 0 then '}' else '\n'}"
     for prop, i in props
       if i is dynamicIndex
         answer.push @makeCode "\n#{idt}}" unless i is 0
@@ -973,7 +974,7 @@ exports.Obj = class Obj extends Base
     if hasDynamic
       answer.push @makeCode ",\n#{idt}#{oref}\n#{@tab})"
     else
-      answer.push @makeCode "\n#{@tab}}" unless props.length is 0
+      answer.push @makeCode "\n#{@tab}]" unless props.length is 0
     if @front and not hasDynamic then @wrapInBraces answer else answer
 
   assigns: (name) ->
@@ -1146,22 +1147,28 @@ exports.Class = class Class extends Base
     @hoistDirectivePrologue()
     @setContext name
     @walkBody name, o
-    @ensureConstructor name
+    # @ensureConstructor name
     @addBoundFunctions o
     @body.spaced = yes
-    @body.expressions.push lname
+    # @body.expressions.push lname
 
-    if @parent
-      superClass = new Literal o.classScope.freeVariable 'superClass', reserve: no
-      @body.expressions.unshift new Extends lname, superClass
-      func.params.push new Param superClass
-      args.push @parent
+    # if @parent
+    #   superClass = new Literal o.classScope.freeVariable 'superClass', reserve: no
+    #   @body.expressions.unshift new Extends lname, superClass
+    #   func.params.push new Param superClass
+    #   args.push @parent
 
     @body.expressions.unshift @directives...
 
-    klass = new Parens new Call func, args
-    klass = new Assign @variable, klass if @variable
-    klass.compileToFragments o
+    # console.log @body.expressions[1].variable
+    # klass = new Parens new Call func, args
+    # klass = new Assign @variable, klass if @variable
+    # func.compileToFragments o
+    # _body = Block.wrap [@body]
+    [@makeCode( "class #{ name } {\n" ),
+     @body.compileNode( o )...,
+     # do _body.compileNode
+     @makeCode( '}' )]
 
 #### Assign
 
@@ -1218,8 +1225,14 @@ exports.Assign = class Assign extends Base
           o.scope.find varBase.value
     val = @value.compileToFragments o, LEVEL_LIST
     compiledName = @variable.compileToFragments o, LEVEL_LIST
-    return (compiledName.concat @makeCode(": "), val) if @context is 'object'
-    answer = compiledName.concat @makeCode(" #{ @context or '=' } "), val
+    # console.log @variable if @context is 'object'
+    return (compiledName.concat @makeCode(" => "), val) if @context is 'object'
+    answer =
+      if @value instanceof Code
+        console.log val
+        [val...]
+      else
+        compiledName.concat @makeCode(" #{ @context or '=' } "), val
     if o.level <= LEVEL_LIST then answer else @wrapInBraces answer
 
   # Brief implementation of recursive pattern matching, when assigning array or
@@ -1433,7 +1446,7 @@ exports.Code = class Code extends Base
     @body.makeReturn() unless wasEmpty or @noReturn
     code = 'function'
     code += '*' if @isGenerator
-    code += ' ' + @name if @ctor
+    code += ' ' + @name.name.value # if @ctor
     code += '('
     answer = [@makeCode(code)]
     for p, i in params
