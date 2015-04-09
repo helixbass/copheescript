@@ -1165,7 +1165,7 @@ exports.Class = class Class extends Base
     # klass = new Assign @variable, klass if @variable
     # func.compileToFragments o
     # _body = Block.wrap [@body]
-    [@makeCode( "class #{ name } {\n" ),
+    [@makeCode( "class #{ name } #{ if @parent then "extends #{ @parent.base.value }" else '' } {\n" ),
      @body.compileNode( o )...,
      # do _body.compileNode
      @makeCode( '}' )]
@@ -1229,7 +1229,7 @@ exports.Assign = class Assign extends Base
     return (compiledName.concat @makeCode(" => "), val) if @context is 'object'
     answer =
       if @value instanceof Code
-        console.log val
+        # console.log val
         [val...]
       else
         compiledName.concat @makeCode(" #{ @context or '=' } "), val
