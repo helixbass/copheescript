@@ -1164,7 +1164,7 @@ exports.Class = class Class extends Base
     #   func.params.push new Param superClass
     #   args.push @parent
 
-    console.log 'class body.expressions', @body.expressions
+    # console.log 'class body.expressions', @body.expressions
     for expression in @body.expressions
       if expression.value instanceof Code
         expression.value._is_method = yes
@@ -2349,7 +2349,7 @@ NUMBER    = ///^[+-]?(?:
 # Is a literal value a string/regex?
 IS_STRING = /^['"]/
 IS_REGEX = /^\//
-IS_VAR = /^[\w$]+$/
+IS_VAR = /^\$\w+$/
 
 # Helper Functions
 # ----------------
