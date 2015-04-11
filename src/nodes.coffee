@@ -498,7 +498,7 @@ exports.Value = class Value extends Base
   isSimpleNumber : -> @bareLiteral(Literal) and SIMPLENUM.test @base.value
   isString       : -> @bareLiteral(Literal) and IS_STRING.test @base.value
   isRegex        : -> @bareLiteral(Literal) and IS_REGEX.test @base.value
-  isVar          : -> not do @isSimpleNumber and IS_VAR.test @base.value
+  isVar          : -> IS_VAR.test @base.value
   isAtomic       : ->
     for node in @properties.concat @base
       return no if node.soak or node instanceof Call
@@ -552,15 +552,18 @@ exports.Value = class Value extends Base
   # evaluate anything twice when building the soak chain.
   compileNode: (o) ->
     # console.log 'props', @base, @properties if @properties?.length
-    if @base.value and do @isVar and @properties?[0]?.name?.value isnt 'prototype'
+    if @base.value and do @isVar and @properties[0]?.name?.value isnt 'prototype'
       o.scope.add_free @base.value
     @base.front = @front
     props = @properties
     fragments = @base.compileToFragments o, (if props.length then LEVEL_ACCESS else null)
     if (@base instanceof Parens or props.length) and SIMPLENUM.test fragmentsToText fragments
       fragments.push @makeCode '.'
-    for prop in props
-      fragments.push (prop.compileToFragments o)...
+    if @properties.length > 1 and @properties[0].name?.value is 'prototype'
+      fragments.push @makeCode "::#{ @properties[1].name.value }"
+    else
+      for prop in props
+        fragments.push (prop.compileToFragments o)...
     fragments
 
   # Unfold a soak into an `If`: `a?.b` -> `a.b if a?`
@@ -1168,6 +1171,7 @@ exports.Class = class Class extends Base
     for expression in @body.expressions
       if expression.value instanceof Code
         expression.value._is_method = yes
+        expression.value._is_static = expression.variable.properties[0]?.name.value isnt 'prototype'
     @body.expressions.unshift @directives...
 
     # console.log @body.expressions[1].variable
@@ -1459,6 +1463,13 @@ exports.Code = class Code extends Base
     wasEmpty = @body.isEmpty()
     exprs.unshift splats if splats
     @body.expressions.unshift exprs... if exprs.length
+    for exp, i in @body.expressions
+      break unless exp instanceof If and (_var=exp.condition.value.match( /^(\$\w+) == null$/ )[1]) and _param=@hasParamNamed _var
+      _param._default = exp.body.value.compileToFragments()[0].code
+
+      # console.log 'if', exp, exp.body.variable, do exp.body.value.compileToFragments
+    # console.log 'params', params
+    @body.expressions = @body.expressions.slice i if i
     for p, i in params
       params[i] = p.compileToFragments o
       # console.log params[i]
@@ -1468,13 +1479,12 @@ exports.Code = class Code extends Base
       node.error "multiple parameters named #{name}" if name in uniqs
       uniqs.push name
     @body.makeReturn() unless wasEmpty or @noReturn
-    code = 'function'
+    code = "#{ if @_is_static then 'static ' else '' }function"
     code += '*' if @isGenerator
     if @name?.name?.value
       code += ' ' + @name.name.value # if @ctor
     code += '('
     answer = [@makeCode(code)]
-    # console.log params
     for p, i in params
       if i then answer.push @makeCode ", "
       answer.push p...
@@ -1494,6 +1504,11 @@ exports.Code = class Code extends Base
 
   eachParamName: (iterator) ->
     param.eachName iterator for param in @params
+
+  hasParamNamed: ( name ) ->
+    for param in @params
+      return param if param.name.value is name
+    no
 
   # Short-circuit `traverseChildren` method to prevent it from crossing scope boundaries
   # unless `crossScope` is `true`.
@@ -1521,6 +1536,7 @@ exports.Param = class Param extends Base
        (@name.compileToFragments o, LEVEL_LIST)...]
     else
       @name.compileToFragments o, LEVEL_LIST
+       .concat if @_default then [@name.makeCode "=#{ @_default }"] else []
 
   asReference: (o) ->
     return @reference if @reference
