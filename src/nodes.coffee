@@ -360,16 +360,17 @@ exports.Block = class Block extends Base
     if scope.expressions is this
       declars = o.scope.hasDeclarations()
       assigns = scope.hasAssignments
-      if declars or assigns
-        fragments.push @makeCode '\n' if i
-        fragments.push @makeCode "#{@tab}var "
-        if declars
-          fragments.push @makeCode scope.declaredVariables().join(', ')
-        if assigns
-          fragments.push @makeCode ",\n#{@tab + TAB}" if declars
-          fragments.push @makeCode scope.assignedVariables().join(",\n#{@tab + TAB}")
-        fragments.push @makeCode ";\n#{if @spaced then '\n' else ''}"
-      else if fragments.length and post.length
+      # if declars or assigns
+      #   fragments.push @makeCode '\n' if i
+      #   fragments.push @makeCode "#{@tab}var "
+      #   if declars
+      #     fragments.push @makeCode scope.declaredVariables().join(', ')
+      #   if assigns
+      #     fragments.push @makeCode ",\n#{@tab + TAB}" if declars
+      #     fragments.push @makeCode scope.assignedVariables().join(",\n#{@tab + TAB}")
+      #   fragments.push @makeCode ";\n#{if @spaced then '\n' else ''}"
+      # else if fragments.length and post.length
+      if fragments.length and post.length
         fragments.push @makeCode "\n"
     fragments.concat post
 
@@ -497,6 +498,7 @@ exports.Value = class Value extends Base
   isSimpleNumber : -> @bareLiteral(Literal) and SIMPLENUM.test @base.value
   isString       : -> @bareLiteral(Literal) and IS_STRING.test @base.value
   isRegex        : -> @bareLiteral(Literal) and IS_REGEX.test @base.value
+  isVar          : -> not do @isSimpleNumber and IS_VAR.test @base.value
   isAtomic       : ->
     for node in @properties.concat @base
       return no if node.soak or node instanceof Call
@@ -549,6 +551,9 @@ exports.Value = class Value extends Base
   # operators `?.` interspersed. Then we have to take care not to accidentally
   # evaluate anything twice when building the soak chain.
   compileNode: (o) ->
+    # console.log 'props', @base, @properties if @properties?.length
+    if @base.value and do @isVar and @properties?[0]?.name?.value isnt 'prototype'
+      o.scope.add_free @base.value
     @base.front = @front
     props = @properties
     fragments = @base.compileToFragments o, (if props.length then LEVEL_ACCESS else null)
@@ -1159,6 +1164,10 @@ exports.Class = class Class extends Base
     #   func.params.push new Param superClass
     #   args.push @parent
 
+    console.log 'class body.expressions', @body.expressions
+    for expression in @body.expressions
+      if expression.value instanceof Code
+        expression.value._is_method = yes
     @body.expressions.unshift @directives...
 
     # console.log @body.expressions[1].variable
@@ -1423,18 +1432,18 @@ exports.Code = class Code extends Base
       splats = new Assign new Value(new Arr(p.asReference o for p in @params)),
                           new Value new Literal 'arguments'
       break
-    for param in @params
-      if 0 is param.name.value.indexOf 'USE'
-        param.uses = yes
+    unless @_is_method
+      for param in @params
+        if 0 is param.name.value.indexOf 'USE'
+          param.uses = yes
 
-        uses.unshift((
-          param
-           .name
-           .value
-           .substr 3
-           .split '_$'
-           .slice 1 )... )
-        # console.log uses
+          uses.unshift(
+            ("$#{ use }" for use in param
+               .name
+               .value
+               .substr 3
+               .split '_$'
+               .slice 1 )... )
     for param in @params
       if param.isComplex()
         val = ref = param.asReference o
@@ -1470,12 +1479,14 @@ exports.Code = class Code extends Base
       if i then answer.push @makeCode ", "
       answer.push p...
     answer.push @makeCode ') '
+    compiled_body = @body.compileWithDeclarations(o) unless @body.isEmpty()
+    uses = do o.scope.uses unless uses.length or @_is_method
     if uses.length
       answer.push @makeCode 'use ('
-      answer.push @makeCode ["$#{ use }" for use in uses].join ', '
+      answer.push @makeCode ["#{ use }" for use in uses].join ', '
       answer.push @makeCode ')'
     answer.push @makeCode ' {'
-    answer = answer.concat(@makeCode("\n"), @body.compileWithDeclarations(o), @makeCode("\n#{@tab}")) unless @body.isEmpty()
+    answer = answer.concat(@makeCode("\n"), compiled_body, @makeCode("\n#{@tab}")) unless @body.isEmpty()
     answer.push @makeCode '}'
 
     return [@makeCode(@tab), answer...] if @ctor
@@ -2338,6 +2349,7 @@ NUMBER    = ///^[+-]?(?:
 # Is a literal value a string/regex?
 IS_STRING = /^['"]/
 IS_REGEX = /^\//
+IS_VAR = /^[\w$]+$/
 
 # Helper Functions
 # ----------------

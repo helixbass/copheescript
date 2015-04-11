@@ -15,7 +15,9 @@ and therefore should be avoided when generating variables.
 
       constructor: (@parent, @expressions, @method, @referencedVars) ->
         @variables = [{name: 'arguments', type: 'arguments'}]
+        @free_variables = []
         @positions = {}
+        @free_positions = {}
         @utilities = {} unless @parent
 
 The `@root` is the top-level **Scope** object for a given file.
@@ -25,11 +27,19 @@ The `@root` is the top-level **Scope** object for a given file.
 Adds a new variable or overrides an existing one.
 
       add: (name, type, immediate) ->
+        # console.log 'add', name
         return @parent.add name, type, immediate if @shared and not immediate
         if Object::hasOwnProperty.call @positions, name
           @variables[@positions[name]].type = type
         else
           @positions[name] = @variables.push({name, type}) - 1
+
+      add_free: (name, type, immediate) ->
+        return @parent.add_free name, type, immediate if @shared and not immediate
+        if Object::hasOwnProperty.call @free_positions, name
+          @free_variables[@free_positions[name]].type = type
+        else
+          @free_positions[name] = @free_variables.push({name, type}) - 1
 
 When `super` is called, we need to find the name of the current method we're
 in, so that we know how to invoke the same method of the parent class. This
@@ -45,7 +55,10 @@ Look up a variable name in lexical scope, and declare it if it does not
 already exist.
 
       find: (name) ->
-        return yes if @check name
+        # console.log name
+        if @check name
+          @add_free name, 'var'
+          return yes
         @add name, 'var'
         no
 
@@ -98,7 +111,23 @@ Ensure that an assignment is made at the top of this scope
 Does this scope have any declared variables?
 
       hasDeclarations: ->
+        # console.log 'uses', do @uses
+        # console.log 'free_vars', @free_variables
+        # console.log 'vars', @variables
         !!@declaredVariables().length
+
+      uses: ->
+        free_var.name for free_var in @free_variables when not @in_positions( free_var.name ) and not @special_or_global free_var.name
+      in_positions: ( name ) ->
+        return yes if name of @positions
+        for _name, pos of @positions
+          chunks = _name.split ' '
+          continue unless chunks.length > 1
+          return yes if name is chunks[chunks.length - 1]
+        no
+      special_or_global: ( name ) ->
+        return yes if name is 'this'
+        no
 
 Return the list of variables first declared in this scope.
 
