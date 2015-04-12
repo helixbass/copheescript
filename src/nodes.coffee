@@ -950,6 +950,7 @@ exports.Obj = class Obj extends Base
     #   answer.push @makeCode "(\n#{idt}#{oref} = "
     answer.push @makeCode "[#{if props.length is 0 or dynamicIndex is 0 then ']' else '\n'}"
     for prop, i in props
+      prop.variable.base.value = @ensureQuoted prop.variable.base.value unless prop.variable.properties.length or not prop.variable.base.value
       # if i is dynamicIndex
       #   answer.push @makeCode "\n#{idt}}" unless i is 0
       #   answer.push @makeCode ',\n'
@@ -986,6 +987,11 @@ exports.Obj = class Obj extends Base
     answer.push @makeCode "\n#{@tab}]" unless props.length is 0
     if @front and not hasDynamic then @wrapInBraces answer else answer
 
+  ensureQuoted: ( name ) ->
+    return name if starts name, '"'
+    return name if starts name, "'"
+
+    "'#{ name }'"
   assigns: (name) ->
     for prop in @properties when prop.assigns name then return yes
     no
@@ -1464,7 +1470,7 @@ exports.Code = class Code extends Base
     exprs.unshift splats if splats
     @body.expressions.unshift exprs... if exprs.length
     for exp, i in @body.expressions
-      break unless exp instanceof If and (_var=exp.condition.value.match( /^(\$\w+) == null$/ )[1]) and _param=@hasParamNamed _var
+      break unless exp instanceof If and (_var=exp.condition.value?.match( /^(\$\w+) == null$/ )[1]) and _param=@hasParamNamed _var
       _param._default = exp.body.value.compileToFragments()[0].code
 
       # console.log 'if', exp, exp.body.variable, do exp.body.value.compileToFragments
@@ -1528,15 +1534,14 @@ exports.Param = class Param extends Base
   children: ['name', 'value']
 
   compileToFragments: (o) ->
-    if 0 is @name.value.indexOf 'WRAP'
-      @name.value = @name.value.substr 5
-      # console.log [@name.makeCode( 'Wrap ' ),
-      #  (@name.compileToFragments o, LEVEL_LIST)...]
-      [@name.makeCode( 'Wrap ' ),
-       (@name.compileToFragments o, LEVEL_LIST)...]
-    else
-      @name.compileToFragments o, LEVEL_LIST
-       .concat if @_default then [@name.makeCode "=#{ @_default }"] else []
+    fragments = []
+    unless starts @name.value, '$'
+      type = @name.value.substr 0, @name.value.indexOf '_$'
+      @name.value = @name.value.substr 1 + @name.value.indexOf '_$'
+      fragments.push @name.makeCode "#{ type } "
+    fragments.push ( @name.compileToFragments o, LEVEL_LIST )...
+    fragments.push ( if @_default then [@name.makeCode "=#{ @_default }"] else [] )...
+    fragments
 
   asReference: (o) ->
     return @reference if @reference
