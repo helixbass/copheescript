@@ -35,11 +35,13 @@ Adds a new variable or overrides an existing one.
           @positions[name] = @variables.push({name, type}) - 1
 
       add_free: (name, type, immediate) ->
+        # console.log 'add_free', name
         return @parent.add_free name, type, immediate if @shared and not immediate
         if Object::hasOwnProperty.call @free_positions, name
           @free_variables[@free_positions[name]].type = type
         else
           @free_positions[name] = @free_variables.push({name, type}) - 1
+        # console.log 'free_vars after add_free', @free_variables
 
 When `super` is called, we need to find the name of the current method we're
 in, so that we know how to invoke the same method of the parent class. This
@@ -117,13 +119,14 @@ Does this scope have any declared variables?
         !!@declaredVariables().length
 
       uses: ->
-        free_var.name for free_var in @free_variables when not @in_positions( free_var.name ) and not @special_or_global free_var.name
-      in_positions: ( name ) ->
+        # console.log 'pos', @positions
+        # console.log 'vars', @variables
+        # console.log 'free vars', @free_variables
+        free_var.name for free_var in @free_variables when not @in_variables( free_var.name ) and not @special_or_global free_var.name
+      in_variables: ( name ) ->
         return yes if name of @positions
-        for _name, pos of @positions
-          chunks = _name.split ' '
-          continue unless chunks.length > 1
-          return yes if name is chunks[chunks.length - 1]
+        for _var in @variables
+          return yes if _var.name?.base?.value is name
         no
       special_or_global: ( name ) ->
         return yes if name is 'this'

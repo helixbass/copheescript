@@ -284,6 +284,7 @@ exports.Block = class Block extends Base
     top   = o.level is LEVEL_TOP
     compiledNodes = []
 
+    # console.log 'Block exp types', exp.constructor.name for exp in @expressions
     for node, index in @expressions
 
       node = node.unwrapAll()
@@ -394,6 +395,9 @@ exports.Literal = class Literal extends Base
   isAssignable: ->
     IDENTIFIER.test @value
 
+  isVar: ->
+    IS_VAR.test @value
+
   isStatement: ->
     @value in ['break', 'continue', 'debugger']
 
@@ -408,6 +412,8 @@ exports.Literal = class Literal extends Base
 
   compileNode: (o) ->
     # console.log @value
+    if do @isVar
+      o.scope.add_free @value
     code = if @value is 'this'
       if o.scope.method?.bound then o.scope.method.context else '$this'
     # else if @value.reserved
@@ -455,6 +461,7 @@ exports.Return = class Return extends Base
     if expr and expr not instanceof Return then expr.compileToFragments o, level else super o, level
 
   compileNode: (o) ->
+    # console.log 'return expression type', @expression.constructor.name
     answer = []
     exprIsYieldReturn = @expression?.isYieldReturn?()
     # TODO: If we call expression.compile() here twice, we'll sometimes get back different results!
@@ -551,7 +558,7 @@ exports.Value = class Value extends Base
   # operators `?.` interspersed. Then we have to take care not to accidentally
   # evaluate anything twice when building the soak chain.
   compileNode: (o) ->
-    # console.log 'props', @base, @properties if @properties?.length
+    # console.log 'value props', @base, @properties if @properties?.length
     if @base.value and do @isVar and @properties[0]?.name?.value isnt 'prototype'
       o.scope.add_free @base.value
     @base.front = @front
@@ -1831,7 +1838,7 @@ exports.Op = class Op extends Base
       else
         lhs = @first.compileToFragments o, LEVEL_OP
         rhs = @second.compileToFragments o, LEVEL_OP
-        answer = [].concat lhs, @makeCode(" #{ if @operator is '+' then '.' else @operator } "), rhs
+        answer = [].concat lhs, @makeCode(" #{ @operator } "), rhs
         if o.level <= LEVEL_OP then answer else @wrapInBraces answer
 
   # Mimic Python's chained comparisons when multiple comparison operators are

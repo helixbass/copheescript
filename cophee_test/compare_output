@@ -1,0 +1,161 @@
+#!/usr/bin/env ruby
+
+# require 'open3'
+
+GLOBAL_COFFEE = `which coffee`
+TEST_COPHEE = '../bin/coffee'
+
+def normalized s
+  " #{ s } ".gsub /\s+/, ' '
+end
+
+def compare msg, input, expected_output
+  # test_output = system TEST_COPHEE, '-p', '-b', 
+  # stdin, stdout, stderr = Open3.popen3 TEST_COPHEE, '-b', '-p', '-s'
+  # stdin.puts input
+  # test_output = stdout.gets
+  tempfile_name = './tmp_input'
+  File.open( tempfile_name, 'w' ) {|file| file.write( input )}
+  test_output = `#{ TEST_COPHEE } -b -p -s < #{ tempfile_name }`
+  unless normalized( test_output ) == normalized( expected_output )
+    raise [msg, "Expected: #{ expected_output }", "Actual: #{ test_output }"].join "\n"
+  end
+  print '.'
+end
+
+compare "string interpolation becomes dot",
+  '''
+  "#{ a }bc"
+  ''',
+  '''
+  a . "bc";
+  '''
+
+compare "arithmetic +",
+  '''
+  1 + 2
+  ''',
+  '''
+  1 + 2;
+  '''
+
+compare "array +",
+  '''
+  $a + a: 3
+  ''',
+  """
+  $a + [ 'a' => 3 ];
+  """
+
+compare "bare @ becomes $this",
+  '''
+  @
+  ''',
+  '''
+  $this;
+  '''
+
+compare "@prop becomes $this->prop",
+  '''
+  @prop
+  ''',
+  '''
+  $this->prop;
+  '''
+
+compare "$obj.prop becomes $obj->prop",
+  '''
+  $obj.prop
+  ''',
+  '''
+  $obj->prop;
+  '''
+
+compare "function no args",
+  '''
+  -> 5
+  ''',
+  '''
+  (function() { return 5; });
+  '''
+
+compare "function args including default",
+  '''
+  ( $a, $b=2 ) -> $a - $b
+  ''',
+  '''
+  (function($a, $b=2) { return $a - $b; });
+  '''
+
+compare "automatic use",
+  '''
+  -> $a
+  ''',
+  '''
+  (function() use ($a) { return $a; });
+  '''
+
+compare "obj literal adds quotes to keys",
+  "
+  a: 1
+  b: 2
+  'c': 3
+  ",
+  "
+  ([ 'a' => 1, 'b' => 2, 'c' => 3 ]);
+  "
+
+compare "class non-static method",
+  '''
+  class A
+    b: ->
+  ''',
+  '''
+  class A {
+    function b() {}
+  }
+  '''
+
+compare "class static method",
+  '''
+  class A
+    @b: ->
+  ''',
+  '''
+  class A {
+    static function b() {}
+  }
+  '''
+
+compare "pseudo-typed param",
+  '''
+  ( Wrap_$b ) -> $b
+  ''',
+  '''
+  (function(Wrap $b) { return $b; });
+  '''
+
+compare "reference class static prop",
+  '''
+  Zdb::OneToOne
+  ''',
+  '''
+  Zdb::OneToOne;
+  '''
+
+compare "call static method",
+  '''
+  Dt::first_day_of_month $dt
+  ''',
+  '''
+  Dt::first_day_of_month($dt);
+  '''
+
+compare "class extends",
+  '''
+  class A extends B
+  ''',
+  '''
+  class A extends B {
+  }
+  '''

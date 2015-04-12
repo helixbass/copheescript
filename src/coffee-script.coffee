@@ -52,6 +52,7 @@ exports.compile = compile = withPrettyErrors (code, options) ->
     token[1] for token in tokens when token.variable
   )
 
+  # console.log 'tokens', tokens
   fragments = parser.parse(tokens).compileToFragments options
 
   currentLine = 0

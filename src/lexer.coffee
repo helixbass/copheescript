@@ -570,7 +570,8 @@ exports.Lexer = class Lexer
           tokensToPush = [token]
       if @tokens.length > firstIndex
         # Create a 0-length "+" token.
-        plusToken = @token '+', '+'
+        # plusToken = @token '+', '+'
+        plusToken = @token 'STR_CONCAT', 'STR_CONCAT'
         plusToken[2] =
           first_line:   locationToken[2].first_line
           first_column: locationToken[2].first_column
