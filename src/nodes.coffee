@@ -299,8 +299,10 @@ exports.Block = class Block extends Base
         fragments = node.compileToFragments o
         unless node.isStatement o
           fragments.unshift @makeCode "#{@tab}"
-          unless @expressions[0] instanceof Class or @_is_class_body and node instanceof Assign and node.value instanceof Code
+          unless node instanceof Class or @_is_class_body and node instanceof Assign and node.value instanceof Code
             fragments.push @makeCode ";"
+          if @_is_class_body and node instanceof Assign and not( node.value instanceof Code )
+            fragments.unshift @makeCode "public "
         compiledNodes.push fragments
       else
         compiledNodes.push node.compileToFragments o, LEVEL_LIST

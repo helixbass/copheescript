@@ -176,9 +176,9 @@ compare "class static, non-static vars",
   ''',
   '''
   class A {
-    static $b = 1;
+    public static $b = 1;
 
-    $c = 2;
+    public $c = 2;
   }
   '''
 
@@ -268,7 +268,7 @@ compare "class with prop and method",
   ''',
   '''
   class A {
-    static $b = 1;
+    public static $b = 1;
 
     function $c() { return echo($c); }
   }
