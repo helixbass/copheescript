@@ -3,14 +3,14 @@
 # require 'open3'
 
 GLOBAL_COFFEE = `which coffee`
-TEST_COPHEE = '../bin/coffee'
+TEST_COPHEE = 'bin/coffee'
 
 def normalized s
   " #{ s } ".gsub /\s+/, ' '
 end
 
 def compare msg, input, expected_output
-  # test_output = system TEST_COPHEE, '-p', '-b', 
+  # test_output = system TEST_COPHEE, '-p', '-b',
   # stdin, stdout, stderr = Open3.popen3 TEST_COPHEE, '-b', '-p', '-s'
   # stdin.puts input
   # test_output = stdout.gets
@@ -22,6 +22,14 @@ def compare msg, input, expected_output
   end
   print '.'
 end
+
+compare "function no args",
+  '''
+  ( Wrap $x ) ->  $x + 5
+  ''',
+  '''
+  (function(Wrap $x) { return $x + 5; });
+  '''
 
 compare "string interpolation becomes dot",
   '''

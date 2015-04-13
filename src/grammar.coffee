@@ -224,10 +224,11 @@ grammar =
   # A single parameter in a function definition can be ordinary, or a splat
   # that hoovers up the remaining arguments.
   Param: [
-    o 'ParamVar',                               -> new Param $1
-    o 'ParamVar ...',                           -> new Param $1, null, on
-    o 'ParamVar = Expression',                  -> new Param $1, $3
-    o '...',                                    -> new Expansion
+    o 'Identifier CALL_START ParamVar CALL_END', -> new Param $3, null, null, $1
+    o 'ParamVar',                                -> new Param $1
+    o 'ParamVar ...',                            -> new Param $1, null, on
+    o 'ParamVar = Expression',                   -> new Param $1, $3
+    o '...',                                     -> new Expansion
   ]
 
   # Function Parameters

@@ -3,6 +3,6 @@
 var path = require('path');
 var fs   = require('fs');
 // var lib  = path.join(path.dirname(fs.realpathSync(__filename)), '../lib');
-var lib  = path.join(path.dirname(fs.realpathSync(__filename)), '../../coffeescript_orig/lib');
+var lib  = path.join(path.dirname(fs.realpathSync(__filename)), '../node_modules/coffee-script/lib');
 
 require(lib + '/coffee-script/cake').run();

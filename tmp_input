@@ -1,0 +1,6 @@
+
+  class A
+    @$b = 1
+    $c: ->
+      echo $c
+  
