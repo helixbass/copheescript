@@ -159,3 +159,70 @@ compare "class extends",
   class A extends B {
   }
   '''
+
+compare "existence",
+  '''
+  $a?
+  ''',
+  '''
+  isset( $a );
+  '''
+
+compare "class static, non-static vars",
+  '''
+  class A
+    @$b = 1
+    $c = 2
+  ''',
+  '''
+  class A {
+    static $b = 1;
+
+    $c = 2;
+  }
+  '''
+
+compare "try with pseudo-typed catch",
+  '''
+  try
+    $a = 1
+  catch Exception_$e
+    echo $e
+  ''',
+  '''
+  try {
+    $a = 1;
+  } catch (Exception $e) {
+    echo($e);
+  }
+  '''
+
+compare "simple foreach loop",
+  '''
+  for $a of $b
+    echo $a
+  ''',
+  '''
+    foreach ($b as $a) {
+      echo($a);
+    }
+  '''
+
+compare "foreach loop including key",
+  '''
+  for $k, $v of $b
+    echo $k
+  ''',
+  '''
+    foreach ($b as $k => $v) {
+      echo($k);
+    }
+  '''
+
+compare "existy or",
+  '''
+  $b = $a ? 3
+  ''',
+  '''
+  $b = isset( $a ) ? $a : 3;
+  '''

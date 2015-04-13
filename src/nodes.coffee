@@ -1185,6 +1185,11 @@ exports.Class = class Class extends Base
       if expression.value instanceof Code
         expression.value._is_method = yes
         expression.value._is_static = expression.variable.properties[0]?.name.value isnt 'prototype'
+      else
+        if expression.variable?.properties.length > 0
+          expression.variable._is_static = yes
+          expression.variable.base.value = expression.variable.properties[0].name.value
+          expression.variable.properties = []
     @body.expressions.unshift @directives...
 
     # console.log @body.expressions[1].variable
@@ -1235,12 +1240,14 @@ exports.Assign = class Assign extends Base
         @value.klass = @variable.base
         @value.name  = @variable.properties[0]
         @value.variable = @variable
-      else if @variable.properties?.length >= 2
-        [properties..., prototype, name] = @variable.properties
-        if prototype.name?.value is 'prototype'
-          @value.klass = new Value @variable.base, properties
-          @value.name  = name
-          @value.variable = @variable
+      else if [name, initialProps]=do @isPrototypeVar
+        @value.klass = new Value @variable.base, initialProps
+        @value.name  = name
+        @value.variable = @variable
+    else if @context is 'object'
+      if do @isPrototypeVar
+        @variable.base = @variable.properties[1]
+        @variable.properties = []
     unless @context
       varBase = @variable.unwrapAll()
       unless varBase.isAssignable()
@@ -1251,7 +1258,9 @@ exports.Assign = class Assign extends Base
         else
           o.scope.find varBase.value
     val = @value.compileToFragments o, LEVEL_LIST
-    compiledName = @variable.compileToFragments o, LEVEL_LIST
+    compiledName =
+      @variable.compileToFragments o, LEVEL_LIST
+    compiledName.unshift @makeCode 'static ' if @variable._is_static
     # console.log @variable if @context is 'object'
     return (compiledName.concat @makeCode(" => "), val) if @context is 'object'
     answer =
@@ -1261,6 +1270,12 @@ exports.Assign = class Assign extends Base
       else
         compiledName.concat @makeCode(" #{ @context or '=' } "), val
     if o.level <= LEVEL_LIST then answer else @wrapInBraces answer
+
+  isPrototypeVar: ->
+    return no unless @variable.properties?.length >= 2
+
+    [properties..., prototype, name] = @variable.properties
+    return [name, properties] if prototype.name?.value is 'prototype'
 
   # Brief implementation of recursive pattern matching, when assigning array or
   # object literals to a value. Peeks at their properties to assign inner names.
@@ -1740,8 +1755,8 @@ exports.Op = class Op extends Base
 
   # The map of conversions from CoffeeScript to JavaScript symbols.
   CONVERSIONS =
-    '==':        '==='
-    '!=':        '!=='
+    # '==':        '==='
+    # '!=':        '!=='
     'of':        'in'
     'yieldfrom': 'yield*'
 
@@ -1855,12 +1870,12 @@ exports.Op = class Op extends Base
 
   # Keep reference to the left expression, unless this an existential assignment
   compileExistence: (o) ->
-    if @first.isComplex()
-      ref = new Literal o.scope.freeVariable 'ref'
-      fst = new Parens new Assign ref, @first
-    else
-      fst = @first
-      ref = fst
+    # if @first.isComplex()
+    #   ref = new Literal o.scope.freeVariable 'ref'
+    #   fst = new Parens new Assign ref, @first
+    # else
+    fst = @first
+    ref = fst
     new If(new Existence(fst), ref, type: 'if').addElse(@second).compileToFragments o
 
   # Compile a unary **Op**.
@@ -1976,9 +1991,14 @@ exports.Try = class Try extends Base
     tryPart   = @attempt.compileToFragments o, LEVEL_TOP
 
     catchPart = if @recovery
-      placeholder = new Literal '_error'
-      @recovery.unshift new Assign @errorVariable, placeholder if @errorVariable
-      [].concat @makeCode(" catch ("), placeholder.compileToFragments(o), @makeCode(") {\n"),
+      # placeholder = new Literal '_error'
+      # @recovery.unshift new Assign @errorVariable, placeholder if @errorVariable
+
+      errorVarType = ''
+      unless starts @errorVariable.value, '$'
+        errorVarType = @errorVariable.value.substr 0, @errorVariable.value.indexOf '_$'
+        @errorVariable.value = @errorVariable.value.substr 1 + @errorVariable.value.indexOf '_$'
+      [].concat @makeCode(" catch ("), @makeCode( if errorVarType then "#{ errorVarType } " else '' ), @errorVariable.compileToFragments(o), @makeCode(") {\n"),
         @recovery.compileToFragments(o, LEVEL_TOP), @makeCode("\n#{@tab}}")
     else unless @ensure or @recovery
       [@makeCode(' catch (_error) {}')]
@@ -2024,12 +2044,12 @@ exports.Existence = class Existence extends Base
   compileNode: (o) ->
     @expression.front = @front
     code = @expression.compile o, LEVEL_OP
-    if IDENTIFIER.test(code) and not o.scope.check code
-      [cmp, cnj] = if @negated then ['===', '||'] else ['!==', '&&']
-      code = "typeof #{code} #{cmp} \"undefined\" #{cnj} #{code} #{cmp} null"
-    else
-      # do not use strict equality here; it will break existing code
-      code = "#{code} #{if @negated then '==' else '!='} null"
+    # if IDENTIFIER.test(code) and not o.scope.check code
+    neg = if @negated then '! ' else ''
+    code = "#{ neg } isset( #{code} )"
+    # else
+    #   # do not use strict equality here; it will break existing code
+    #   code = "#{code} #{if @negated then '==' else '!='} null"
     [@makeCode(if o.level <= LEVEL_COND then code else "(#{code})")]
 
 #### Parens
@@ -2117,8 +2137,9 @@ exports.For = class For extends While
       if (name or @own) and not IDENTIFIER.test svar
         defPart    += "#{@tab}#{ref = scope.freeVariable 'ref'} = #{svar};\n"
         svar       = ref
-      if name and not @pattern
-        namePart   = "#{name} = #{svar}[#{kvar}]"
+      # if name and not @pattern
+      #   namePart   = "#{name} = #{svar}[#{kvar}]"
+      namePart = null
       if not @object
         defPart += "#{@tab}#{step};\n" if step isnt stepVar
         lvar = scope.freeVariable 'len' unless @step and stepNum and down = (parseNum(stepNum[0]) < 0)
@@ -2152,12 +2173,12 @@ exports.For = class For extends While
     defPartFragments = [].concat @makeCode(defPart), @pluckDirectCall(o, body)
     varPart = "\n#{idt1}#{namePart};" if namePart
     if @object
-      forPartFragments   = [@makeCode("#{kvar} in #{svar}")]
+      forPartFragments   = [@makeCode("#{svar} as #{kvar}#{ if name then " => #{ name }" else '' }")]
       guardPart = "\n#{idt1}if (!#{utility 'hasProp', o}.call(#{svar}, #{kvar})) continue;" if @own
     bodyFragments = body.compileToFragments merge(o, indent: idt1), LEVEL_TOP
     if bodyFragments and (bodyFragments.length > 0)
       bodyFragments = [].concat @makeCode("\n"), bodyFragments, @makeCode("\n")
-    [].concat defPartFragments, @makeCode("#{resultPart or ''}#{@tab}for ("),
+    [].concat defPartFragments, @makeCode("#{resultPart or ''}#{@tab}foreach ("),
       forPartFragments, @makeCode(") {#{guardPart}#{varPart}"), bodyFragments,
       @makeCode("#{@tab}}#{returnResult or ''}")
 
