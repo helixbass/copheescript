@@ -1186,11 +1186,13 @@ exports.Class = class Class extends Base
       if expression.value instanceof Code
         expression.value._is_method = yes
         expression.value._is_static = expression.variable.properties[0]?.name.value isnt 'prototype'
-      else
-        if expression.variable?.properties.length > 0
-          expression.variable._is_static = yes
-          expression.variable.base.value = expression.variable.properties[0].name.value
-          expression.variable.properties = []
+      else if expression.variable?.properties.length is 1
+        expression.variable._is_static = yes
+        expression.variable.base.value = expression.variable.properties[0].name.value
+        expression.variable.properties = []
+      else if expression.variable?.properties.length == 2
+        expression.variable.base.value = expression.variable.properties[1].name.value
+        expression.variable.properties = []
     @body.expressions.unshift @directives...
 
     # console.log @body.expressions[1].variable
