@@ -299,7 +299,7 @@ exports.Block = class Block extends Base
         fragments = node.compileToFragments o
         unless node.isStatement o
           fragments.unshift @makeCode "#{@tab}"
-          unless @expressions[0] instanceof Class or @expressions[0] instanceof Assign and @expressions[0].value instanceof Code
+          unless @expressions[0] instanceof Class or @_is_class_body and node instanceof Assign and node.value instanceof Code
             fragments.push @makeCode ";"
         compiledNodes.push fragments
       else
@@ -1173,6 +1173,7 @@ exports.Class = class Class extends Base
     @addBoundFunctions o
     @body.spaced = yes
     # @body.expressions.push lname
+    @body._is_class_body = yes
 
     # if @parent
     #   superClass = new Literal o.classScope.freeVariable 'superClass', reserve: no

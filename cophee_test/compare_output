@@ -258,3 +258,18 @@ compare ".= op",
   '''
   $a .= "abc";
   '''
+
+compare "class with prop and method",
+  '''
+  class A
+    @$b = 1
+    $c: ->
+      echo $c
+  ''',
+  '''
+  class A {
+    static $b = 1;
+
+    function $c() { return echo($c); }
+  }
+  '''
