@@ -226,3 +226,35 @@ compare "existy or",
   '''
   $b = isset( $a ) ? $a : 3;
   '''
+
+compare "existy prop",
+  '''
+  $c = $a?.b
+  ''',
+  '''
+  $c = isset( $a->b ) ? $a->b : null;
+  '''
+
+compare "existy access",
+  '''
+  $c = $a?["b"]
+  ''',
+  '''
+  $c = isset( $a["b"] ) ? $a["b"] : null;
+  '''
+
+compare "existy function call",
+  '''
+  $c = $a?( $b )
+  ''',
+  '''
+  $c = is_callable( $a ) ? $a($b) : null;
+  '''
+
+compare ".= op",
+  '''
+  $a .= "abc"
+  ''',
+  '''
+  $a .= "abc";
+  '''

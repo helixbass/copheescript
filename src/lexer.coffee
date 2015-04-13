@@ -802,7 +802,7 @@ NUMBER     = ///
 
 OPERATOR   = /// ^ (
   ?: [-=]>             # function
-   | [-+*/%<>&|^!?=]=  # compound assign / compare
+   | [-+*/%<>&|^!?=.]=  # compound assign / compare
    | >>>=?             # zero-fill right shift
    | ([-+:])\1         # doubles
    | ([&|<>*/%])\2=?   # logic / shift / power / floor division / modulo
@@ -883,7 +883,7 @@ TRAILING_SPACES     = /\s+$/
 # Compound assignment tokens.
 COMPOUND_ASSIGN = [
   '-=', '+=', '/=', '*=', '%=', '||=', '&&=', '?=', '<<=', '>>=', '>>>='
-  '&=', '^=', '|=', '**=', '//=', '%%='
+  '&=', '^=', '|=', '**=', '//=', '%%=', '.='
 ]
 
 # Unary tokens.

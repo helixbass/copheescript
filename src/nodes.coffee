@@ -312,7 +312,7 @@ exports.Block = class Block extends Base
     if compiledNodes.length
       answer = @joinFragmentArrays(compiledNodes, ', ')
     else
-      answer = [@makeCode "void 0"]
+      answer = [@makeCode "null"]
     if compiledNodes.length > 1 and o.level >= LEVEL_LIST then @wrapInBraces answer else answer
 
   # If we happen to be the top-level **Block**, wrap everything in
@@ -430,7 +430,7 @@ class exports.Undefined extends Base
   isAssignable: NO
   isComplex: NO
   compileNode: (o) ->
-    [@makeCode if o.level >= LEVEL_ACCESS then '(void 0)' else 'void 0']
+    [@makeCode if o.level >= LEVEL_ACCESS then '(null)' else 'null']
 
 class exports.Null extends Base
   isAssignable: NO
@@ -587,7 +587,7 @@ exports.Value = class Value extends Base
           ref = new Literal o.scope.freeVariable 'ref'
           fst = new Parens new Assign ref, fst
           snd.base = ref
-        return new If new Existence(fst), snd, soak: on
+        return new If new Existence(snd), snd, soak: on
       no
 
 #### Comment
@@ -670,7 +670,7 @@ exports.Call = class Call extends Base
         rite = new Value left
       rite = new Call rite, @args
       rite.isNew = @isNew
-      left = new Literal "typeof #{ left.compile o } === \"function\""
+      left = new Literal "is_callable( #{ left.compile o } )"
       return new If left, new Value(rite), soak: yes
     call = this
     list = []
@@ -2219,7 +2219,7 @@ exports.Switch = class Switch extends Base
 
   makeReturn: (res) ->
     pair[1].makeReturn res for pair in @cases
-    @otherwise or= new Block [new Literal 'void 0'] if res
+    @otherwise or= new Block [new Literal 'null'] if res
     @otherwise?.makeReturn res
     this
 
@@ -2284,7 +2284,7 @@ exports.If = class If extends Base
     if @isStatement o then @compileStatement o else @compileExpression o
 
   makeReturn: (res) ->
-    @elseBody  or= new Block [new Literal 'void 0'] if res
+    @elseBody  or= new Block [new Literal 'null'] if res
     @body     and= new Block [@body.makeReturn res]
     @elseBody and= new Block [@elseBody.makeReturn res]
     this
@@ -2319,7 +2319,7 @@ exports.If = class If extends Base
   compileExpression: (o) ->
     cond = @condition.compileToFragments o, LEVEL_COND
     body = @bodyNode().compileToFragments o, LEVEL_LIST
-    alt  = if @elseBodyNode() then @elseBodyNode().compileToFragments(o, LEVEL_LIST) else [@makeCode('void 0')]
+    alt  = if @elseBodyNode() then @elseBodyNode().compileToFragments(o, LEVEL_LIST) else [@makeCode('null')]
     fragments = cond.concat @makeCode(" ? "), body, @makeCode(" : "), alt
     if o.level >= LEVEL_COND then @wrapInBraces fragments else fragments
 
