@@ -281,3 +281,19 @@ compare "class with prop and method",
     function $c() { return echo($c); }
   }
   '''
+
+compare "do method name",
+  '''
+  do $b
+  ''',
+  '''
+  $b();
+  '''
+
+compare "do closure",
+  '''
+  do -> 5
+  ''',
+  '''
+  call_user_func((function() { return 5; }));
+  '''

@@ -705,6 +705,7 @@ exports.Call = class Call extends Base
       compiledArgs.push (arg.compileToFragments o, LEVEL_LIST)...
 
     fragments = []
+    fragments.push @makeCode "call_user_func(" unless @variable instanceof Value
     if @isSuper
       preface = @superReference(o) + ".call(#{@superThis(o)}"
       if compiledArgs.length then preface += ", "
@@ -712,7 +713,7 @@ exports.Call = class Call extends Base
     else
       if @isNew then fragments.push @makeCode 'new '
       fragments.push @variable.compileToFragments(o, LEVEL_ACCESS)...
-      fragments.push @makeCode "("
+      fragments.push @makeCode "(" if @variable instanceof Value
     fragments.push compiledArgs...
     fragments.push @makeCode ")"
     fragments
