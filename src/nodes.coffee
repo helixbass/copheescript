@@ -289,6 +289,7 @@ exports.Block = class Block extends Base
 
       node = node.unwrapAll()
       node = (node.unfoldSoak(o) or node)
+      node._is_class_body = yes if @_is_class_body
       if node instanceof Block
         # This is a nested block. We don't do anything special here like enclose
         # it in a new scope; we just compile the statements in this block along with
@@ -1270,7 +1271,7 @@ exports.Assign = class Assign extends Base
     # console.log @variable if @context is 'object'
     return (compiledName.concat @makeCode(" => "), val) if @context is 'object'
     answer =
-      if @value instanceof Code
+      if @value instanceof Code and @_is_class_body
         # console.log val
         [val...]
       else

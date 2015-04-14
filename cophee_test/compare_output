@@ -311,3 +311,11 @@ compare "do closure",
   '''
   call_user_func((function() { return 5; }));
   '''
+
+compare "assign local to var",
+  '''
+  $x = -> 3
+  ''',
+  '''
+  $x = function() { return 3; };
+  '''
