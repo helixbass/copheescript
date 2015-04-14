@@ -149,11 +149,11 @@ exports.Lexer = class Lexer
     unless forcedIdentifier
       id  = COFFEE_ALIAS_MAP[id] if id in COFFEE_ALIASES
       tag = switch id
-        when '!'                 then 'UNARY'
-        when '==', '!='          then 'COMPARE'
-        when '&&', '||'          then 'LOGIC'
-        when 'true', 'false'     then 'BOOL'
-        when 'break', 'continue' then 'STATEMENT'
+        when '!'                      then 'UNARY'
+        when '==', '!=', '===', '!==' then 'COMPARE'
+        when '&&', '||'               then 'LOGIC'
+        when 'true', 'false'          then 'BOOL'
+        when 'break', 'continue'      then 'STATEMENT'
         else  tag
 
     tagToken = @token tag, id, 0, idLength
@@ -754,8 +754,8 @@ COFFEE_KEYWORDS = ['undefined', 'then', 'unless', 'until', 'loop', 'of', 'by', '
 COFFEE_ALIAS_MAP =
   and  : '&&'
   or   : '||'
-  is   : '=='
-  isnt : '!='
+  is   : '==='
+  isnt : '!=='
   not  : '!'
   yes  : 'true'
   no   : 'false'

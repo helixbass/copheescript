@@ -319,3 +319,35 @@ compare "assign local to var",
   '''
   $x = function() { return 3; };
   '''
+
+compare "is",
+  '''
+  $x is 3
+  ''',
+  '''
+  $x === 3;
+  '''
+
+compare "isnt",
+  '''
+  $x isnt 3
+  ''',
+  '''
+  $x !== 3;
+  '''
+
+compare "==",
+  '''
+  $x == 3
+  ''',
+  '''
+  $x == 3;
+  '''
+
+compare "!=",
+  '''
+  $x != 3
+  ''',
+  '''
+  $x != 3;
+  '''
