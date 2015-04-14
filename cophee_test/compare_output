@@ -23,7 +23,7 @@ def compare msg, input, expected_output
   print '.'
 end
 
-compare "function no args",
+compare "function typed arg",
   '''
   ( Wrap $x ) ->  $x + 5
   ''',
@@ -205,6 +205,20 @@ compare "try with pseudo-typed catch",
   }
   '''
 
+compare "catch typed arg",
+  '''
+  try
+    $a = 1
+  catch Exception $e
+    echo $e
+  ''',
+  '''
+  try {
+    $a = 1;
+  } catch (Exception $e) {
+    echo($e);
+  }
+  '''
 compare "simple foreach loop",
   '''
   for $a of $b

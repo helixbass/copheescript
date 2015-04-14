@@ -1978,7 +1978,7 @@ exports.In = class In extends Base
 
 # A classic *try/catch/finally* block.
 exports.Try = class Try extends Base
-  constructor: (@attempt, @errorVariable, @recovery, @ensure) ->
+  constructor: (@attempt, @errorVariable, @recovery, @ensure, @errorVariableType) ->
 
   children: ['attempt', 'recovery', 'ensure']
 
@@ -2001,11 +2001,10 @@ exports.Try = class Try extends Base
       # placeholder = new Literal '_error'
       # @recovery.unshift new Assign @errorVariable, placeholder if @errorVariable
 
-      errorVarType = ''
       unless starts @errorVariable.value, '$'
-        errorVarType = @errorVariable.value.substr 0, @errorVariable.value.indexOf '_$'
+        @errorVariableType = value: @errorVariable.value.substr 0, @errorVariable.value.indexOf '_$'
         @errorVariable.value = @errorVariable.value.substr 1 + @errorVariable.value.indexOf '_$'
-      [].concat @makeCode(" catch ("), @makeCode( if errorVarType then "#{ errorVarType } " else '' ), @errorVariable.compileToFragments(o), @makeCode(") {\n"),
+      [].concat @makeCode(" catch ("), @makeCode( if @errorVariableType?.value then "#{ @errorVariableType.value } " else '' ), @errorVariable.compileToFragments(o), @makeCode(") {\n"),
         @recovery.compileToFragments(o, LEVEL_TOP), @makeCode("\n#{@tab}}")
     else unless @ensure or @recovery
       [@makeCode(' catch (_error) {}')]
