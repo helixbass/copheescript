@@ -359,3 +359,12 @@ compare "$arr[] = ...",
   '''
   $x[] = 5;
   '''
+
+compare "use from nested closure",
+  '''
+  ->
+    -> $x
+  ''',
+  '''
+  (function() use ($x) { return function() use ($x) { return $x; }; });
+  '''

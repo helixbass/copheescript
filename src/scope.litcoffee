@@ -37,6 +37,7 @@ Adds a new variable or overrides an existing one.
       add_free: (name, type, immediate) ->
         # console.log 'add_free', name
         return @parent.add_free name, type, immediate if @shared and not immediate
+        @parent.add_free name, type, immediate if @parent
         if Object::hasOwnProperty.call @free_positions, name
           @free_variables[@free_positions[name]].type = type
         else
