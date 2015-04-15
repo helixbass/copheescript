@@ -673,7 +673,8 @@ exports.Call = class Call extends Base
         rite = new Value left
       rite = new Call rite, @args
       rite.isNew = @isNew
-      left = new Literal "is_callable( #{ left.compile o } )"
+      left_compiled = left.compile o
+      left = new Literal "isset( #{ left_compiled } ) && is_callable( #{ left_compiled } )"
       return new If left, new Value(rite), soak: yes
     call = this
     list = []

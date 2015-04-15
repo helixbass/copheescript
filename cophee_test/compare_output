@@ -270,7 +270,7 @@ compare "existy function call",
   $c = $a?( $b )
   ''',
   '''
-  $c = is_callable( $a ) ? $a($b) : null;
+  $c = isset( $a ) && is_callable( $a ) ? $a($b) : null;
   '''
 
 compare ".= op",
@@ -350,4 +350,12 @@ compare "!=",
   ''',
   '''
   $x != 3;
+  '''
+
+compare "$arr[] = ...",
+  '''
+  $x[] = 5;
+  ''',
+  '''
+  $x[] = 5;
   '''
