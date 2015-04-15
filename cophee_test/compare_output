@@ -273,6 +273,14 @@ compare "existy function call",
   $c = isset( $a ) && is_callable( $a ) ? $a($b) : null;
   '''
 
+compare "existy method call",
+  '''
+  $c = $a.has?( $b )
+  ''',
+  '''
+  $c = isset( $a ) && is_callable( [$a, "has"] ) ? $a->has($b) : null;
+  '''
+
 compare ".= op",
   '''
   $a .= "abc"

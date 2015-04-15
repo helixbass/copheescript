@@ -668,13 +668,19 @@ exports.Call = class Call extends Base
       if @variable
         return ifn if ifn = unfoldSoak o, this, 'variable'
         [left, rite] = new Value(@variable).cacheReference o
+        # console.log 'soak call', left, rite
       else
         left = new Literal @superReference o
         rite = new Value left
       rite = new Call rite, @args
       rite.isNew = @isNew
-      left_compiled = left.compile o
-      left = new Literal "isset( #{ left_compiled } ) && is_callable( #{ left_compiled } )"
+      if left.properties?.length
+        base_compiled = left.base.compile o
+        method_name = left.properties[0].name.value
+        left = new Literal "isset( #{ base_compiled } ) && is_callable( [#{ base_compiled }, \"#{ method_name }\"] )"
+      else
+        left_compiled = left.compile o
+        left = new Literal "isset( #{ left_compiled } ) && is_callable( #{ left_compiled } )"
       return new If left, new Value(rite), soak: yes
     call = this
     list = []
