@@ -78,7 +78,7 @@ exports.Base = class Base
   compileClosure: (o) ->
     if jumpNode = @jumps()
       jumpNode.error 'cannot use a pure statement in an expression'
-    o.sharedScope = yes
+    # o.sharedScope = yes
     func = new Code [], Block.wrap [this]
     args = []
     if (argumentsNode = @contains isLiteralArguments) or @contains isLiteralThis
@@ -562,6 +562,7 @@ exports.Value = class Value extends Base
   # evaluate anything twice when building the soak chain.
   compileNode: (o) ->
     # console.log 'value props', @base, @properties if @properties?.length
+    # console.log 'value', @base, @properties, do @isVar, o.scope
     if @base.value and do @isVar and @properties[0]?.name?.value isnt 'prototype'
       o.scope.add_free @base.value
     @base.front = @front
@@ -1272,6 +1273,7 @@ exports.Assign = class Assign extends Base
         else
           o.scope.find varBase.value
     val = @value.compileToFragments o, LEVEL_LIST
+    # console.log 'Assign val', val, @value
     compiledName =
       @variable.compileToFragments o, LEVEL_LIST
     compiledName.unshift @makeCode 'static ' if @variable._is_static
@@ -1533,6 +1535,7 @@ exports.Code = class Code extends Base
     answer.push @makeCode ') '
     compiled_body = @body.compileWithDeclarations(o) unless @body.isEmpty()
     uses = do o.scope.uses unless uses.length or @_is_method
+    # console.log 'uses', uses, @
     do o.scope.add_uses_to_parent_free_vars
     if uses.length
       answer.push @makeCode 'use ('

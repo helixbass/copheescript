@@ -23,6 +23,21 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "assigned switch",
+  '''
+  $x =
+    switch $y
+      when 5
+        3
+  ''',
+  '''
+  $x = call_user_func((function() use ($y) {
+    switch ($y) {
+      case 5:
+        return 3;
+    }
+  }));
+  '''
 compare "function typed arg",
   '''
   ( Wrap $x ) ->  $x + 5
@@ -385,3 +400,4 @@ compare "use from nested closure don't use nested param",
   '''
   (function() use ($x) { return function($y) use ($x) { return $x + $y; }; });
   '''
+
