@@ -89,8 +89,12 @@ Generate a temporary variable name at the given index.
 Gets the type of a variable.
 
       type: (name) ->
-        return v.type for v in @variables when v.name is name
+        return v.type for v in @variables when @isNamed v, name
         null
+      isNamed: ( v, name ) ->
+        return yes if v.name is name
+        return no unless ( equalsPos=v.name.indexOf?( '=' )) > -1
+        name is v.name.substr 0, equalsPos
 
 If we need to store an intermediate result, find an available name for a
 compiler-generated variable. `_var`, `_var2`, and so on...

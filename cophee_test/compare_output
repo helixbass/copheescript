@@ -23,6 +23,13 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "?= param w/ default",
+  '''
+  ( $x=5 ) -> $x ?= 3
+  ''',
+  '''
+  (function($x=5) { return isset( $x ) ? $x : $x = 3; });
+  '''
 compare "assigned switch",
   '''
   $x =
@@ -400,4 +407,5 @@ compare "use from nested closure don't use nested param",
   '''
   (function() use ($x) { return function($y) use ($x) { return $x + $y; }; });
   '''
+
 
