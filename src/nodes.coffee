@@ -1527,6 +1527,7 @@ exports.Code = class Code extends Base
     answer.push @makeCode ') '
     compiled_body = @body.compileWithDeclarations(o) unless @body.isEmpty()
     uses = do o.scope.uses unless uses.length or @_is_method
+    do o.scope.add_uses_to_parent_free_vars
     if uses.length
       answer.push @makeCode 'use ('
       answer.push @makeCode ["#{ use }" for use in uses].join ', '

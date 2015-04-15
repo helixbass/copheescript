@@ -37,7 +37,7 @@ Adds a new variable or overrides an existing one.
       add_free: (name, type, immediate) ->
         # console.log 'add_free', name
         return @parent.add_free name, type, immediate if @shared and not immediate
-        @parent.add_free name, type, immediate if @parent
+        # @parent.add_free name, type, immediate if @parent
         if Object::hasOwnProperty.call @free_positions, name
           @free_variables[@free_positions[name]].type = type
         else
@@ -119,11 +119,18 @@ Does this scope have any declared variables?
         # console.log 'vars', @variables
         !!@declaredVariables().length
 
+      _uses: ->
+        free_var for free_var in @free_variables when not @in_variables( free_var.name ) and not @special_or_global free_var.name
       uses: ->
         # console.log 'pos', @positions
         # console.log 'vars', @variables
         # console.log 'free vars', @free_variables
-        free_var.name for free_var in @free_variables when not @in_variables( free_var.name ) and not @special_or_global free_var.name
+        free_var.name for free_var in do @_uses
+      add_uses_to_parent_free_vars: ->
+        return unless @parent
+
+        @parent.add_free free_var.name, free_var.type for free_var in do @_uses
+        
       in_variables: ( name ) ->
         return yes if name of @positions
         for _var in @variables

@@ -368,3 +368,12 @@ compare "use from nested closure",
   '''
   (function() use ($x) { return function() use ($x) { return $x; }; });
   '''
+
+compare "use from nested closure don't use nested param",
+  '''
+  ->
+    ( $y ) -> $x + $y
+  ''',
+  '''
+  (function() use ($x) { return function($y) use ($x) { return $x + $y; }; });
+  '''
