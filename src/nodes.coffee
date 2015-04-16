@@ -973,9 +973,8 @@ exports.Obj = class Obj extends Base
     #   answer.push @makeCode "(\n#{idt}#{oref} = "
     answer.push @makeCode "[#{if props.length is 0 or dynamicIndex is 0 then ']' else '\n'}"
     for prop, i in props
-      # console.log 'obj prop', prop.constructor.name
       prop.variable.base.value = ensureQuoted prop.variable.base.value unless prop.variable?.properties.length or not prop.variable?.base.value
-      if prop instanceof Value
+      if prop instanceof Value and not prop.this
         assigned_var = new Value new Literal "$#{ prop.base.value }"
         prop.base.value = ensureQuoted prop.base.value
         prop = new Assign prop, assigned_var, 'object'
@@ -990,10 +989,12 @@ exports.Obj = class Obj extends Base
         ',\n'
       indent = if prop instanceof Comment then '' else idt
       indent += TAB if hasDynamic and i < dynamicIndex
+      # console.log 'obj prop', prop.variable
       if prop instanceof Assign and prop.variable instanceof Value and prop.variable.hasProperties()
         prop.variable.error 'Invalid object key'
       if prop instanceof Value and prop.this
-        prop = new Assign prop.properties[0].name, prop, 'object'
+        variable = new Literal ensureQuoted prop.properties[0].name.value
+        prop = new Assign variable, prop, 'object'
       if prop not instanceof Comment
         if i < dynamicIndex
           if prop not instanceof Assign

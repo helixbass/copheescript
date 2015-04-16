@@ -23,6 +23,22 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "{@a}",
+  '''
+  { @a }
+  ''',
+  """
+  ([ 'a' => $this->a ]);
+  """
+
+compare "{b, @a}",
+  '''
+  { b, @a }
+  ''',
+  """
+  ([ 'b' => $b, 'a' => $this->a ]);
+  """
+
 compare "deref obj from expr",
   '''
   { a, b } = Arr::wrap $obj
