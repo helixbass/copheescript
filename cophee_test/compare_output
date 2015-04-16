@@ -23,6 +23,30 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "deref obj from expr",
+  '''
+  { a, b } = Arr::wrap $obj
+  ''',
+  """
+  $ref = Arr::wrap($obj); $a = $ref['a']; $b = $ref['b'];
+  """
+
+compare "deref obj single prop",
+  '''
+  { a } = $obj
+  ''',
+  """
+  $a = $obj['a'];
+  """
+
+compare "deref obj",
+  '''
+  { a, b } = $obj
+  ''',
+  """
+  $a = $obj['a']; $b = $obj['b'];
+  """
+
 compare "global decl",
   '''
   global $ZDB

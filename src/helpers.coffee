@@ -3,7 +3,7 @@
 # arrays, count characters, that sort of thing.
 
 # Peek at the beginning of a given string to see if it matches a sequence.
-exports.starts = (string, literal, start) ->
+exports.starts = starts = (string, literal, start) ->
   literal is string.substr start, literal.length
 
 # Peek at the end of a given string to see if it matches a sequence.
@@ -193,3 +193,9 @@ exports.nameWhitespaceCharacter = (string) ->
     when '\r' then 'carriage return'
     when '\t' then 'tab'
     else string
+
+exports.ensureQuoted = ( name ) ->
+  return name if starts name, '"'
+  return name if starts name, "'"
+
+  "'#{ name }'"

@@ -10,7 +10,7 @@ Error.stackTraceLimit = Infinity
 
 # Import the helpers we plan to use.
 {compact, flatten, extend, merge, del, starts, ends, some,
-addLocationDataFn, locationDataToString, throwSyntaxError} = require './helpers'
+addLocationDataFn, locationDataToString, throwSyntaxError, ensureQuoted} = require './helpers'
 
 # Functions required by parser
 exports.extend = extend
@@ -974,10 +974,10 @@ exports.Obj = class Obj extends Base
     answer.push @makeCode "[#{if props.length is 0 or dynamicIndex is 0 then ']' else '\n'}"
     for prop, i in props
       # console.log 'obj prop', prop.constructor.name
-      prop.variable.base.value = @ensureQuoted prop.variable.base.value unless prop.variable?.properties.length or not prop.variable?.base.value
+      prop.variable.base.value = ensureQuoted prop.variable.base.value unless prop.variable?.properties.length or not prop.variable?.base.value
       if prop instanceof Value
         assigned_var = new Value new Literal "$#{ prop.base.value }"
-        prop.base.value = @ensureQuoted prop.base.value
+        prop.base.value = ensureQuoted prop.base.value
         prop = new Assign prop, assigned_var, 'object'
       # if i is dynamicIndex
       #   answer.push @makeCode "\n#{idt}}" unless i is 0
@@ -1015,11 +1015,6 @@ exports.Obj = class Obj extends Base
     answer.push @makeCode "\n#{@tab}]" unless props.length is 0
     if @front and not hasDynamic then @wrapInBraces answer else answer
 
-  ensureQuoted: ( name ) ->
-    return name if starts name, '"'
-    return name if starts name, "'"
-
-    "'#{ name }'"
   assigns: (name) ->
     for prop in @properties when prop.assigns name then return yes
     no
@@ -1314,6 +1309,7 @@ exports.Assign = class Assign extends Base
       code = value.compileToFragments o
       return if o.level >= LEVEL_OP then @wrapInBraces code else code
     isObject = @variable.isObject()
+    # console.log 'pattern var', @variable.base.objects, objects[0].constructor.name
     if top and olen is 1 and (obj = objects[0]) not instanceof Splat
       # Unroll simplest cases: `{v} = x` -> `v = x.v`
       if obj instanceof Assign
@@ -1324,8 +1320,10 @@ exports.Assign = class Assign extends Base
         else
           new Literal 0
       acc   = IDENTIFIER.test idx.unwrap().value or 0
+      obj = new Value new Literal "$#{ obj.base.value }"
+      idx = new Value new Literal ensureQuoted idx.base.value if idx instanceof Value
       value = new Value value
-      value.properties.push new (if acc then Access else Index) idx
+      value.properties.push new Index idx
       if obj.unwrap().value in RESERVED
         obj.error "assignment to a reserved word: #{obj.compile o}"
       return new Assign(obj, value, null, param: @param).compileToFragments o, LEVEL_TOP
@@ -1335,7 +1333,7 @@ exports.Assign = class Assign extends Base
     expandedIdx = false
     # Make vvar into a simple variable if it isn't already.
     if not IDENTIFIER.test(vvarText) or @variable.assigns(vvarText)
-      assigns.push [@makeCode("#{ ref = o.scope.freeVariable 'ref' } = "), vvar...]
+      assigns.push [@makeCode("#{ ref = o.scope.freeVariable '$ref' } = "), vvar...]
       vvar = [@makeCode ref]
       vvarText = ref
     for obj, i in objects
@@ -1381,12 +1379,17 @@ exports.Assign = class Assign extends Base
           acc = no
         else
           acc = isObject and IDENTIFIER.test idx.unwrap().value or 0
-        val = new Value new Literal(vvarText), [new (if acc then Access else Index) idx]
+        # console.log 'idx', idx
+        # console.log 'obj', obj, obj.constructor.name, obj.base.constructor.name
+        obj = new Value new Literal "$#{ obj.base.value }"
+        idx = new Value new Literal ensureQuoted idx.base.value if idx instanceof Value
+        val = new Value new Literal(vvarText), [new Index idx]
+        # obj =
       if name? and name in RESERVED
         obj.error "assignment to a reserved word: #{obj.compile o}"
       assigns.push new Assign(obj, val, null, param: @param, subpattern: yes).compileToFragments o, LEVEL_LIST
     assigns.push vvar unless top or @subpattern
-    fragments = @joinFragmentArrays assigns, ', '
+    fragments = @joinFragmentArrays assigns, '; '
     if o.level < LEVEL_LIST then fragments else @wrapInBraces fragments
 
   # When compiling a conditional assignment, take care to ensure that the
