@@ -23,6 +23,13 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "global decl",
+  '''
+  global $ZDB
+  ''',
+  '''
+  global $ZDB;
+  '''
 
 compare "{ a }",
   '''

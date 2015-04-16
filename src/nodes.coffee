@@ -722,10 +722,14 @@ exports.Call = class Call extends Base
     else
       if @isNew then fragments.push @makeCode 'new '
       fragments.push @variable.compileToFragments(o, LEVEL_ACCESS)...
-      fragments.push @makeCode "(" if @variable instanceof Value
+      if @variable instanceof Value
+        fragments.push @makeCode if do @_dont_paren then " " else "("
     fragments.push compiledArgs...
-    fragments.push @makeCode ")"
+    fragments.push @makeCode ")" unless do @_dont_paren
     fragments
+
+  _dont_paren: ->
+   @variable.base?.value in ['global']
 
   # If you call a function with a splat, it's converted into a JavaScript
   # `.apply()` call to allow an array of arguments to be passed.
