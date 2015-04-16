@@ -969,7 +969,12 @@ exports.Obj = class Obj extends Base
     #   answer.push @makeCode "(\n#{idt}#{oref} = "
     answer.push @makeCode "[#{if props.length is 0 or dynamicIndex is 0 then ']' else '\n'}"
     for prop, i in props
-      prop.variable.base.value = @ensureQuoted prop.variable.base.value unless prop.variable.properties.length or not prop.variable.base.value
+      # console.log 'obj prop', prop.constructor.name
+      prop.variable.base.value = @ensureQuoted prop.variable.base.value unless prop.variable?.properties.length or not prop.variable?.base.value
+      if prop instanceof Value
+        assigned_var = new Value new Literal "$#{ prop.base.value }"
+        prop.base.value = @ensureQuoted prop.base.value
+        prop = new Assign prop, assigned_var, 'object'
       # if i is dynamicIndex
       #   answer.push @makeCode "\n#{idt}}" unless i is 0
       #   answer.push @makeCode ',\n'

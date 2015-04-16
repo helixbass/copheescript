@@ -23,6 +23,15 @@ def compare msg, input, expected_output
   print '.'
 end
 
+
+compare "{ a }",
+  '''
+  { a }
+  ''',
+  """
+  ([ 'a' => $a ]);
+  """
+
 compare "?= param w/ default",
   '''
   ( $x=5 ) -> $x ?= 3
