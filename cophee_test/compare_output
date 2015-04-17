@@ -23,6 +23,13 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "(@a=3)",
+  '''
+  ( @$a=3 ) ->
+  ''',
+  """
+  (function($a=3) { $this->a = $a; });
+  """
 compare "(@a)",
   '''
   ( @$a, $b ) ->

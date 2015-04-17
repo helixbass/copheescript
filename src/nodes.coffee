@@ -1512,7 +1512,12 @@ exports.Code = class Code extends Base
         # console.log 'complex param', param.name.properties[0]
         val = ref = param.asReference o
         param.name.properties[0].name.value = param.name.properties[0].name.value.slice 1 if param.name.this
-        val = new Op '?', ref, param.value if param.value
+        # val = new Op '?', ref, param.value if param.value
+        if param.value
+          # console.log 'ref', ref, ref.constructor.name
+          ref = new Param ref.base
+          ref._default = param.value.compileToFragments()[0].code
+        # console.log 'param default', param._default if param.value
         exprs.push new Assign new Value(param.name), val, '=', param: yes
       else
         ref = param
@@ -1599,6 +1604,7 @@ exports.Param = class Param extends Base
       @name.value = @name.value.substr 1 + @name.value.indexOf '_$'
       fragments.push @name.makeCode "#{ type } "
     fragments.push ( @name.compileToFragments o, LEVEL_LIST )...
+    # console.log 'compiling default', @_default if @_default
     fragments.push ( if @_default then [@name.makeCode "=#{ @_default }"] else [] )...
     fragments
 
