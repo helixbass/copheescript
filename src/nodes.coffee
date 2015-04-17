@@ -1494,9 +1494,10 @@ exports.Code = class Code extends Base
       splats = new Assign new Value(new Arr(p.asReference o for p in @params)),
                           new Value new Literal 'arguments'
       break
+    # console.log 'code params', @params
     unless @_is_method
       for param in @params
-        if 0 is param.name.value.indexOf 'USE'
+        if 0 is param.name.value?.indexOf 'USE'
           param.uses = yes
 
           uses.unshift(
@@ -1508,7 +1509,9 @@ exports.Code = class Code extends Base
                .slice 1 )... )
     for param in @params
       if param.isComplex()
+        # console.log 'complex param', param.name.properties[0]
         val = ref = param.asReference o
+        param.name.properties[0].name.value = param.name.properties[0].name.value.slice 1 if param.name.this
         val = new Op '?', ref, param.value if param.value
         exprs.push new Assign new Value(param.name), val, '=', param: yes
       else
@@ -1532,6 +1535,7 @@ exports.Code = class Code extends Base
       params[i] = p.compileToFragments o
       # console.log params[i]
       o.scope.parameter fragmentsToText params[i]
+    # console.log 'compiled params', params
     uniqs = []
     @eachParamName (name, node) ->
       node.error "multiple parameters named #{name}" if name in uniqs
