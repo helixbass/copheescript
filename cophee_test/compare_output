@@ -23,6 +23,22 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "auto-return for",
+  '''
+  ( $a ) ->
+    for $x of $a
+      $x[1]
+  ''',
+  """
+  (function($a) {
+    $results = [];
+    foreach ($a as $x) {
+      $results[] = $x[1];
+    }
+    return $results;
+    });
+  """
+
 compare "(&$a)",
   '''
   ( &$a ) ->

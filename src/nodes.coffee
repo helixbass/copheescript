@@ -121,7 +121,7 @@ exports.Base = class Base
   makeReturn: (res) ->
     me = @unwrapAll()
     if res
-      new Call new Literal("#{res}.push"), [me]
+      new Assign new Value( new Literal( res ), [new Index new Literal '']), me
     else
       new Return me
 
@@ -903,7 +903,7 @@ exports.Range = class Range extends Base
       return [@makeCode "[#{ range.join(', ') }]"]
     idt    = @tab + TAB
     i      = o.scope.freeVariable 'i', single: true
-    result = o.scope.freeVariable 'results'
+    result = o.scope.freeVariable '$results'
     pre    = "\n#{idt}#{result} = [];"
     if @fromNum and @toNum
       o.index = i
@@ -1765,7 +1765,7 @@ exports.While = class While extends Base
       body = @makeCode ''
     else
       if @returns
-        body.makeReturn rvar = o.scope.freeVariable 'results'
+        body.makeReturn rvar = o.scope.freeVariable '$results'
         set  = "#{@tab}#{rvar} = [];\n"
       if @guard
         if body.expressions.length > 1
@@ -2160,7 +2160,7 @@ exports.For = class For extends While
     index       = @index and (@index.compile o, LEVEL_LIST)
     scope.find(name)  if name and not @pattern
     scope.find(index) if index
-    rvar        = scope.freeVariable 'results' if @returns
+    rvar        = scope.freeVariable '$results' if @returns
     ivar        = (@object and index) or scope.freeVariable 'i', single: true
     kvar        = (@range and name) or index or ivar
     kvarAssign  = if kvar isnt ivar then "#{kvar} = " else ""
