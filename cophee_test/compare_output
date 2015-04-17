@@ -23,6 +23,13 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "(&$a)",
+  '''
+  ( &$a ) ->
+  ''',
+  """
+  (function(&$a) {});
+  """
 compare "(@a=3)",
   '''
   ( @$a=3 ) ->

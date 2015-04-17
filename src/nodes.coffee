@@ -1590,7 +1590,7 @@ exports.Code = class Code extends Base
 # these parameters can also attach themselves to the context of the function,
 # as well as be a splat, gathering up a group of parameters into an array.
 exports.Param = class Param extends Base
-  constructor: (@name, @value, @splat, @type) ->
+  constructor: (@name, @value, @splat, @type, @isRef) ->
     if (name = @name.unwrapAll().value) in STRICT_PROSCRIBED
       @name.error "parameter name \"#{name}\" is not allowed"
 
@@ -1599,6 +1599,7 @@ exports.Param = class Param extends Base
   compileToFragments: (o) ->
     fragments = []
     fragments.push @name.makeCode "#{ @type.value } " if @type
+    fragments.push @name.makeCode "&" if @isRef
     unless starts @name.value, '$'
       type = @name.value.substr 0, @name.value.indexOf '_$'
       @name.value = @name.value.substr 1 + @name.value.indexOf '_$'

@@ -226,6 +226,7 @@ grammar =
   Param: [
     o 'Identifier CALL_START ParamVar CALL_END', -> new Param $3, null, null, $1
     o 'ParamVar',                                -> new Param $1
+    o 'LOGIC ParamVar',                          -> new Param $2, null, null, null, $1
     o 'ParamVar ...',                            -> new Param $1, null, on
     o 'ParamVar = Expression',                   -> new Param $1, $3
     o '...',                                     -> new Expansion
