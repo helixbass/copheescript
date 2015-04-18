@@ -260,6 +260,10 @@ grammar =
     o 'Object',                                 -> new Value $1
   ]
 
+  Silenced: [
+    o 'This This Identifier',                   -> new Value new Literal "@#{ $3.value }"
+  ]
+
   # The types of things that can be treated as values -- assigned to, invoked
   # as functions, indexed into, named as a class, etc.
   Value: [
@@ -268,6 +272,7 @@ grammar =
     o 'Parenthetical',                          -> new Value $1
     o 'Range',                                  -> new Value $1
     o 'This'
+    o 'Silenced'
   ]
 
   # The general group of accessors into an object, by property, by prototype

@@ -23,6 +23,14 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "@@fwrite",
+  '''
+  @@fwrite $socket, "abc"
+  ''',
+  '''
+  @fwrite($socket, "abc");
+  '''
+
 compare "?: op",
   '''
   $a ?: 3
