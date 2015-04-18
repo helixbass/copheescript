@@ -803,6 +803,7 @@ NUMBER     = ///
 OPERATOR   = /// ^ (
   ?: [-=]>             # function
    | [-+*/%<>&|^!?=.]=  # compound assign / compare
+   | \?:               # mini ternary
    | >>>=?             # zero-fill right shift
    | ([-+:])\1         # doubles
    | ([&|<>*/%])\2=?   # logic / shift / power / floor division / modulo

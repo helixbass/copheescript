@@ -566,6 +566,7 @@ grammar =
     o 'Expression +  Expression',               -> new Op '+' , $1, $3
     o 'Expression -  Expression',               -> new Op '-' , $1, $3
     o 'Expression STR_CONCAT Expression',       -> new Op '.' , $1, $3
+    o 'Expression ?: Expression',               -> new Op '?:', $1, $3
 
     o 'Expression MATH     Expression',         -> new Op $2, $1, $3
     o 'Expression **       Expression',         -> new Op $2, $1, $3
@@ -608,7 +609,7 @@ operators = [
   ['right',     '**']
   ['right',     'UNARY_MATH']
   ['left',      'MATH']
-  ['left',      '+', '-', 'STR_CONCAT']
+  ['left',      '+', '-', 'STR_CONCAT', '?:']
   ['left',      'SHIFT']
   ['left',      'RELATION']
   ['left',      'COMPARE']

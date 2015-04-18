@@ -23,6 +23,14 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "?: op",
+  '''
+  $a ?: 3
+  ''',
+  '''
+  $a ?: 3;
+  '''
+
 compare "mixed obj",
   '''
   { a: 1, "abc" }
