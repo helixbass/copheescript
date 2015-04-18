@@ -23,6 +23,14 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "deref list",
+  '''
+  [a, b] = $c;
+  ''',
+  """
+  $a = $c[0]; $b = $c[1];
+  """
+
 compare "deref obj just @prop",
   '''
   { @a } = $obj

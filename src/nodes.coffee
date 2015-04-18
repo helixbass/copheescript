@@ -401,6 +401,9 @@ exports.Literal = class Literal extends Base
   isVar: ->
     IS_VAR.test @value
 
+  isSimpleNumber: ->
+    SIMPLENUM.test @value
+
   isStatement: ->
     @value in ['break', 'continue', 'debugger']
 
@@ -1385,7 +1388,7 @@ exports.Assign = class Assign extends Base
         # console.log 'obj', obj, obj.constructor.name, obj.base.constructor.name
         obj = new Value new Literal "$#{ obj.base.value }" unless obj.this
         idx = new Value new Literal ensureQuoted idx.base.value if idx instanceof Value
-        idx = new Value new Literal ensureQuoted idx.value      if idx instanceof Literal
+        idx = new Value new Literal ensureQuoted idx.value      if idx instanceof Literal and not do idx.isSimpleNumber
         val = new Value new Literal(vvarText), [new Index idx]
         # obj =
       if name? and name in RESERVED
