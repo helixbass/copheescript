@@ -23,6 +23,14 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "var object key",
+  '''
+  $x: 3
+  ''',
+  '''
+  ([ $x => 3 ]);
+  '''
+
 compare "deref list",
   '''
   [a, b] = $c;
