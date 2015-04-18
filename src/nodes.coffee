@@ -1321,8 +1321,9 @@ exports.Assign = class Assign extends Base
         else
           new Literal 0
       acc   = IDENTIFIER.test idx.unwrap().value or 0
-      obj = new Value new Literal "$#{ obj.base.value }"
+      obj = new Value new Literal "$#{ obj.base.value }" unless obj.this
       idx = new Value new Literal ensureQuoted idx.base.value if idx instanceof Value
+      idx = new Value new Literal ensureQuoted idx.value      if idx instanceof Literal
       value = new Value value
       value.properties.push new Index idx
       if obj.unwrap().value in RESERVED
@@ -1380,10 +1381,11 @@ exports.Assign = class Assign extends Base
           acc = no
         else
           acc = isObject and IDENTIFIER.test idx.unwrap().value or 0
-        # console.log 'idx', idx
+        # console.log 'idx', idx, idx.constructor.name
         # console.log 'obj', obj, obj.constructor.name, obj.base.constructor.name
-        obj = new Value new Literal "$#{ obj.base.value }"
+        obj = new Value new Literal "$#{ obj.base.value }" unless obj.this
         idx = new Value new Literal ensureQuoted idx.base.value if idx instanceof Value
+        idx = new Value new Literal ensureQuoted idx.value      if idx instanceof Literal
         val = new Value new Literal(vvarText), [new Index idx]
         # obj =
       if name? and name in RESERVED

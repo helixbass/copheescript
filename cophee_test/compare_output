@@ -23,6 +23,21 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "deref obj just @prop",
+  '''
+  { @a } = $obj
+  ''',
+  """
+  $this->a = $obj['a'];
+  """
+compare "deref obj incl @prop",
+  '''
+  { @a, b } = $obj
+  ''',
+  """
+  $this->a = $obj['a']; $b = $obj['b'];
+  """
+
 compare "auto-return for",
   '''
   ( $a ) ->
