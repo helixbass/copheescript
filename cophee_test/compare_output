@@ -23,6 +23,22 @@ def compare msg, input, expected_output
   print '.'
 end
 
+# compare "mixed obj w/ num, expression",
+#   '''
+#   { a: 1, "abc", $a, 1, ($b + 5), c }
+#   ''',
+#   """
+#   ([ 'a' => 1, \"abc\", $a, 1, $b + 5, 'c' => $c ]);
+#   """
+
+compare "mixed obj w/ num",
+  '''
+  { a: 1, "abc", $a, 1, c }
+  ''',
+  """
+  ([ 'a' => 1, \"abc\", $a, 1, 'c' => $c ]);
+  """
+
 compare "@@fwrite",
   '''
   @@fwrite $socket, "abc"

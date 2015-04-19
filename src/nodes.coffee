@@ -977,7 +977,7 @@ exports.Obj = class Obj extends Base
     answer.push @makeCode "[#{if props.length is 0 or dynamicIndex is 0 then ']' else '\n'}"
     for prop, i in props
       prop.variable.base.value = ensureQuoted prop.variable.base.value unless prop.variable?.properties.length or not prop.variable?.base.value or starts prop.variable.base.value, '$'
-      if prop instanceof Value and not prop.this and not IS_STRING.test prop.base.value
+      if prop instanceof Value and not prop.this and ( IS_NAME.test( prop.base.value ) and not SIMPLENUM.test prop.base.value )
         assigned_var = new Value new Literal "$#{ prop.base.value }"
         prop.base.value = ensureQuoted prop.base.value
         prop = new Assign prop, assigned_var, 'object'
@@ -999,7 +999,7 @@ exports.Obj = class Obj extends Base
         variable = new Literal ensureQuoted prop.properties[0].name.value
         prop = new Assign variable, prop, 'object'
       if prop not instanceof Comment
-        if i < dynamicIndex and not ( prop instanceof Value and IS_STRING.test prop.base.value )
+        if i < dynamicIndex and not ( prop instanceof Value and not ( IS_NAME.test( prop.base.value ) and not SIMPLENUM.test prop.base.value ))
           if prop not instanceof Assign
             prop = new Assign prop, prop, 'object'
           (prop.variable.base or prop.variable).asKey = yes
@@ -2447,6 +2447,7 @@ NUMBER    = ///^[+-]?(?:
 IS_STRING = /^['"]/
 IS_REGEX = /^\//
 IS_VAR = /^\$\w+$/
+IS_NAME = /^\w+$/
 
 # Helper Functions
 # ----------------
