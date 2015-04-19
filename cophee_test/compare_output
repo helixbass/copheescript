@@ -23,6 +23,26 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "use shouldn't pick up other method params",
+  '''
+  class A
+    a: ( $start ) ->
+    b: ->
+      ->
+        $start = date_create $new_time
+  ''',
+  """
+  class A {
+    function a($start) {}
+
+    function b() {
+      return function() use ($new_time) {
+        return $start = date_create($new_time);
+      };
+    }
+  }
+  """
+
 # compare "mixed obj w/ num, expression",
 #   '''
 #   { a: 1, "abc", $a, 1, ($b + 5), c }

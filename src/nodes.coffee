@@ -1483,7 +1483,8 @@ exports.Code = class Code extends Base
       boundfunc.updateLocationDataIfMissing @locationData
       return boundfunc.compileNode(o)
 
-    o.scope         = del(o, 'classScope') or @makeScope o.scope
+    # o.scope         = del(o, 'classScope') or @makeScope o.scope
+    o.scope         = @makeScope o.scope
     o.scope.shared  = del(o, 'sharedScope')
     o.indent        += TAB
     delete o.bare
