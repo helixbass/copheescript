@@ -23,6 +23,17 @@ def compare msg, input, expected_output
   print '.'
 end
 
+
+compare "triple quote newline",
+  '''
+  """
+    abc
+    def"""
+  ''',
+  '''
+  "abc
+def";
+  '''
 compare "use shouldn't pick up other method params",
   '''
   class A

@@ -718,7 +718,8 @@ exports.Lexer = class Lexer
       when backslash then (if options.double then backslash + backslash else backslash)
       when nul       then '\\x00'
       when delimiter then "\\#{delimiter}"
-      when lf        then '\\n'
+      # when lf        then '\\n'
+      when lf        then '\n'
       when cr        then '\\r'
       when ls        then '\\u2028'
       when ps        then '\\u2029'
