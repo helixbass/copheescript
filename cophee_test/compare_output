@@ -24,6 +24,22 @@ def compare msg, input, expected_output
 end
 
 
+
+compare "deref list",
+  '''
+  [ a ] = $obj
+  ''',
+  """
+  $a = $obj[0];
+  """
+compare "deref list multiple",
+  '''
+  [ a, b ] = $obj
+  ''',
+  """
+  $a = $obj[0]; $b = $obj[1];
+  """
+
 compare "triple quote newline",
   '''
   """

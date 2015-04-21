@@ -1325,8 +1325,9 @@ exports.Assign = class Assign extends Base
           new Literal 0
       acc   = IDENTIFIER.test idx.unwrap().value or 0
       obj = new Value new Literal "$#{ obj.base.value }" unless obj.this
+      # console.log 'idx', idx, idx.constructor.name
       idx = new Value new Literal ensureQuoted idx.base.value if idx instanceof Value
-      idx = new Value new Literal ensureQuoted idx.value      if idx instanceof Literal
+      idx = new Value new Literal ensureQuoted idx.value      if idx instanceof Literal and not SIMPLENUM.test idx.value
       value = new Value value
       value.properties.push new Index idx
       if obj.unwrap().value in RESERVED
