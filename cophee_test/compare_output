@@ -71,7 +71,7 @@ compare "use shouldn't pick up other method params",
     function a($start) {}
 
     function b() {
-      return function() use ($new_time) {
+      return function() use (&$new_time) {
         return $start = date_create($new_time);
       };
     }
@@ -258,7 +258,7 @@ compare "assigned switch",
         3
   ''',
   '''
-  $x = call_user_func((function() use ($y) {
+  $x = call_user_func((function() use (&$y) {
     switch ($y) {
       case 5:
         return 3;
@@ -342,7 +342,7 @@ compare "automatic use",
   -> $a
   ''',
   '''
-  (function() use ($a) { return $a; });
+  (function() use (&$a) { return $a; });
   '''
 
 compare "obj literal adds quotes to keys",
@@ -616,7 +616,7 @@ compare "use from nested closure",
     -> $x
   ''',
   '''
-  (function() use ($x) { return function() use ($x) { return $x; }; });
+  (function() use (&$x) { return function() use (&$x) { return $x; }; });
   '''
 
 compare "use from nested closure don't use nested param",
@@ -625,7 +625,7 @@ compare "use from nested closure don't use nested param",
     ( $y ) -> $x + $y
   ''',
   '''
-  (function() use ($x) { return function($y) use ($x) { return $x + $y; }; });
+  (function() use (&$x) { return function($y) use (&$x) { return $x + $y; }; });
   '''
 
 

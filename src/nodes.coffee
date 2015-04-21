@@ -1569,7 +1569,7 @@ exports.Code = class Code extends Base
     do o.scope.add_uses_to_parent_free_vars
     if uses.length
       answer.push @makeCode 'use ('
-      answer.push @makeCode ["#{ use }" for use in uses].join ', '
+      answer.push @makeCode ["&#{ use }" for use in uses].join ', '
       answer.push @makeCode ')'
     answer.push @makeCode ' {'
     answer = answer.concat(@makeCode("\n"), compiled_body, @makeCode("\n#{@tab}")) unless @body.isEmpty()
