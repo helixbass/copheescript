@@ -18,7 +18,7 @@
      `-.._________..-'                                  | |
                                                         |_|
 
-CoffeeScript is a little language that compiles into JavaScript.
+CopfeeScript is a little language that compiles into PHP.
 
 ## Installation
 
