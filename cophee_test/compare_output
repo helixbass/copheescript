@@ -25,6 +25,14 @@ end
 
 
 
+
+compare "namespaced name",
+  '''
+  $x = do Parse\ParseInstallation::query
+  ''',
+  '''
+  $x = Parse\ParseInstallation::query();
+  '''
 compare "deref list",
   '''
   [ a ] = $obj
