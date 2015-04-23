@@ -26,6 +26,14 @@ end
 
 
 
+
+compare "mixed obj w/ interpolated string",
+  '''
+  { a, "abc#{ $b }" }
+  ''',
+  """
+  [ 'a' => $a, \"abc\" . $b ];
+  """
 compare "namespaced name",
   '''
   $x = do Parse\ParseInstallation::query

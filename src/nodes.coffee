@@ -977,7 +977,7 @@ exports.Obj = class Obj extends Base
     answer.push @makeCode "[#{if props.length is 0 or dynamicIndex is 0 then ']' else '\n'}"
     for prop, i in props
       prop.variable.base.value = ensureQuoted prop.variable.base.value unless prop.variable?.properties.length or not prop.variable?.base.value or starts prop.variable.base.value, '$'
-      if prop instanceof Value and not prop.this and ( IS_NAME.test( prop.base.value ) and not SIMPLENUM.test prop.base.value )
+      if prop instanceof Value and not prop.this and prop.base.value and ( IS_NAME.test( prop.base.value ) and not SIMPLENUM.test prop.base.value )
         assigned_var = new Value new Literal "$#{ prop.base.value }"
         prop.base.value = ensureQuoted prop.base.value
         prop = new Assign prop, assigned_var, 'object'
