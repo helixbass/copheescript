@@ -23,9 +23,27 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "use trait",
+  '''
+  class A
+    use B
+  ''',
+  """
+  class A {
+    use B;
+  }
+  """
 
-
-
+compare "backticked methods",
+  '''
+  class A
+    `function x() {}`
+  ''',
+  """
+  class A {
+    function x() {}
+  }
+  """
 
 compare "mixed obj w/ interpolated string",
   '''

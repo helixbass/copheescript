@@ -149,7 +149,7 @@ grammar =
   # through and printed to JavaScript.
   Literal: [
     o 'AlphaNumeric'
-    o 'JS',                                     -> new Literal $1
+    o 'JS',                                     -> new Literal $1, yes
     o 'Regex'
     o 'DEBUGGER',                               -> new Literal $1
     o 'UNDEFINED',                              -> new Undefined

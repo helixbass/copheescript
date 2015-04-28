@@ -300,7 +300,7 @@ exports.Block = class Block extends Base
         fragments = node.compileToFragments o
         unless node.isStatement o
           fragments.unshift @makeCode "#{@tab}"
-          unless node instanceof Class or @_is_class_body and node instanceof Assign and node.value instanceof Code
+          unless node instanceof Class or @_is_class_body and ( node.is_backticked or node instanceof Assign and node.value instanceof Code )
             fragments.push @makeCode ";"
           if @_is_class_body and node instanceof Assign and not( node.value instanceof Code )
             fragments.unshift @makeCode "public "
@@ -390,7 +390,7 @@ exports.Block = class Block extends Base
 # JavaScript without translation, such as: strings, numbers,
 # `true`, `false`, `null`...
 exports.Literal = class Literal extends Base
-  constructor: (@value) ->
+  constructor: (@value, @is_backticked) ->
 
   makeReturn: ->
     if @isStatement() then this else super
@@ -732,7 +732,7 @@ exports.Call = class Call extends Base
     fragments
 
   _dont_paren: ->
-   @variable.base?.value in ['global']
+   @variable.base?.value in ['global', 'use']
 
   # If you call a function with a splat, it's converted into a JavaScript
   # `.apply()` call to allow an array of arguments to be passed.
