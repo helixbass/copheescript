@@ -23,6 +23,20 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "trait",
+  '''
+  trait A
+    x: ->
+      3
+  ''',
+  """
+  trait A {
+    function x() {
+      return 3;
+    }
+  }
+  """
+
 compare "1 < $a < 3",
   '''
   1 < $a.b < 3

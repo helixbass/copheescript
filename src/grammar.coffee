@@ -112,6 +112,7 @@ grammar =
     o 'For'
     o 'Switch'
     o 'Class'
+    o 'Trait'
     o 'Throw'
   ]
 
@@ -324,6 +325,10 @@ grammar =
     o 'CLASS SimpleAssignable Block',                    -> new Class $2, null, $3
     o 'CLASS SimpleAssignable EXTENDS Expression',       -> new Class $2, $4
     o 'CLASS SimpleAssignable EXTENDS Expression Block', -> new Class $2, $4, $5
+  ]
+
+  Trait: [
+    o 'TRAIT SimpleAssignable Block',                    -> new Class $2, null, $3, yes
   ]
 
   # Ordinary function invocation, or a chained series of calls.

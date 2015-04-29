@@ -184,7 +184,7 @@ class exports.Rewriter
 
       # Don't end an implicit call on next indent if any of these are in an argument
       if inImplicitCall() and tag in ['IF', 'TRY', 'FINALLY', 'CATCH',
-        'CLASS', 'SWITCH']
+        'CLASS', 'TRAIT', 'SWITCH']
         stack.push ['CONTROL', i, ours: true]
         return forward(1)
 
@@ -255,7 +255,7 @@ class exports.Rewriter
       # that creates grammatical ambiguities.
       if tag in IMPLICIT_FUNC and
          @indexOfTag(i + 1, 'INDENT', null, ':') > -1 and
-         not @findTagsBackwards(i, ['CLASS', 'EXTENDS', 'IF', 'CATCH',
+         not @findTagsBackwards(i, ['CLASS', 'TRAIT', 'EXTENDS', 'IF', 'CATCH',
           'SWITCH', 'LEADING_WHEN', 'FOR', 'WHILE', 'UNTIL'])
         startImplicitCall i + 1
         stack.push ['INDENT', i + 2]
@@ -484,7 +484,7 @@ IMPLICIT_FUNC    = ['IDENTIFIER', 'SUPER', ')', 'CALL_END', ']', 'INDEX_END', '@
 # If preceded by an `IMPLICIT_FUNC`, indicates a function invocation.
 IMPLICIT_CALL    = [
   'IDENTIFIER', 'NUMBER', 'STRING', 'STRING_START', 'JS', 'REGEX', 'REGEX_START'
-  'NEW', 'PARAM_START', 'CLASS', 'IF', 'TRY', 'SWITCH', 'THIS', 'BOOL', 'NULL'
+  'NEW', 'PARAM_START', 'CLASS', 'TRAIT', 'IF', 'TRY', 'SWITCH', 'THIS', 'BOOL', 'NULL'
   'UNDEFINED', 'UNARY', 'YIELD', 'UNARY_MATH', 'SUPER', 'THROW'
   '@', '->', '=>', '[', '(', '{', '--', '++'
 ]
