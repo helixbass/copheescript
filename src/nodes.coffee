@@ -588,13 +588,16 @@ exports.Value = class Value extends Base
         return ifn
       for prop, i in @properties when prop.soak
         prop.soak = off
-        fst = new Value @base, @properties[...i]
-        snd = new Value @base, @properties[i..]
-        if fst.isComplex()
-          ref = new Literal o.scope.freeVariable '$ref'
-          fst = new Parens new Assign ref, fst
-          snd.base = ref
-        return new If new Existence(snd), snd, soak: on
+        # fst = new Value @base, @properties[...i]
+        fst = new Value @base, @properties[..i]
+        # snd = new Value @base, @properties[i..]
+        snd = new Value @base, @properties[...]
+        # if fst.isComplex()
+        #   ref = new Literal o.scope.freeVariable '$ref'
+        #   fst = new Parens new Assign ref, fst
+        #   snd.base = ref
+        # return new If new Existence(snd), snd, soak: on
+        return new If new Existence(fst), snd, soak: on
       no
 
 #### Comment
