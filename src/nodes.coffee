@@ -105,7 +105,7 @@ exports.Base = class Base
   cache: (o, level, isComplex) ->
     complex = if isComplex? then isComplex this else @isComplex()
     if complex
-      ref = new Literal o.scope.freeVariable 'ref'
+      ref = new Literal o.scope.freeVariable '$ref'
       sub = new Assign ref, this
       if level then [sub.compileToFragments(o, level), [@makeCode(ref.value)]] else [sub, ref]
     else
@@ -591,7 +591,7 @@ exports.Value = class Value extends Base
         fst = new Value @base, @properties[...i]
         snd = new Value @base, @properties[i..]
         if fst.isComplex()
-          ref = new Literal o.scope.freeVariable 'ref'
+          ref = new Literal o.scope.freeVariable '$ref'
           fst = new Parens new Assign ref, fst
           snd.base = ref
         return new If new Existence(snd), snd, soak: on
@@ -759,7 +759,7 @@ exports.Call = class Call extends Base
     answer = []
     base = new Value @variable
     if (name = base.properties.pop()) and base.isComplex()
-      ref = o.scope.freeVariable 'ref'
+      ref = o.scope.freeVariable '$ref'
       answer = answer.concat @makeCode("(#{ref} = "),
         (base.compileToFragments o, LEVEL_LIST),
         @makeCode(")"),
@@ -2185,7 +2185,7 @@ exports.For = class For extends While
     else
       svar    = @source.compile o, LEVEL_LIST
       if (name or @own) and not IDENTIFIER.test svar
-        defPart    += "#{@tab}#{ref = scope.freeVariable 'ref'} = #{svar};\n"
+        defPart    += "#{@tab}#{ref = scope.freeVariable '$ref'} = #{svar};\n"
         svar       = ref
       # if name and not @pattern
       #   namePart   = "#{name} = #{svar}[#{kvar}]"
