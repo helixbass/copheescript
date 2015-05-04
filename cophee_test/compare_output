@@ -26,11 +26,15 @@ end
 compare "phpdoc block comment",
   '''
   ###
+  # Great test
+  #
   # @dataProvider provider_test
   ###
   ''',
   """
   /**
+   * Great test
+   *
    * @dataProvider provider_test
    */
   """
