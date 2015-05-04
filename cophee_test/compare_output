@@ -23,6 +23,18 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "phpdoc block comment",
+  '''
+  ###
+  # @dataProvider provider_test
+  ###
+  ''',
+  """
+  /**
+   * @dataProvider provider_test
+   */
+  """
+
 compare "triple regex",
   '''
   ///
