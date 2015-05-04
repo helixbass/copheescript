@@ -422,6 +422,8 @@ exports.Literal = class Literal extends Base
       o.scope.add_free @value
     code = if @value is 'this'
       if o.scope.method?.bound then o.scope.method.context else '$this'
+    else if IS_REGEX.test @value
+      ensureQuoted @value
     # else if @value.reserved
     #   "\"#{@value}\""
     else

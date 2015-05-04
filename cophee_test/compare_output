@@ -23,6 +23,17 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "triple regex",
+  '''
+  ///
+    a*
+    b
+  ///
+  ''',
+  """
+  '/a*b/';
+  """
+
 compare "existy prop w/ chain",
   '''
   $c = $a?.b.c
