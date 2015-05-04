@@ -332,9 +332,10 @@ exports.Block = class Block extends Base
     o.scope.parameter name for name in o.locals or []
     prelude   = []
     unless o.bare
-      preludeExps = for exp, i in @expressions
-        break unless exp.unwrap() instanceof Comment
-        exp
+      preludeExps = []
+      # preludeExps = for exp, i in @expressions
+      #   break unless exp.unwrap() instanceof Comment
+      #   exp
       rest = @expressions[preludeExps.length...]
       @expressions = preludeExps
       if preludeExps.length
