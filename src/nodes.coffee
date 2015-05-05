@@ -1709,17 +1709,19 @@ exports.Splat = class Splat extends Base
     for node, i in args
       compiledNode = node.compileToFragments o, LEVEL_LIST
       args[i] = if node instanceof Splat
-      then [].concat node.makeCode("#{ utility 'slice', o }.call("), compiledNode, node.makeCode(")")
+      # then [].concat node.makeCode("#{ utility 'slice', o }.call("), compiledNode, node.makeCode(")")
+      then [].concat compiledNode
       else [].concat node.makeCode("["), compiledNode, node.makeCode("]")
     if index is 0
       node = list[0]
       concatPart = (node.joinFragmentArrays args[1..], ', ')
-      return args[0].concat node.makeCode(".concat("), concatPart, node.makeCode(")")
+      # return args[0].concat node.makeCode(".concat("), concatPart, node.makeCode(")")
+      return [node.makeCode("array_merge("), args[0], concatPart..., node.makeCode(")")]
     base = (node.compileToFragments o, LEVEL_LIST for node in list[...index])
     base = list[0].joinFragmentArrays base, ', '
     concatPart = list[index].joinFragmentArrays args, ', '
     [..., last] = list
-    [].concat list[0].makeCode("["), base, list[index].makeCode("].concat("), concatPart, last.makeCode(")")
+    [].concat list[0].makeCode("array_merge(["), base, list[index].makeCode("], "), concatPart, last.makeCode(")")
 
 #### Expansion
 
