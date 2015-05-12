@@ -1365,12 +1365,15 @@ exports.Assign = class Assign extends Base
       if not expandedIdx and obj instanceof Splat
         name = obj.name.unwrap().value
         obj = obj.unwrap()
-        val = "#{olen} <= #{vvarText}.length ? #{ utility 'slice', o }.call(#{vvarText}, #{i}"
+        obj = new Value new Literal "$#{ obj.base.value }" unless obj.this
+        val = "array_slice(#{vvarText}, #{i}"
         if rest = olen - i - 1
           ivar = o.scope.freeVariable 'i', single: true
-          val += ", #{ivar} = #{vvarText}.length - #{rest}) : (#{ivar} = #{i}, [])"
+          # val += ", #{ivar} = count( #{vvarText} ) - #{rest}) : (#{ivar} = #{i}, [])"
+          val += ", -#{rest})"
         else
-          val += ") : []"
+          val += ")"
+        val += "; #{ivar} = count(#{vvarText}) - #{rest}" if rest
         val   = new Literal val
         expandedIdx = "#{ivar}++"
       else if not expandedIdx and obj instanceof Expansion
@@ -1396,7 +1399,7 @@ exports.Assign = class Assign extends Base
         # console.log 'obj', obj, obj.constructor.name, obj.base.constructor.name
         obj = new Value new Literal "$#{ obj.base.value }" unless obj.this
         idx = new Value new Literal ensureQuoted idx.base.value if idx instanceof Value
-        idx = new Value new Literal ensureQuoted idx.value      if idx instanceof Literal and not do idx.isSimpleNumber
+        idx = new Value new Literal ensureQuoted idx.value      if idx instanceof Literal and not do idx.isSimpleNumber and not expandedIdx
         val = new Value new Literal(vvarText), [new Index idx]
         # obj =
       if name? and name in RESERVED

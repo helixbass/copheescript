@@ -23,6 +23,14 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "assign to splatted array",
+  '''
+  [a, b..., c] = $v;
+  ''',
+  """
+  $a = $v[0]; $b = array_slice($v, 1, -1); $i = count($v) - 1; $c = $v[$i++];
+  """
+
 compare "splatted array",
   '''
   [@a, ( $b ?: [])...]
