@@ -2381,7 +2381,7 @@ exports.If = class If extends Base
   compileExpression: (o) ->
     cond = @condition.compileToFragments o, LEVEL_COND
     body = @bodyNode().compileToFragments o, LEVEL_LIST
-    alt  = if @elseBodyNode() then @elseBodyNode().compileToFragments(o, LEVEL_LIST) else [@makeCode('null')]
+    alt  = if @elseBodyNode() then @wrapInBraces @elseBodyNode().compileToFragments(o, LEVEL_LIST) else [@makeCode('null')]
     fragments = cond.concat @makeCode(" ? "), body, @makeCode(" : "), alt
     if o.level >= LEVEL_COND then @wrapInBraces fragments else fragments
 
