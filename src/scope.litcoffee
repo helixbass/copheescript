@@ -142,6 +142,7 @@ Does this scope have any declared variables?
         no
       special_or_global: ( name ) ->
         return yes if name is 'this'
+        return yes if name is '$GLOBALS'
         no
 
 Return the list of variables first declared in this scope.

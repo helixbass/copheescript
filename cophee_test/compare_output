@@ -23,6 +23,17 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "don't use $GLOBALS",
+  """
+  ->
+    $GLOBALS['a'] + $b
+  """,
+  """
+  (function() use (&$b) {
+    return $GLOBALS['a'] + $b;
+  });
+  """
+
 compare "else if expression",
   '''
   $x =
