@@ -39,8 +39,26 @@ compare "(unset) vs unset",
   unset $x
   ''',
   """
-  (unset) $x;
+  (unset)($x);
   unset($x);
+  """
+
+# compare "type cast w/ expr",
+#   '''
+#   (int) $x + $y
+#   ''',
+#   """
+#   (int)($x) + $y;
+#   """
+
+compare "type cast w/ paren expr",
+  '''
+  (int) ($x + $y)
+  (int)($x) + $y
+  ''',
+  """
+  (int)($x + $y);
+  (int)($x) + $y;
   """
 
 compare "type cast",
@@ -48,7 +66,7 @@ compare "type cast",
   (int) $x
   ''',
   """
-  (int) $x;
+  (int)($x);
   """
 
 compare "static::$prop",
