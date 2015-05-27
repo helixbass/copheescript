@@ -23,6 +23,14 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "octal escape",
+  '''
+  "abc\033def"
+  ''',
+  '''
+  "abc\033def";
+  '''
+
 compare "don't return unset",
   """
   ( $x ) -> unset $x['a'];

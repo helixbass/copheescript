@@ -418,7 +418,7 @@ exports.Literal = class Literal extends Base
     return this if @value is 'continue' and not o?.loop
 
   compileNode: (o) ->
-    # console.log @value
+    # console.log 'value', @value
     if do @isVar
       o.scope.add_free @value
     code = if @value is 'this'
