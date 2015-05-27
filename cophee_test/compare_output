@@ -23,6 +23,34 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "don't return unset",
+  """
+  ( $x ) -> unset $x['a'];
+  """,
+  """
+  (function($x) {
+    unset($x['a']);
+  });
+  """
+
+compare "(unset) vs unset",
+  '''
+  (unset) $x
+  unset $x
+  ''',
+  """
+  (unset) $x;
+  unset($x);
+  """
+
+compare "type cast",
+  '''
+  (int) $x
+  ''',
+  """
+  (int) $x;
+  """
+
 compare "static::$prop",
   '''
   static::$prop

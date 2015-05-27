@@ -730,15 +730,24 @@ exports.Call = class Call extends Base
       fragments.push @makeCode preface
     else
       if @isNew then fragments.push @makeCode 'new '
+      fragments.push @makeCode "(" if do @_is_cast
       fragments.push @variable.compileToFragments(o, LEVEL_ACCESS)...
+      fragments.push @makeCode ")" if do @_is_cast
       if @variable instanceof Value
         fragments.push @makeCode if do @_dont_paren then " " else "("
     fragments.push compiledArgs...
     fragments.push @makeCode ")" unless do @_dont_paren
     fragments
 
+  _is_cast: ->
+    @variable.base and @variable.base instanceof Parens and @variable.base.body?.expressions?[0]?.base?.value in ['int', 'integer', 'bool', 'boolean', 'float', 'double', 'real', 'string', 'array', 'object', 'unset', 'binary']
   _dont_paren: ->
-   @variable.base?.value in ['global', 'use']
+    do @_is_cast or @variable.base?.value in ['global', 'use']
+  _dont_return: ->
+    @variable.base?.value in ['unset']
+
+  makeReturn: ->
+    if do @_dont_return then this else super
 
   # If you call a function with a splat, it's converted into a JavaScript
   # `.apply()` call to allow an array of arguments to be passed.
