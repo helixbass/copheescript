@@ -772,7 +772,7 @@ COFFEE_KEYWORDS = COFFEE_KEYWORDS.concat COFFEE_ALIASES
 RESERVED = [
   'case', 'default', 'function', 'var', 'void', 'with', 'const', 'let', 'enum'
   'export', 'import', 'native', 'implements', 'interface', 'package', 'private'
-  'protected', 'public', 'static'
+  'protected', 'public', #'static'
 ]
 
 STRICT_PROSCRIBED = ['arguments', 'eval', 'yield*']

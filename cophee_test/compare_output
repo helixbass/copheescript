@@ -23,6 +23,14 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "static::$prop",
+  '''
+  static::$prop
+  ''',
+  """
+  static::$prop;
+  """
+
 compare "don't use $GLOBALS",
   """
   ->
