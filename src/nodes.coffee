@@ -569,6 +569,7 @@ exports.Value = class Value extends Base
   compileNode: (o) ->
     # console.log 'value props', @base, @properties if @properties?.length
     # console.log 'value', @base, @properties, do @isVar, o.scope
+    # console.log 'prop', @properties[1], @properties[1].constructor.name
     if @base.value and do @isVar and @properties[0]?.name?.value isnt 'prototype'
       o.scope.add_free @base.value
     @base.front = @front
@@ -578,6 +579,8 @@ exports.Value = class Value extends Base
       fragments.push @makeCode '.'
     if @properties.length > 1 and @properties[0].name?.value is 'prototype'
       fragments.push @makeCode "::#{ @properties[1].name.value }"
+      if @properties.length > 2
+        fragments.push (property.compileToFragments o)... for property in @properties[2..]
     else
       for prop in props
         fragments.push (prop.compileToFragments o)...

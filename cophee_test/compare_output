@@ -23,6 +23,22 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "access self prop",
+  """
+  self::$a['b']
+  """,
+  """
+  self::$a['b'];
+  """
+
+compare "existy op on prop",
+  """
+  $x = self::$a['b'] ? 3
+  """,
+  """
+  $x = isset( self::$a['b'] ) ? self::$a['b'] : (3);
+  """
+
 compare "splatted param",
   '''
   ( $a, $b... ) ->
