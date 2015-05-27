@@ -1517,8 +1517,9 @@ exports.Code = class Code extends Base
     for param in @params when param.splat or param instanceof Expansion
       for p in @params when p not instanceof Expansion and p.name.value
         o.scope.add p.name.value, 'var', yes
-      splats = new Assign new Value(new Arr(p.asReference o for p in @params)),
-                          new Value new Literal 'arguments'
+      # console.log 'splatting', @params
+      splats = new Assign new Value(new Arr(p.asReference( o, yes ) for p in @params)),
+                          new Value new Literal '$__args'
       break
     # console.log 'code params', @params
     unless @_is_method
@@ -1553,7 +1554,10 @@ exports.Code = class Code extends Base
           exprs.push new If lit, val
       params.push ref unless splats or param.uses
     wasEmpty = @body.isEmpty()
-    exprs.unshift splats if splats
+    if splats
+      exprs.unshift splats
+      exprs.unshift new Assign new Value( new Literal '$__args' ),
+                               new Literal 'func_get_args()'
     @body.expressions.unshift exprs... if exprs.length
     for exp, i in @body.expressions
       break unless exp instanceof If and (_var=exp.condition.value?.match( /^(\$\w+) == null$/ )[1]) and _param=@hasParamNamed _var
@@ -1635,19 +1639,23 @@ exports.Param = class Param extends Base
     fragments.push ( if @_default then [@name.makeCode "=#{ @_default }"] else [] )...
     fragments
 
-  asReference: (o) ->
-    return @reference if @reference
+  asReference: (o, remove_$=no) ->
+    return @reference if @reference and not remove_$
     node = @name
+    # console.log 'node', node, node.constructor.name
     if node.this
       name = node.properties[0].name.value
       name = "_#{name}" if name.reserved
       node = new Literal o.scope.freeVariable name
     else if node.isComplex()
       node = new Literal o.scope.freeVariable 'arg'
+    else if remove_$ and node instanceof Literal and starts node.value, '$'
+      node = new Literal node.value.substr 1
     node = new Value node
     node = new Splat node if @splat
     node.updateLocationDataIfMissing @locationData
-    @reference = node
+    @reference = node unless remove_$
+    node
 
   isComplex: ->
     @name.isComplex()

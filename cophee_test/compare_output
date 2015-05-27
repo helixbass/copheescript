@@ -23,6 +23,18 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "splatted param",
+  '''
+  ( $a, $b... ) ->
+  ''',
+  """
+  (function() {
+    $__args = func_get_args();
+    $a = $__args[0];
+    $b = array_slice($__args, 1);
+  });
+  """
+
 compare "octal escape",
   '''
   "abc\033def"
