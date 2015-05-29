@@ -31,8 +31,8 @@ compare "abstract method",
   ''',
   """
   abstract class A {
-    abstract function x() {}
-    abstract static function y() {}
+    abstract function x() ;
+    abstract static function y() ;
   }
   """
 
@@ -45,7 +45,7 @@ compare "non-initial abstract method",
   """
   class A {
     function x() {}
-    abstract function y() {}
+    abstract function y() ;
   }
   """
 
