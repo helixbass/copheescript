@@ -109,7 +109,7 @@ class exports.Rewriter
   # `@<x>:`, `<x>:` or `<EXPRESSION_START><x>...<EXPRESSION_END>:`,
   # skipping over 'HERECOMMENT's.
   looksObjectish: (j) ->
-    return yes if @indexOfTag(j, '@', null, ':') > -1 or @indexOfTag(j, null, ':') > -1
+    return yes if @indexOfTag(j, '@', null, ':') > -1 or @indexOfTag(j, null, ':') > -1 or @indexOfTag(j, 'ABSTRACT', '@', null, ':') > -1 or @indexOfTag(j, 'ABSTRACT', null, ':') > -1
     index = @indexOfTag(j, EXPRESSION_START)
     if index > -1
       end = null
@@ -266,7 +266,9 @@ class exports.Rewriter
         # Go back to the (implicit) start of the object
         s = switch
           when @tag(i - 1) in EXPRESSION_END then start[1]
+          when @tag(i - 2) is '@' and @tag(i - 3) is 'ABSTRACT' then i - 3
           when @tag(i - 2) is '@' then i - 2
+          when @tag(i - 2) is 'ABSTRACT' then i - 2
           else i - 1
         s -= 2 while @tag(s - 2) is 'HERECOMMENT'
 
@@ -276,11 +278,13 @@ class exports.Rewriter
         startsLine = s is 0 or @tag(s - 1) in LINEBREAKS or tokens[s - 1].newLine
         # Are we just continuing an already declared object?
         if stackTop()
+          # console.log 'stackTop', stackTop(), @tokens
           [stackTag, stackIdx] = stackTop()
           if (stackTag is '{' or stackTag is 'INDENT' and @tag(stackIdx - 1) is '{') and
              (startsLine or @tag(s - 1) is ',' or @tag(s - 1) is '{')
             return forward(1)
 
+        # console.log 'starting implicit object', s
         startImplicitObject(s, !!startsLine)
         return forward(2)
 

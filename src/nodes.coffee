@@ -486,11 +486,15 @@ exports.Return = class Return extends Base
 # A value, variable or literal or parenthesized, indexed or dotted into,
 # or vanilla.
 exports.Value = class Value extends Base
-  constructor: (base, props, tag) ->
-    return base if not props and base instanceof Value
+  constructor: (base, props, tag, @is_abstract) ->
+    # return base if not props and base instanceof Value
+    if not props and base instanceof Value
+      base.is_abstract = @is_abstract
+      return base
     @base       = base
     @properties = props or []
     @[tag]      = true if tag
+    # console.log 'abstract value', base, base.constructor.name if @is_abstract
     return this
 
   children: ['base', 'properties']
@@ -575,6 +579,8 @@ exports.Value = class Value extends Base
     @base.front = @front
     props = @properties
     fragments = @base.compileToFragments o, (if props.length then LEVEL_ACCESS else null)
+    # if @is_abstract
+    #   fragments.unshift @makeCode 'abstract '
     if (@base instanceof Parens or props.length) and SIMPLENUM.test fragmentsToText fragments
       fragments.push @makeCode '.'
     if @properties.length > 1 and @properties[0].name?.value is 'prototype'
@@ -1141,7 +1147,7 @@ exports.Class = class Class extends Base
             func.static = yes
           else
             acc = if base.isComplex() then new Index base else new Access base
-            assign.variable = new Value(new Literal(name), [(new Access new Literal 'prototype'), acc])
+            assign.variable = new Value(new Literal(name), [(new Access new Literal 'prototype'), acc], null, assign.variable.is_abstract)
             if func instanceof Code and func.bound
               @boundFuncs.push base
               func.bound = no
@@ -1161,6 +1167,7 @@ exports.Class = class Class extends Base
           else if node instanceof Value and node.isObject(true)
             cont = false
             exps[i] = @addProperties node, name, o
+        # console.log 'class walkBody', (exp.constructor.name for exp in child.expressions), child.expressions[0][0].variable, (exp.constructor.name for exp in exps), exps[0][0].variable
         child.expressions = exps = flatten exps
       cont and child not instanceof Class
 
@@ -1220,11 +1227,11 @@ exports.Class = class Class extends Base
     #   func.params.push new Param superClass
     #   args.push @parent
 
-    # console.log 'class body.expressions', @body.expressions
     for expression in @body.expressions
       if expression.value instanceof Code
         expression.value._is_method = yes
         expression.value._is_static = expression.variable.properties[0]?.name.value isnt 'prototype'
+        expression.value._is_abstract = expression.variable.is_abstract
       else if expression.variable?.properties.length is 1
         expression.variable._is_static = yes
         expression.variable.base.value = expression.variable.properties[0].name.value
@@ -1304,7 +1311,7 @@ exports.Assign = class Assign extends Base
     compiledName =
       @variable.compileToFragments o, LEVEL_LIST
     compiledName.unshift @makeCode 'static ' if @variable._is_static
-    # console.log @variable if @context is 'object'
+    # console.log 'assign var', @variable if @context is 'object'
     return (compiledName.concat @makeCode(" => "), val) if @context is 'object'
     answer =
       if @value instanceof Code and @_is_class_body
@@ -1579,7 +1586,7 @@ exports.Code = class Code extends Base
       node.error "multiple parameters named #{name}" if name in uniqs
       uniqs.push name
     @body.makeReturn() unless wasEmpty or @noReturn
-    code = "#{ if @_is_static then 'static ' else '' }function"
+    code = "#{ if @_is_abstract then 'abstract ' else '' }#{ if @_is_static then 'static ' else '' }function"
     code += '*' if @isGenerator
     if @name?.name?.value
       code += ' ' + @name.name.value # if @ctor

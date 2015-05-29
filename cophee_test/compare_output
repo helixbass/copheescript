@@ -23,6 +23,32 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "abstract method",
+  '''
+  abstract class A
+    abstract x: ->
+    abstract @y: ->
+  ''',
+  """
+  abstract class A {
+    abstract function x() {}
+    abstract static function y() {}
+  }
+  """
+
+compare "non-initial abstract method",
+  '''
+  class A
+    x: ->
+    abstract y: ->
+  ''',
+  """
+  class A {
+    function x() {}
+    abstract function y() {}
+  }
+  """
+
 compare "abstract class",
   '''
   abstract class A

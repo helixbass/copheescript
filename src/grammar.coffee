@@ -172,6 +172,7 @@ grammar =
     o 'ObjAssignable : Expression',             -> new Assign LOC(1)(new Value($1)), $3, 'object'
     o 'ObjAssignable :
        INDENT Expression OUTDENT',              -> new Assign LOC(1)(new Value($1)), $4, 'object'
+    o 'ABSTRACT ObjAssignable : Expression',    -> new Assign LOC(1)(new Value($2, null, null, yes)), $4, 'object'
     o 'Comment'
   ]
 
