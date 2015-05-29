@@ -1080,7 +1080,7 @@ exports.Arr = class Arr extends Base
 # Initialize a **Class** with its name, an optional superclass, and a
 # list of prototype property assignments.
 exports.Class = class Class extends Base
-  constructor: (@variable, @parent, @body = new Block, @is_trait=no) ->
+  constructor: (@variable, @parent, @body = new Block, @is_trait=no, @is_abstract=no) ->
     @body = new Block unless @body
     @boundFuncs = []
     @body.classBody = yes
@@ -1239,7 +1239,7 @@ exports.Class = class Class extends Base
     # klass = new Assign @variable, klass if @variable
     # func.compileToFragments o
     # _body = Block.wrap [@body]
-    [@makeCode( "#{ if @is_trait then 'trait' else 'class' } #{ name } #{ if @parent then "extends #{ @parent.base.value }" else '' } {\n" ),
+    [@makeCode( "#{ if @is_abstract then 'abstract ' else ''}#{ if @is_trait then 'trait' else 'class' } #{ name } #{ if @parent then "extends #{ @parent.base.value }" else '' } {\n" ),
      @body.compileNode( o )...,
      # do _body.compileNode
      @makeCode( '}' )]

@@ -23,6 +23,17 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "abstract class",
+  '''
+  abstract class A
+    use B
+  ''',
+  """
+  abstract class A {
+    use B;
+  }
+  """
+
 compare "access self prop",
   """
   self::$a['b']

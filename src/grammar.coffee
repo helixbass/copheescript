@@ -325,6 +325,14 @@ grammar =
     o 'CLASS SimpleAssignable Block',                    -> new Class $2, null, $3
     o 'CLASS SimpleAssignable EXTENDS Expression',       -> new Class $2, $4
     o 'CLASS SimpleAssignable EXTENDS Expression Block', -> new Class $2, $4, $5
+    o 'ABSTRACT CLASS',                                           -> new Class null, null, null, no, yes
+    o 'ABSTRACT CLASS Block',                                     -> new Class null, null, $3, no, yes
+    o 'ABSTRACT CLASS EXTENDS Expression',                        -> new Class null, $4, null, no, yes
+    o 'ABSTRACT CLASS EXTENDS Expression Block',                  -> new Class null, $4, $5, no,  yes
+    o 'ABSTRACT CLASS SimpleAssignable',                          -> new Class $3, null, null, no, yes
+    o 'ABSTRACT CLASS SimpleAssignable Block',                    -> new Class $3, null, $4, no, yes
+    o 'ABSTRACT CLASS SimpleAssignable EXTENDS Expression',       -> new Class $3, $5, null, no, yes
+    o 'ABSTRACT CLASS SimpleAssignable EXTENDS Expression Block', -> new Class $3, $5, $6, no, yes
   ]
 
   Trait: [
