@@ -23,6 +23,26 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "interpolated key",
+  '''
+  "#{ $a }.b": 1
+  ''',
+  '''
+  ([ $a . ".b" => 1 ]);
+  '''
+
+# compare "prop/access obj key",
+#   """
+#   a:      1
+#   $b.c:    2
+#   $d['e']: 3
+#   """,
+#   """
+#   ['a' => 1,
+#    $b->c => 2,
+#    $d['e'] => 3]
+#   """
+
 compare "abstract method",
   '''
   abstract class A
@@ -274,7 +294,7 @@ compare "mixed obj w/ interpolated string",
   { a, "abc#{ $b }" }
   ''',
   """
-  [ 'a' => $a, \"abc\" . $b ];
+  ([ 'a' => $a, \"abc\" . $b ]);
   """
 compare "namespaced name",
   '''

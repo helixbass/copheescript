@@ -990,7 +990,8 @@ exports.Obj = class Obj extends Base
     if @generated
       for node in props when node instanceof Value
         node.error 'cannot have an implicit value in an implicit object'
-    break for prop, dynamicIndex in props when (prop.variable or prop).base instanceof Parens
+    # break for prop, dynamicIndex in props when (prop.variable or prop).base instanceof Parens
+    dynamicIndex = props.length
     hasDynamic  = dynamicIndex < props.length
     idt         = o.indent += TAB
     lastNoncom  = @lastNonComment @properties
@@ -1023,7 +1024,7 @@ exports.Obj = class Obj extends Base
         variable = new Literal ensureQuoted prop.properties[0].name.value
         prop = new Assign variable, prop, 'object'
       if prop not instanceof Comment
-        if i < dynamicIndex and not ( prop instanceof Value and not ( IS_NAME.test( prop.base.value ) and not SIMPLENUM.test prop.base.value ))
+        if i < dynamicIndex and not ( prop instanceof Value and not ( IS_NAME.test( prop.base.value ) and not SIMPLENUM.test( prop.base.value ) and not prop.base instanceof Parens ))
           if prop not instanceof Assign
             prop = new Assign prop, prop, 'object'
           (prop.variable.base or prop.variable).asKey = yes
