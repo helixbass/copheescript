@@ -23,6 +23,28 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "foreach &ref",
+  '''
+  for &$a of $b
+    $a["c"] = 3
+  ''',
+  '''
+  foreach ($b as &$a) {
+    $a["c"] = 3;
+  }
+  '''
+
+compare "foreach &ref w/ key",
+  '''
+  for $k, &$a of $b
+    $a["c"] = 3
+  ''',
+  '''
+  foreach ($b as $k => &$a) {
+    $a["c"] = 3;
+  }
+  '''
+
 compare "interpolated key",
   '''
   "#{ $a }.b": 1

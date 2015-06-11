@@ -2266,7 +2266,7 @@ exports.For = class For extends While
     defPartFragments = [].concat @makeCode(defPart), @pluckDirectCall(o, body)
     varPart = "\n#{idt1}#{namePart};" if namePart
     if @object
-      forPartFragments   = [@makeCode("#{svar} as #{kvar}#{ if name then " => #{ name }" else '' }")]
+      forPartFragments   = [@makeCode("#{svar} as #{ if @index.is_ref then '&' else '' }#{kvar}#{ if name then " => #{ if @name.is_ref then '&' else '' }#{ name }" else '' }")]
       guardPart = "\n#{idt1}if (!#{utility 'hasProp', o}.call(#{svar}, #{kvar})) continue;" if @own
     bodyFragments = body.compileToFragments merge(o, indent: idt1), LEVEL_TOP
     if bodyFragments and (bodyFragments.length > 0)

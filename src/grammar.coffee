@@ -508,7 +508,9 @@ grammar =
   # of object comprehensions.
   ForVariables: [
     o 'ForValue',                               -> [$1]
+    o 'LOGIC ForValue',                         -> $2.is_ref = yes; [$2]
     o 'ForValue , ForValue',                    -> [$1, $3]
+    o 'ForValue , LOGIC ForValue',              -> $4.is_ref = yes; [$1, $4]
   ]
 
   # The source of a comprehension is an array or object with an optional guard
