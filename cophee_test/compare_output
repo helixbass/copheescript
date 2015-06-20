@@ -23,6 +23,16 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "splatted arg",
+  '''
+  A::b $a...
+  f $b, $c...
+  ''',
+  """
+  call_user_func_array('A::b', $a);
+  call_user_func_array('f', array_merge([$b], $c));
+  """
+
 compare "foreach &ref",
   '''
   for &$a of $b

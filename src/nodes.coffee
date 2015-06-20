@@ -782,22 +782,24 @@ exports.Call = class Call extends Base
 
     answer = []
     base = new Value @variable
-    if (name = base.properties.pop()) and base.isComplex()
-      ref = o.scope.freeVariable '$ref'
-      answer = answer.concat @makeCode("(#{ref} = "),
-        (base.compileToFragments o, LEVEL_LIST),
-        @makeCode(")"),
-        name.compileToFragments(o)
-    else
-      fun = base.compileToFragments o, LEVEL_ACCESS
-      fun = @wrapInBraces fun if SIMPLENUM.test fragmentsToText fun
-      if name
-        ref = fragmentsToText fun
-        fun.push (name.compileToFragments o)...
-      else
-        ref = 'null'
-      answer = answer.concat fun
-    answer = answer.concat @makeCode(".apply(#{ref}, "), splatArgs, @makeCode(")")
+    # console.log 'splat var', @variable, @variable.compileToFragments o
+    # if (name = base.properties.pop()) and base.isComplex()
+    #   ref = o.scope.freeVariable '$ref'
+    #   answer = answer.concat @makeCode("(#{ref} = "),
+    #     (base.compileToFragments o, LEVEL_LIST),
+    #     @makeCode(")"),
+    #     name.compileToFragments(o)
+    # else
+    #   fun = base.compileToFragments o, LEVEL_ACCESS
+    #   fun = @wrapInBraces fun if SIMPLENUM.test fragmentsToText fun
+    #   if name
+    #     ref = fragmentsToText fun
+    #     fun.push (name.compileToFragments o)...
+    #   else
+    #     ref = 'null'
+    #   answer = answer.concat fun
+    # answer = answer.concat @makeCode(".apply(#{ref}, "), splatArgs, @makeCode(")")
+    answer = answer.concat @makeCode("call_user_func_array('"), @variable.compileToFragments( o ), @makeCode("', "), splatArgs, @makeCode(")")
 
 #### Extends
 
