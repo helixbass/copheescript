@@ -1004,8 +1004,19 @@ exports.Obj = class Obj extends Base
     answer.push @makeCode "[#{if props.length is 0 or dynamicIndex is 0 then ']' else '\n'}"
     for prop, i in props
       prop.variable.base.value = ensureQuoted prop.variable.base.value unless prop.variable?.properties.length or not prop.variable?.base.value or starts prop.variable.base.value, '$'
-      if prop instanceof Value and not prop.this and prop.base.value and ( IS_NAME.test( prop.base.value ) and not SIMPLENUM.test prop.base.value )
-        assigned_var = new Value new Literal "$#{ prop.base.value }"
+      if prop instanceof Value and not prop.this and prop.base.value and (
+        (IS_NAME.test( prop.base.value ) or
+         IS_DOT_NAME.test( prop.base.value ) or
+         IS_DOT_AT_NAME.test( prop.base.value )) and
+        not SIMPLENUM.test prop.base.value )
+        assigned_var = new Value new Literal(
+          if starts prop.base.value, '.@'
+            "$this->#{ prop.base.value.substr 2 }"
+          else if starts prop.base.value, '.'
+            "$#{ prop.base.value.substr 1 }"
+          else
+            "$#{ prop.base.value }" )
+        prop.base.value = ".#{ prop.base.value.substr 2 }" if starts prop.base.value, '.@'
         prop.base.value = ensureQuoted prop.base.value
         prop = new Assign prop, assigned_var, 'object'
       # if i is dynamicIndex
@@ -2495,6 +2506,8 @@ IS_STRING = /^['"]/
 IS_REGEX = /^\//
 IS_VAR = /^\$\w+$/
 IS_NAME = /^\w+$/
+IS_DOT_NAME = /^\.\w+$/
+IS_DOT_AT_NAME = /^\.@\w+$/
 
 # Helper Functions
 # ----------------

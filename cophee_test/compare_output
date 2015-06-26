@@ -23,6 +23,39 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "{ .col }",
+  '''
+  { .col }
+  ''',
+  """
+  ([ '.col' => $col ]);
+  """
+compare "{ .@col }",
+  '''
+  { .@col }
+  ''',
+  """
+  ([ '.col' => $this->col ]);
+  """
+compare "{ .@col } mixed",
+  # '''
+  # { a: 1
+  #   .@col }
+  # ''',
+  '''
+  { .col, .col2 }
+  { a: 1,
+    .@col,
+    .col2 }
+  ''',
+  """
+  ([ '.col' => $col,
+     '.col2' => $col2 ]);
+  ([ 'a' => 1,
+     '.col' => $this->col,
+     '.col2' => $col2 ]);
+  """
+
 compare "splatted arg",
   '''
   A::b $a...

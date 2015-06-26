@@ -174,6 +174,8 @@ grammar =
        INDENT Expression OUTDENT',              -> new Assign LOC(1)(new Value($1)), $4, 'object'
     o 'ABSTRACT ObjAssignable : Expression',    -> new Assign LOC(1)(new Value($2, null, null, yes)), $4, 'object'
     o 'Comment'
+    o '. Identifier',                           -> new Value new Literal ".#{ $2.value }"
+    o '. @ Identifier',                         -> new Value new Literal ".@#{ $3.value }"
   ]
 
   ObjAssignable: [
