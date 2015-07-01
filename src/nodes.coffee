@@ -1437,7 +1437,7 @@ exports.Assign = class Assign extends Base
         # obj =
       if name? and name in RESERVED
         obj.error "assignment to a reserved word: #{obj.compile o}"
-      assigns.push new Assign(obj, val, null, param: @param, subpattern: yes).compileToFragments o, LEVEL_LIST
+      assigns.push new Assign(obj, val, null, param: @param, subpattern: yes).compileToFragments o, LEVEL_LIST unless name is '__IGNORED_ARG'
     assigns.push vvar unless top or @subpattern
     fragments = @joinFragmentArrays assigns, '; '
     if o.level < LEVEL_LIST then fragments else @wrapInBraces fragments
@@ -1542,7 +1542,7 @@ exports.Code = class Code extends Base
       for p in @params when p not instanceof Expansion and p.name.value
         o.scope.add p.name.value, 'var', yes
       # console.log 'splatting', @params
-      splats = new Assign new Value(new Arr(p.asReference( o, yes ) for p in @params)),
+      splats = new Assign new Value(new Arr((if p.isRef then new Value new Literal '__IGNORED_ARG' else p.asReference( o, yes )) for p in @params)),
                           new Value new Literal '$__args'
       break
     # console.log 'code params', @params
@@ -1576,7 +1576,7 @@ exports.Code = class Code extends Base
           lit = new Literal ref.name.value + ' == null'
           val = new Assign new Value(param.name), param.value, '='
           exprs.push new If lit, val
-      params.push ref unless splats or param.uses
+      params.push ref unless (splats and not ref.isRef) or param.uses
     wasEmpty = @body.isEmpty()
     if splats
       exprs.unshift splats

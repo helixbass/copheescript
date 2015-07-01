@@ -23,6 +23,16 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "preserve ref w/ splatted args",
+  '''
+  ( &$a, $b... ) ->
+  ''',
+  """
+  (function(&$a) {
+    $__args = func_get_args();
+    $b = array_slice($__args, 1);
+  });
+  """
 compare "{ .col }",
   '''
   { .col }
