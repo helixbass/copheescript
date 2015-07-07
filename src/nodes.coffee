@@ -303,7 +303,12 @@ exports.Block = class Block extends Base
           unless node instanceof Class or @_is_class_body and ( node.is_backticked or node instanceof Assign and node.value instanceof Code )
             fragments.push @makeCode ";"
           if @_is_class_body and node instanceof Assign and not( node.value instanceof Code )
-            fragments.unshift @makeCode "public "
+            fragments.unshift @makeCode(
+              if node.variable?.base?.isCapsName?()
+                "const "
+              else
+                "public "
+            )
         compiledNodes.push fragments
       else
         compiledNodes.push node.compileToFragments o, LEVEL_LIST
@@ -401,6 +406,8 @@ exports.Literal = class Literal extends Base
 
   isVar: ->
     IS_VAR.test @value
+  isCapsName: ->
+    IS_CAPS_NAME.test @value
 
   isSimpleNumber: ->
     SIMPLENUM.test @value
@@ -2506,6 +2513,7 @@ IS_STRING = /^['"]/
 IS_REGEX = /^\//
 IS_VAR = /^\$\w+$/
 IS_NAME = /^\w+$/
+IS_CAPS_NAME = /^[A-Z_]+$/
 IS_DOT_NAME = /^\.\w+$/
 IS_DOT_AT_NAME = /^\.@\w+$/
 

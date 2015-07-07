@@ -23,6 +23,16 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "class const",
+  '''
+  class A
+    B: 1
+  ''',
+  """
+  class A {
+    const B = 1;
+  }
+  """
 compare "preserve ref w/ splatted args",
   '''
   ( &$a, $b... ) ->
