@@ -1682,7 +1682,7 @@ exports.Param = class Param extends Base
       name = "_#{name}" if name.reserved
       node = new Literal o.scope.freeVariable name
     else if node.isComplex()
-      node = new Literal o.scope.freeVariable 'arg'
+      node = new Literal o.scope.freeVariable '$arg'
     else if remove_$ and node instanceof Literal and starts node.value, '$'
       node = new Literal node.value.substr 1
     node = new Value node

@@ -23,6 +23,16 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "destructured param",
+  '''
+  ([a, b]) ->
+  ''',
+  """
+  (function($arg) {
+    $a = $arg[0];
+    $b = $arg[1];
+  });
+  """
 compare "class const",
   '''
   class A
