@@ -163,8 +163,8 @@ task 'build:browser', 'rebuild the merged script for inclusion in the browser', 
   unless process.env.MINIFY is 'false'
     {code} = require('uglify-js').minify code, fromString: true
   fs.writeFileSync 'extras/coffee-script.js', header + '\n' + code
-  console.log "built ... running browser tests:"
-  invoke 'test:browser'
+  # console.log "built ... running browser tests:"
+  # invoke 'test:browser'
 
 
 task 'doc:site', 'watch and continually rebuild the documentation for the website', ->

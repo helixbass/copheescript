@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta http-equiv="content-type" content="text/html;charset=UTF-8" />
-  <title>CoffeeScript</title>
+  <title>CopheeScript</title>
   <link rel="canonical" href="http://coffeescript.org" />
   <link rel="stylesheet" type="text/css" href="documentation/css/docs.css" />
   <link rel="stylesheet" type="text/css" href="documentation/css/tomorrow.css" />
@@ -49,7 +49,7 @@
     </div>
     <div class="navigation try">
       <div class="button">
-        Try CoffeeScript
+        Try CopheeScript
         <div class="repl_bridge"></div>
       </div>
       <div class="contents repl_wrapper">
@@ -59,7 +59,7 @@
           <div class="screenshadow bl"></div>
           <div class="screenshadow br"></div>
           <div id="repl_source_wrap">
-            <textarea id="repl_source" rows="100" spellcheck="false">alert "Hello CoffeeScript!"</textarea>
+            <textarea id="repl_source" rows="100" spellcheck="false">echo "Hello CopheeScript!"</textarea>
           </div>
           <div id="repl_results_wrap"><pre id="repl_results"></pre></div>
           <div class="minibutton dark run" title="Ctrl-Enter">Run</div>
@@ -1795,7 +1795,7 @@ ref = text.split(" "), first = ref[0], last = ref[ref.length - 1];
       to assign properties to your instance from an options object passed to the constructor.
     </p>
     <div class='code'><pre><code><span class="class"><span class="keyword">class</span> <span class="title">Person</span></span>
-  <span class="attribute">constructor</span>: <span class="function"><span class="params">(options)</span> -&gt;</span> 
+  <span class="attribute">constructor</span>: <span class="function"><span class="params">(options)</span> -&gt;</span>
     {<span class="property">@name</span>, <span class="property">@age</span>, <span class="property">@height</span>} = options
 
 tim = <span class="keyword">new</span> Person <span class="attribute">age</span>: <span class="number">4</span>
@@ -1876,9 +1876,9 @@ Account = <span class="function"><span class="keyword">function</span><span clas
       constructed.
     </p>
     <p>
-      CoffeeScript functions also support 
+      CoffeeScript functions also support
       <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/function*">ES6 generator functions</a>
-      through the <tt>yield</tt> keyword. There's no <tt>function*(){}</tt> 
+      through the <tt>yield</tt> keyword. There's no <tt>function*(){}</tt>
       nonsense &mdash; a generator in CoffeeScript is simply a function that yields.
     </p>
     <div class='code'><pre><code><span class="function"><span class="title">perfectSquares</span> = -&gt;</span>
@@ -2129,7 +2129,7 @@ mobyDick = "Call me Ishmael. Some years ago -- never mind how long precisely -- 
          cup of coffeescript
        &lt;/strong&gt;
        """</span>
-       
+
 </code></pre><pre><code><span class="keyword">var</span> html;
 
 html = <span class="string">"&lt;strong&gt;\n  cup of coffeescript\n&lt;/strong&gt;"</span>;
@@ -2499,7 +2499,7 @@ task(<span class="string">'build:parser'</span>, <span class="string">'rebuild t
 </b>
       <ul>
         <li>
-          Interpolation now works in object literal keys (again). You can use this to 
+          Interpolation now works in object literal keys (again). You can use this to
           dynamically name properties.
         </li>
         <li>
@@ -2527,10 +2527,10 @@ task(<span class="string">'build:parser'</span>, <span class="string">'rebuild t
       <ul>
         <li>
           CoffeeScript now supports ES6 generators. A generator is simply a function
-          that <tt>yield</tt>s. 
+          that <tt>yield</tt>s.
         </li>
         <li>
-          More robust parsing and improved error messages for strings and regexes — 
+          More robust parsing and improved error messages for strings and regexes —
           especially with respect to interpolation.
         </li>
         <li>
@@ -3535,94 +3535,9 @@ task(<span class="string">'build:parser'</span>, <span class="string">'rebuild t
 
   </div>
 
-  <script type="text/coffeescript">
-    sourceFragment = "try:"
-
-    # Set up the compilation function, to run when you stop typing.
-    compileSource = ->
-      source = $('#repl_source').val()
-      results = $('#repl_results')
-      window.compiledJS = ''
-      try
-        window.compiledJS = CoffeeScript.compile source, bare: on
-        el = results[0]
-        if el.innerText
-          el.innerText = window.compiledJS
-        else
-          results.text(window.compiledJS)
-        results.removeClass 'error'
-        $('.minibutton.run').removeClass 'error'
-      catch {location, message}
-        if location?
-          message = "Error on line #{location.first_line + 1}: #{message}"
-        results.text(message).addClass 'error'
-        $('.minibutton.run').addClass 'error'
-
-      # Update permalink
-      $('#repl_permalink').attr 'href', "##{sourceFragment}#{encodeURIComponent source}"
-
-    # Listen for keypresses and recompile.
-    $('#repl_source').keyup -> compileSource()
-
-    # Eval the compiled js.
-    evalJS = ->
-      try
-        eval window.compiledJS
-      catch error then alert error
-
-    # Load the console with a string of CoffeeScript.
-    window.loadConsole = (coffee) ->
-      $('#repl_source').val coffee
-      compileSource()
-      $('.navigation.try').addClass('active')
-      false
-
-    # Helper to hide the menus.
-    closeMenus = ->
-      $('.navigation.active').removeClass 'active'
-
-    $('.minibutton.run').click -> evalJS()
-
-    # Bind navigation buttons to open the menus.
-    $('.navigation').click (e) ->
-      return if e.target.tagName.toLowerCase() is 'a'
-      return false if $(e.target).closest('.repl_wrapper').length
-      if $(this).hasClass('active')
-        closeMenus()
-      else
-        closeMenus()
-        $(this).addClass 'active'
-      false
-
-    # Dismiss console if Escape pressed or click falls outside console
-    # Trigger Run button on Ctrl-Enter
-    $(document.body)
-      .keydown (e) ->
-        closeMenus() if e.which == 27
-        evalJS() if e.which == 13 and (e.metaKey or e.ctrlKey) and $('.minibutton.run:visible').length
-      .click (e) ->
-        return false if $(e.target).hasClass('minibutton')
-        closeMenus()
-
-    $('#open_webchat').click ->
-      $(this).replaceWith $('<iframe src="http://webchat.freenode.net/?channels=coffeescript" width="625" height="400"></iframe>')
-
-    $("#repl_permalink").click (e) ->
-        window.location = $(this).attr("href")
-        false
-
-    # If source code is included in location.hash, display it.
-    hash = decodeURIComponent location.hash.replace(/^#/, '')
-    if hash.indexOf(sourceFragment) == 0
-        src = hash.substr sourceFragment.length
-        loadConsole src
-
-    compileSource()
-
-  </script>
-
   <script src="documentation/vendor/jquery-1.6.4.js"></script>
   <script src="extras/coffee-script.js"></script>
+  <script src="documentation/index.js"></script>
 
 </body>
 </html>

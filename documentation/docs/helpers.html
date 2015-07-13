@@ -134,7 +134,7 @@ arrays, count characters, that sort of thing.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre><span class="hljs-built_in">exports</span>.<span class="hljs-function"><span class="hljs-title">starts</span> = <span class="hljs-params">(string, literal, start)</span> -&gt;</span>
+            <div class="content"><div class='highlight'><pre><span class="hljs-built_in">exports</span>.starts = <span class="hljs-function"><span class="hljs-title">starts</span> = <span class="hljs-params">(string, literal, start)</span> -&gt;</span>
   literal <span class="hljs-keyword">is</span> string.substr start, literal.length</pre></div></div>
             
         </li>
@@ -583,7 +583,7 @@ it already.</p>
             </div>
             
             <div class="content"><div class='highlight'><pre>  <span class="hljs-keyword">if</span> process?
-    colorsEnabled = process.stdout.isTTY <span class="hljs-keyword">and</span> <span class="hljs-keyword">not</span> process.env.NODE_DISABLE_COLORS
+    colorsEnabled = process.stdout?.isTTY <span class="hljs-keyword">and</span> <span class="hljs-keyword">not</span> process.env?.NODE_DISABLE_COLORS
 
   <span class="hljs-keyword">if</span> <span class="hljs-property">@colorful</span> ? colorsEnabled
     <span class="hljs-function"><span class="hljs-title">colorize</span> = <span class="hljs-params">(str)</span> -&gt;</span> <span class="hljs-string">"\x1B[1;31m<span class="hljs-subst">#{str}</span>\x1B[0m"</span>
@@ -602,7 +602,13 @@ it already.</p>
     <span class="hljs-keyword">when</span> <span class="hljs-string">'\n'</span> <span class="hljs-keyword">then</span> <span class="hljs-string">'newline'</span>
     <span class="hljs-keyword">when</span> <span class="hljs-string">'\r'</span> <span class="hljs-keyword">then</span> <span class="hljs-string">'carriage return'</span>
     <span class="hljs-keyword">when</span> <span class="hljs-string">'\t'</span> <span class="hljs-keyword">then</span> <span class="hljs-string">'tab'</span>
-    <span class="hljs-keyword">else</span> string</pre></div></div>
+    <span class="hljs-keyword">else</span> string
+
+<span class="hljs-built_in">exports</span>.<span class="hljs-function"><span class="hljs-title">ensureQuoted</span> = <span class="hljs-params">( name )</span> -&gt;</span>
+  <span class="hljs-keyword">return</span> name <span class="hljs-keyword">if</span> starts name, <span class="hljs-string">'"'</span>
+  <span class="hljs-keyword">return</span> name <span class="hljs-keyword">if</span> starts name, <span class="hljs-string">"'"</span>
+
+  <span class="hljs-string">"'<span class="hljs-subst">#{ name }</span>'"</span></pre></div></div>
             
         </li>
         

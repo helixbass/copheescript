@@ -405,11 +405,11 @@ though <code>is</code> means <code>===</code> otherwise.</p>
     <span class="hljs-keyword">unless</span> forcedIdentifier
       id  = COFFEE_ALIAS_MAP[id] <span class="hljs-keyword">if</span> id <span class="hljs-keyword">in</span> COFFEE_ALIASES
       tag = <span class="hljs-keyword">switch</span> id
-        <span class="hljs-keyword">when</span> <span class="hljs-string">'!'</span>                 <span class="hljs-keyword">then</span> <span class="hljs-string">'UNARY'</span>
-        <span class="hljs-keyword">when</span> <span class="hljs-string">'=='</span>, <span class="hljs-string">'!='</span>          <span class="hljs-keyword">then</span> <span class="hljs-string">'COMPARE'</span>
-        <span class="hljs-keyword">when</span> <span class="hljs-string">'&amp;&amp;'</span>, <span class="hljs-string">'||'</span>          <span class="hljs-keyword">then</span> <span class="hljs-string">'LOGIC'</span>
-        <span class="hljs-keyword">when</span> <span class="hljs-string">'true'</span>, <span class="hljs-string">'false'</span>     <span class="hljs-keyword">then</span> <span class="hljs-string">'BOOL'</span>
-        <span class="hljs-keyword">when</span> <span class="hljs-string">'break'</span>, <span class="hljs-string">'continue'</span> <span class="hljs-keyword">then</span> <span class="hljs-string">'STATEMENT'</span>
+        <span class="hljs-keyword">when</span> <span class="hljs-string">'!'</span>                      <span class="hljs-keyword">then</span> <span class="hljs-string">'UNARY'</span>
+        <span class="hljs-keyword">when</span> <span class="hljs-string">'=='</span>, <span class="hljs-string">'!='</span>, <span class="hljs-string">'==='</span>, <span class="hljs-string">'!=='</span> <span class="hljs-keyword">then</span> <span class="hljs-string">'COMPARE'</span>
+        <span class="hljs-keyword">when</span> <span class="hljs-string">'&amp;&amp;'</span>, <span class="hljs-string">'||'</span>               <span class="hljs-keyword">then</span> <span class="hljs-string">'LOGIC'</span>
+        <span class="hljs-keyword">when</span> <span class="hljs-string">'true'</span>, <span class="hljs-string">'false'</span>          <span class="hljs-keyword">then</span> <span class="hljs-string">'BOOL'</span>
+        <span class="hljs-keyword">when</span> <span class="hljs-string">'break'</span>, <span class="hljs-string">'continue'</span>      <span class="hljs-keyword">then</span> <span class="hljs-string">'STATEMENT'</span>
         <span class="hljs-keyword">else</span>  tag
 
     tagToken = <span class="hljs-property">@token</span> tag, id, <span class="hljs-number">0</span>, idLength
@@ -484,7 +484,7 @@ interpolation.</p>
     {tokens, <span class="hljs-attribute">index</span>: end} = <span class="hljs-property">@matchWithInterpolations</span> regex, quote
     $ = tokens.length - <span class="hljs-number">1</span>
 
-    delimiter = quote[<span class="hljs-number">0</span>]
+    delimiter = quote.charAt(<span class="hljs-number">0</span>)
     <span class="hljs-keyword">if</span> heredoc</pre></div></div>
             
         </li>
@@ -1197,11 +1197,12 @@ empty string.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-44">&#182;</a>
               </div>
-              <p>Create a 0-length “+” token.</p>
+              <p>Create a 0-length “+” token.
+plusToken = @token ‘+’, ‘+’</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>        plusToken = <span class="hljs-property">@token</span> <span class="hljs-string">'+'</span>, <span class="hljs-string">'+'</span>
+            <div class="content"><div class='highlight'><pre>        plusToken = <span class="hljs-property">@token</span> <span class="hljs-string">'STR_CONCAT'</span>, <span class="hljs-string">'STR_CONCAT'</span>
         plusToken[<span class="hljs-number">2</span>] =
           <span class="hljs-attribute">first_line</span>:   locationToken[<span class="hljs-number">2</span>].first_line
           <span class="hljs-attribute">first_column</span>: locationToken[<span class="hljs-number">2</span>].first_column
@@ -1460,8 +1461,22 @@ not specified, the length of <code>value</code> will be used.</p>
             <div class="content"><div class='highlight'><pre>  <span class="hljs-attribute">validateEscapes</span>: <span class="hljs-function"><span class="hljs-params">(str, options = {})</span> -&gt;</span>
     match = INVALID_ESCAPE.exec str
     <span class="hljs-keyword">return</span> <span class="hljs-keyword">unless</span> match
-    [[], before, octal, hex, unicode] = match
-    <span class="hljs-keyword">return</span> <span class="hljs-keyword">if</span> options.isRegex <span class="hljs-keyword">and</span> octal <span class="hljs-keyword">and</span> octal.charAt(<span class="hljs-number">0</span>) <span class="hljs-keyword">isnt</span> <span class="hljs-string">'0'</span>
+    [[], before, octal, hex, unicode] = match</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-57">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-57">&#182;</a>
+              </div>
+              <p>return if options.isRegex and octal and octal.charAt(0) isnt ‘0’</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">return</span> <span class="hljs-keyword">if</span> octal
     message =
       <span class="hljs-keyword">if</span> octal
         <span class="hljs-string">"octal escape sequences are not allowed"</span>
@@ -1475,11 +1490,11 @@ not specified, the length of <code>value</code> will be used.</p>
         </li>
         
         
-        <li id="section-57">
+        <li id="section-58">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-57">&#182;</a>
+                <a class="pilcrow" href="#section-58">&#182;</a>
               </div>
               <p>Constructs a string or regex by escaping certain characters.</p>
 
@@ -1489,35 +1504,7 @@ not specified, the length of <code>value</code> will be used.</p>
     body = <span class="hljs-string">'(?:)'</span> <span class="hljs-keyword">if</span> body <span class="hljs-keyword">is</span> <span class="hljs-string">''</span> <span class="hljs-keyword">and</span> options.delimiter <span class="hljs-keyword">is</span> <span class="hljs-string">'/'</span>
     regex = <span class="hljs-regexp">///
         (\\\\)                               <span class="hljs-comment"># escaped backslash</span>
-      | (\\0(?=[1-7]))                       <span class="hljs-comment"># nul character mistaken as octal escape</span>
-      | \\?(<span class="hljs-subst">#{options.delimiter}</span>)            <span class="hljs-comment"># (possibly escaped) delimiter</span>
-      | \\?(?: (\n)|(\r)|(\u2028)|(\u2029) ) <span class="hljs-comment"># (possibly escaped) newlines</span>
-      | (\\.)                                <span class="hljs-comment"># other escapes</span>
-    ///</span>g
-    body = body.replace regex, <span class="hljs-function"><span class="hljs-params">(match, backslash, nul, delimiter, lf, cr, ls, ps, other)</span> -&gt;</span> <span class="hljs-keyword">switch</span></pre></div></div>
-            
-        </li>
-        
-        
-        <li id="section-58">
-            <div class="annotation">
-              
-              <div class="pilwrap ">
-                <a class="pilcrow" href="#section-58">&#182;</a>
-              </div>
-              <p>Ignore escaped backslashes.</p>
-
-            </div>
-            
-            <div class="content"><div class='highlight'><pre>      <span class="hljs-keyword">when</span> backslash <span class="hljs-keyword">then</span> (<span class="hljs-keyword">if</span> options.double <span class="hljs-keyword">then</span> backslash + backslash <span class="hljs-keyword">else</span> backslash)
-      <span class="hljs-keyword">when</span> nul       <span class="hljs-keyword">then</span> <span class="hljs-string">'\\x00'</span>
-      <span class="hljs-keyword">when</span> delimiter <span class="hljs-keyword">then</span> <span class="hljs-string">"\\<span class="hljs-subst">#{delimiter}</span>"</span>
-      <span class="hljs-keyword">when</span> lf        <span class="hljs-keyword">then</span> <span class="hljs-string">'\\n'</span>
-      <span class="hljs-keyword">when</span> cr        <span class="hljs-keyword">then</span> <span class="hljs-string">'\\r'</span>
-      <span class="hljs-keyword">when</span> ls        <span class="hljs-keyword">then</span> <span class="hljs-string">'\\u2028'</span>
-      <span class="hljs-keyword">when</span> ps        <span class="hljs-keyword">then</span> <span class="hljs-string">'\\u2029'</span>
-      <span class="hljs-keyword">when</span> other     <span class="hljs-keyword">then</span> (<span class="hljs-keyword">if</span> options.double <span class="hljs-keyword">then</span> <span class="hljs-string">"\\<span class="hljs-subst">#{other}</span>"</span> <span class="hljs-keyword">else</span> other)
-    <span class="hljs-string">"<span class="hljs-subst">#{options.delimiter}</span><span class="hljs-subst">#{body}</span><span class="hljs-subst">#{options.delimiter}</span>"</span></pre></div></div>
+</span></pre></div></div>
             
         </li>
         
@@ -1527,6 +1514,77 @@ not specified, the length of <code>value</code> will be used.</p>
               
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-59">&#182;</a>
+              </div>
+              <p>| (\0(?=[1-7]))                       # nul character mistaken as octal escape</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>      | \\?(<span class="hljs-comment">#{options.delimiter})            # (possibly escaped) delimiter</span>
+      | \\?(?: (\n)|(\r)|(\u2028)|(\u2029) ) <span class="hljs-comment"># (possibly escaped) newlines</span>
+      | (\\.)                                <span class="hljs-comment"># other escapes</span>
+    <span class="hljs-regexp">///g
+    body = body.replace regex, (match, backslash, <span class="hljs-comment">#nul,</span>
+                                delimiter, lf, cr, ls, ps, other) -&gt; switch
+</span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-60">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-60">&#182;</a>
+              </div>
+              <p>Ignore escaped backslashes.</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>      <span class="hljs-keyword">when</span> backslash <span class="hljs-keyword">then</span> (<span class="hljs-keyword">if</span> options.double <span class="hljs-keyword">then</span> backslash + backslash <span class="hljs-keyword">else</span> backslash)</pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-61">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-61">&#182;</a>
+              </div>
+              <p>when nul       then ‘\x00’</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>      <span class="hljs-keyword">when</span> delimiter <span class="hljs-keyword">then</span> <span class="hljs-string">"\\<span class="hljs-subst">#{delimiter}</span>"</span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-62">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-62">&#182;</a>
+              </div>
+              <p>when lf        then ‘\n’</p>
+
+            </div>
+            
+            <div class="content"><div class='highlight'><pre>      <span class="hljs-keyword">when</span> lf        <span class="hljs-keyword">then</span> <span class="hljs-string">'\n'</span>
+      <span class="hljs-keyword">when</span> cr        <span class="hljs-keyword">then</span> <span class="hljs-string">'\\r'</span>
+      <span class="hljs-keyword">when</span> ls        <span class="hljs-keyword">then</span> <span class="hljs-string">'\\u2028'</span>
+      <span class="hljs-keyword">when</span> ps        <span class="hljs-keyword">then</span> <span class="hljs-string">'\\u2029'</span>
+      <span class="hljs-keyword">when</span> other     <span class="hljs-keyword">then</span> (<span class="hljs-keyword">if</span> options.double <span class="hljs-keyword">then</span> <span class="hljs-string">"\\<span class="hljs-subst">#{other}</span>"</span> <span class="hljs-keyword">else</span> other)
+    <span class="hljs-string">"<span class="hljs-subst">#{options.delimiter}</span><span class="hljs-subst">#{body}</span><span class="hljs-subst">#{options.delimiter}</span>"</span></pre></div></div>
+            
+        </li>
+        
+        
+        <li id="section-63">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-63">&#182;</a>
               </div>
               <p>Throws an error at either a given offset from the current chunk or at the
 location of a token (<code>token[2]</code>).</p>
@@ -1545,11 +1603,11 @@ location of a token (<code>token[2]</code>).</p>
         </li>
         
         
-        <li id="section-60">
+        <li id="section-64">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-60">&#182;</a>
+                <a class="pilcrow" href="#section-64">&#182;</a>
               </div>
               <h2 id="constants">Constants</h2>
 
@@ -1558,11 +1616,11 @@ location of a token (<code>token[2]</code>).</p>
         </li>
         
         
-        <li id="section-61">
+        <li id="section-65">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-61">&#182;</a>
+                <a class="pilcrow" href="#section-65">&#182;</a>
               </div>
               
             </div>
@@ -1570,11 +1628,11 @@ location of a token (<code>token[2]</code>).</p>
         </li>
         
         
-        <li id="section-62">
+        <li id="section-66">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-62">&#182;</a>
+                <a class="pilcrow" href="#section-66">&#182;</a>
               </div>
               <p>Keywords that CoffeeScript shares in common with JavaScript.</p>
 
@@ -1585,17 +1643,17 @@ location of a token (<code>token[2]</code>).</p>
   <span class="hljs-string">'new'</span>, <span class="hljs-string">'delete'</span>, <span class="hljs-string">'typeof'</span>, <span class="hljs-string">'in'</span>, <span class="hljs-string">'instanceof'</span>
   <span class="hljs-string">'return'</span>, <span class="hljs-string">'throw'</span>, <span class="hljs-string">'break'</span>, <span class="hljs-string">'continue'</span>, <span class="hljs-string">'debugger'</span>, <span class="hljs-string">'yield'</span>
   <span class="hljs-string">'if'</span>, <span class="hljs-string">'else'</span>, <span class="hljs-string">'switch'</span>, <span class="hljs-string">'for'</span>, <span class="hljs-string">'while'</span>, <span class="hljs-string">'do'</span>, <span class="hljs-string">'try'</span>, <span class="hljs-string">'catch'</span>, <span class="hljs-string">'finally'</span>
-  <span class="hljs-string">'class'</span>, <span class="hljs-string">'extends'</span>, <span class="hljs-string">'super'</span>
+  <span class="hljs-string">'class'</span>, <span class="hljs-string">'extends'</span>, <span class="hljs-string">'super'</span>, <span class="hljs-string">'trait'</span>, <span class="hljs-string">'abstract'</span>
 ]</pre></div></div>
             
         </li>
         
         
-        <li id="section-63">
+        <li id="section-67">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-63">&#182;</a>
+                <a class="pilcrow" href="#section-67">&#182;</a>
               </div>
               <p>CoffeeScript-only keywords.</p>
 
@@ -1606,8 +1664,8 @@ location of a token (<code>token[2]</code>).</p>
 COFFEE_ALIAS_MAP =
   <span class="hljs-keyword">and</span>  : <span class="hljs-string">'&amp;&amp;'</span>
   <span class="hljs-keyword">or</span>   : <span class="hljs-string">'||'</span>
-  <span class="hljs-keyword">is</span>   : <span class="hljs-string">'=='</span>
-  <span class="hljs-keyword">isnt</span> : <span class="hljs-string">'!='</span>
+  <span class="hljs-keyword">is</span>   : <span class="hljs-string">'==='</span>
+  <span class="hljs-keyword">isnt</span> : <span class="hljs-string">'!=='</span>
   <span class="hljs-keyword">not</span>  : <span class="hljs-string">'!'</span>
   <span class="hljs-literal">yes</span>  : <span class="hljs-string">'true'</span>
   <span class="hljs-literal">no</span>   : <span class="hljs-string">'false'</span>
@@ -1620,11 +1678,11 @@ COFFEE_KEYWORDS = COFFEE_KEYWORDS.concat COFFEE_ALIASES</pre></div></div>
         </li>
         
         
-        <li id="section-64">
+        <li id="section-68">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-64">&#182;</a>
+                <a class="pilcrow" href="#section-68">&#182;</a>
               </div>
               <p>The list of keywords that are reserved by JavaScript, but not used, or are
 used by CoffeeScript internally. We throw an error when these are encountered,
@@ -1635,7 +1693,7 @@ to avoid having a JavaScript error at runtime.</p>
             <div class="content"><div class='highlight'><pre>RESERVED = [
   <span class="hljs-string">'case'</span>, <span class="hljs-string">'default'</span>, <span class="hljs-string">'function'</span>, <span class="hljs-string">'var'</span>, <span class="hljs-string">'void'</span>, <span class="hljs-string">'with'</span>, <span class="hljs-string">'const'</span>, <span class="hljs-string">'let'</span>, <span class="hljs-string">'enum'</span>
   <span class="hljs-string">'export'</span>, <span class="hljs-string">'import'</span>, <span class="hljs-string">'native'</span>, <span class="hljs-string">'implements'</span>, <span class="hljs-string">'interface'</span>, <span class="hljs-string">'package'</span>, <span class="hljs-string">'private'</span>
-  <span class="hljs-string">'protected'</span>, <span class="hljs-string">'public'</span>, <span class="hljs-string">'static'</span>
+  <span class="hljs-string">'protected'</span>, <span class="hljs-string">'public'</span>, <span class="hljs-comment">#'static'</span>
 ]
 
 STRICT_PROSCRIBED = [<span class="hljs-string">'arguments'</span>, <span class="hljs-string">'eval'</span>, <span class="hljs-string">'yield*'</span>]</pre></div></div>
@@ -1643,11 +1701,11 @@ STRICT_PROSCRIBED = [<span class="hljs-string">'arguments'</span>, <span class="
         </li>
         
         
-        <li id="section-65">
+        <li id="section-69">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-65">&#182;</a>
+                <a class="pilcrow" href="#section-69">&#182;</a>
               </div>
               <p>The superset of both JavaScript keywords and reserved words, none of which may
 be used as identifiers or properties.</p>
@@ -1662,11 +1720,11 @@ be used as identifiers or properties.</p>
         </li>
         
         
-        <li id="section-66">
+        <li id="section-70">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-66">&#182;</a>
+                <a class="pilcrow" href="#section-70">&#182;</a>
               </div>
               <p>The character code of the nasty Microsoft madness otherwise known as the BOM.</p>
 
@@ -1677,11 +1735,11 @@ be used as identifiers or properties.</p>
         </li>
         
         
-        <li id="section-67">
+        <li id="section-71">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-67">&#182;</a>
+                <a class="pilcrow" href="#section-71">&#182;</a>
               </div>
               <p>Token matching regexes.</p>
 
@@ -1689,7 +1747,7 @@ be used as identifiers or properties.</p>
             
             <div class="content"><div class='highlight'><pre>IDENTIFIER = <span class="hljs-regexp">/// ^
   (?!\d)
-  ( (?: (?!\s)[$\w\x7f-\uffff] )+ )
+  ( (?: (?!\s)[$\\\w\x7f-\uffff] )+ )
   ( [^\n\S]* : (?!:) )?  <span class="hljs-comment"># Is this a property name?</span>
 ///</span>
 
@@ -1702,7 +1760,8 @@ NUMBER     = <span class="hljs-regexp">///
 
 OPERATOR   = <span class="hljs-regexp">/// ^ (
   ?: [-=]&gt;             <span class="hljs-comment"># function</span>
-   | [-+*/%&lt;&gt;&amp;|^!?=]=  <span class="hljs-comment"># compound assign / compare</span>
+   | [-+*/%&lt;&gt;&amp;|^!?=.]=  <span class="hljs-comment"># compound assign / compare</span>
+   | \?:               <span class="hljs-comment"># mini ternary</span>
    | &gt;&gt;&gt;=?             <span class="hljs-comment"># zero-fill right shift</span>
    | ([-+:])\1         <span class="hljs-comment"># doubles</span>
    | ([&amp;|&lt;&gt;*/%])\2=?   <span class="hljs-comment"># logic / shift / power / floor division / modulo</span>
@@ -1723,11 +1782,11 @@ JSTOKEN    = <span class="hljs-regexp">/^`[^\\`]*(?:\\.[^\\`]*)*`/</span></pre><
         </li>
         
         
-        <li id="section-68">
+        <li id="section-72">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-68">&#182;</a>
+                <a class="pilcrow" href="#section-72">&#182;</a>
               </div>
               <p>String-matching-regexes.</p>
 
@@ -1750,11 +1809,11 @@ HEREDOC_INDENT     = <span class="hljs-regexp">/\n+([^\n\S]*)(?=\S)/g</span></pr
         </li>
         
         
-        <li id="section-69">
+        <li id="section-73">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-69">&#182;</a>
+                <a class="pilcrow" href="#section-73">&#182;</a>
               </div>
               <p>Regex-matching-regexes.</p>
 
@@ -1766,7 +1825,7 @@ HEREDOC_INDENT     = <span class="hljs-regexp">/\n+([^\n\S]*)(?=\S)/g</span></pr
    | \\[^\n]         <span class="hljs-comment"># anything but newlines escaped</span>
    | \[              <span class="hljs-comment"># character class</span>
        (?: \\[^\n] | [^ \] \n \\ ] )*
-     ]
+     \]
   )*) (/)?
 ///</span>
 
@@ -1788,11 +1847,11 @@ POSSIBLY_DIVISION   = <span class="hljs-regexp">/// ^ /=?\s ///</span></pre></di
         </li>
         
         
-        <li id="section-70">
+        <li id="section-74">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-70">&#182;</a>
+                <a class="pilcrow" href="#section-74">&#182;</a>
               </div>
               <p>Other regexes.</p>
 
@@ -1819,11 +1878,11 @@ TRAILING_SPACES     = <span class="hljs-regexp">/\s+$/</span></pre></div></div>
         </li>
         
         
-        <li id="section-71">
+        <li id="section-75">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-71">&#182;</a>
+                <a class="pilcrow" href="#section-75">&#182;</a>
               </div>
               <p>Compound assignment tokens.</p>
 
@@ -1831,17 +1890,17 @@ TRAILING_SPACES     = <span class="hljs-regexp">/\s+$/</span></pre></div></div>
             
             <div class="content"><div class='highlight'><pre>COMPOUND_ASSIGN = [
   <span class="hljs-string">'-='</span>, <span class="hljs-string">'+='</span>, <span class="hljs-string">'/='</span>, <span class="hljs-string">'*='</span>, <span class="hljs-string">'%='</span>, <span class="hljs-string">'||='</span>, <span class="hljs-string">'&amp;&amp;='</span>, <span class="hljs-string">'?='</span>, <span class="hljs-string">'&lt;&lt;='</span>, <span class="hljs-string">'&gt;&gt;='</span>, <span class="hljs-string">'&gt;&gt;&gt;='</span>
-  <span class="hljs-string">'&amp;='</span>, <span class="hljs-string">'^='</span>, <span class="hljs-string">'|='</span>, <span class="hljs-string">'**='</span>, <span class="hljs-string">'//='</span>, <span class="hljs-string">'%%='</span>
+  <span class="hljs-string">'&amp;='</span>, <span class="hljs-string">'^='</span>, <span class="hljs-string">'|='</span>, <span class="hljs-string">'**='</span>, <span class="hljs-string">'//='</span>, <span class="hljs-string">'%%='</span>, <span class="hljs-string">'.='</span>
 ]</pre></div></div>
             
         </li>
         
         
-        <li id="section-72">
+        <li id="section-76">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-72">&#182;</a>
+                <a class="pilcrow" href="#section-76">&#182;</a>
               </div>
               <p>Unary tokens.</p>
 
@@ -1854,11 +1913,11 @@ UNARY_MATH = [<span class="hljs-string">'!'</span>, <span class="hljs-string">'~
         </li>
         
         
-        <li id="section-73">
+        <li id="section-77">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-73">&#182;</a>
+                <a class="pilcrow" href="#section-77">&#182;</a>
               </div>
               <p>Logical tokens.</p>
 
@@ -1869,11 +1928,11 @@ UNARY_MATH = [<span class="hljs-string">'!'</span>, <span class="hljs-string">'~
         </li>
         
         
-        <li id="section-74">
+        <li id="section-78">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-74">&#182;</a>
+                <a class="pilcrow" href="#section-78">&#182;</a>
               </div>
               <p>Bit-shifting tokens.</p>
 
@@ -1884,11 +1943,11 @@ UNARY_MATH = [<span class="hljs-string">'!'</span>, <span class="hljs-string">'~
         </li>
         
         
-        <li id="section-75">
+        <li id="section-79">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-75">&#182;</a>
+                <a class="pilcrow" href="#section-79">&#182;</a>
               </div>
               <p>Comparison tokens.</p>
 
@@ -1899,11 +1958,11 @@ UNARY_MATH = [<span class="hljs-string">'!'</span>, <span class="hljs-string">'~
         </li>
         
         
-        <li id="section-76">
+        <li id="section-80">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-76">&#182;</a>
+                <a class="pilcrow" href="#section-80">&#182;</a>
               </div>
               <p>Mathematical tokens.</p>
 
@@ -1914,11 +1973,11 @@ UNARY_MATH = [<span class="hljs-string">'!'</span>, <span class="hljs-string">'~
         </li>
         
         
-        <li id="section-77">
+        <li id="section-81">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-77">&#182;</a>
+                <a class="pilcrow" href="#section-81">&#182;</a>
               </div>
               <p>Relational tokens that are negatable with <code>not</code> prefix.</p>
 
@@ -1929,11 +1988,11 @@ UNARY_MATH = [<span class="hljs-string">'!'</span>, <span class="hljs-string">'~
         </li>
         
         
-        <li id="section-78">
+        <li id="section-82">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-78">&#182;</a>
+                <a class="pilcrow" href="#section-82">&#182;</a>
               </div>
               <p>Boolean tokens.</p>
 
@@ -1944,11 +2003,11 @@ UNARY_MATH = [<span class="hljs-string">'!'</span>, <span class="hljs-string">'~
         </li>
         
         
-        <li id="section-79">
+        <li id="section-83">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-79">&#182;</a>
+                <a class="pilcrow" href="#section-83">&#182;</a>
               </div>
               <p>Tokens which could legitimately be invoked or indexed. An opening
 parentheses or bracket following these tokens will be recorded as the start
@@ -1965,11 +2024,11 @@ INDEXABLE = CALLABLE.concat [
         </li>
         
         
-        <li id="section-80">
+        <li id="section-84">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-80">&#182;</a>
+                <a class="pilcrow" href="#section-84">&#182;</a>
               </div>
               <p>Tokens which a regular expression will never immediately follow (except spaced
 CALLABLEs in some cases), but which a division operator can.</p>
@@ -1982,11 +2041,11 @@ CALLABLEs in some cases), but which a division operator can.</p>
         </li>
         
         
-        <li id="section-81">
+        <li id="section-85">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-81">&#182;</a>
+                <a class="pilcrow" href="#section-85">&#182;</a>
               </div>
               <p>Tokens that, when immediately preceding a <code>WHEN</code>, indicate that the <code>WHEN</code>
 occurs at the start of a line. We disambiguate these from trailing whens to
@@ -1999,11 +2058,11 @@ avoid an ambiguity in the grammar.</p>
         </li>
         
         
-        <li id="section-82">
+        <li id="section-86">
             <div class="annotation">
               
               <div class="pilwrap ">
-                <a class="pilcrow" href="#section-82">&#182;</a>
+                <a class="pilcrow" href="#section-86">&#182;</a>
               </div>
               <p>Additional indent in front of these is ignored.</p>
 
