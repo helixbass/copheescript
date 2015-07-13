@@ -112,6 +112,7 @@ grammar =
     o 'For'
     o 'Switch'
     o 'Class'
+    o 'Trait'
     o 'Throw'
   ]
 
@@ -149,7 +150,7 @@ grammar =
   # through and printed to JavaScript.
   Literal: [
     o 'AlphaNumeric'
-    o 'JS',                                     -> new Literal $1
+    o 'JS',                                     -> new Literal $1, yes
     o 'Regex'
     o 'DEBUGGER',                               -> new Literal $1
     o 'UNDEFINED',                              -> new Undefined
@@ -171,7 +172,10 @@ grammar =
     o 'ObjAssignable : Expression',             -> new Assign LOC(1)(new Value($1)), $3, 'object'
     o 'ObjAssignable :
        INDENT Expression OUTDENT',              -> new Assign LOC(1)(new Value($1)), $4, 'object'
+    o 'ABSTRACT ObjAssignable : Expression',    -> new Assign LOC(1)(new Value($2, null, null, yes)), $4, 'object'
     o 'Comment'
+    o '. Identifier',                           -> new Value new Literal ".#{ $2.value }"
+    o '. @ Identifier',                         -> new Value new Literal ".@#{ $3.value }"
   ]
 
   ObjAssignable: [
@@ -324,6 +328,18 @@ grammar =
     o 'CLASS SimpleAssignable Block',                    -> new Class $2, null, $3
     o 'CLASS SimpleAssignable EXTENDS Expression',       -> new Class $2, $4
     o 'CLASS SimpleAssignable EXTENDS Expression Block', -> new Class $2, $4, $5
+    o 'ABSTRACT CLASS',                                           -> new Class null, null, null, no, yes
+    o 'ABSTRACT CLASS Block',                                     -> new Class null, null, $3, no, yes
+    o 'ABSTRACT CLASS EXTENDS Expression',                        -> new Class null, $4, null, no, yes
+    o 'ABSTRACT CLASS EXTENDS Expression Block',                  -> new Class null, $4, $5, no,  yes
+    o 'ABSTRACT CLASS SimpleAssignable',                          -> new Class $3, null, null, no, yes
+    o 'ABSTRACT CLASS SimpleAssignable Block',                    -> new Class $3, null, $4, no, yes
+    o 'ABSTRACT CLASS SimpleAssignable EXTENDS Expression',       -> new Class $3, $5, null, no, yes
+    o 'ABSTRACT CLASS SimpleAssignable EXTENDS Expression Block', -> new Class $3, $5, $6, no, yes
+  ]
+
+  Trait: [
+    o 'TRAIT SimpleAssignable Block',                    -> new Class $2, null, $3, yes
   ]
 
   # Ordinary function invocation, or a chained series of calls.
@@ -494,7 +510,9 @@ grammar =
   # of object comprehensions.
   ForVariables: [
     o 'ForValue',                               -> [$1]
+    o 'LOGIC ForValue',                         -> $2.is_ref = yes; [$2]
     o 'ForValue , ForValue',                    -> [$1, $3]
+    o 'ForValue , LOGIC ForValue',              -> $4.is_ref = yes; [$1, $4]
   ]
 
   # The source of a comprehension is an array or object with an optional guard

@@ -23,6 +23,395 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "destructured param",
+  '''
+  ([a, b]) ->
+  ''',
+  """
+  (function($arg) {
+    $a = $arg[0];
+    $b = $arg[1];
+  });
+  """
+compare "class const",
+  '''
+  class A
+    B: 1
+  ''',
+  """
+  class A {
+    const B = 1;
+  }
+  """
+compare "preserve ref w/ splatted args",
+  '''
+  ( &$a, $b... ) ->
+  ''',
+  """
+  (function(&$a) {
+    $__args = func_get_args();
+    $b = array_slice($__args, 1);
+  });
+  """
+compare "{ .col }",
+  '''
+  { .col }
+  ''',
+  """
+  ([ '.col' => $col ]);
+  """
+compare "{ .@col }",
+  '''
+  { .@col }
+  ''',
+  """
+  ([ '.col' => $this->col ]);
+  """
+compare "{ .@col } mixed",
+  # '''
+  # { a: 1
+  #   .@col }
+  # ''',
+  '''
+  { .col, .col2 }
+  { a: 1,
+    .@col,
+    .col2 }
+  ''',
+  """
+  ([ '.col' => $col,
+     '.col2' => $col2 ]);
+  ([ 'a' => 1,
+     '.col' => $this->col,
+     '.col2' => $col2 ]);
+  """
+
+compare "splatted arg",
+  '''
+  A::b $a...
+  f $b, $c...
+  ''',
+  """
+  call_user_func_array('A::b', $a);
+  call_user_func_array('f', array_merge([$b], $c));
+  """
+
+compare "foreach &ref",
+  '''
+  for &$a of $b
+    $a["c"] = 3
+  ''',
+  '''
+  foreach ($b as &$a) {
+    $a["c"] = 3;
+  }
+  '''
+
+compare "foreach &ref w/ key",
+  '''
+  for $k, &$a of $b
+    $a["c"] = 3
+  ''',
+  '''
+  foreach ($b as $k => &$a) {
+    $a["c"] = 3;
+  }
+  '''
+
+compare "interpolated key",
+  '''
+  "#{ $a }.b": 1
+  ''',
+  '''
+  ([ $a . ".b" => 1 ]);
+  '''
+
+# compare "prop/access obj key",
+#   """
+#   a:      1
+#   $b.c:    2
+#   $d['e']: 3
+#   """,
+#   """
+#   ['a' => 1,
+#    $b->c => 2,
+#    $d['e'] => 3]
+#   """
+
+compare "abstract method",
+  '''
+  abstract class A
+    abstract x: ->
+    abstract @y: ->
+  ''',
+  """
+  abstract class A {
+    abstract function x() ;
+    abstract static function y() ;
+  }
+  """
+
+compare "non-initial abstract method",
+  '''
+  class A
+    x: ->
+    abstract y: ->
+  ''',
+  """
+  class A {
+    function x() {}
+    abstract function y() ;
+  }
+  """
+
+compare "abstract class",
+  '''
+  abstract class A
+    use B
+  ''',
+  """
+  abstract class A {
+    use B;
+  }
+  """
+
+compare "access self prop",
+  """
+  self::$a['b']
+  """,
+  """
+  self::$a['b'];
+  """
+
+compare "existy op on prop",
+  """
+  $x = self::$a['b'] ? 3
+  """,
+  """
+  $x = isset( self::$a['b'] ) ? self::$a['b'] : (3);
+  """
+
+compare "splatted param",
+  '''
+  ( $a, $b... ) ->
+  ''',
+  """
+  (function() {
+    $__args = func_get_args();
+    $a = $__args[0];
+    $b = array_slice($__args, 1);
+  });
+  """
+
+compare "octal escape",
+  '''
+  "abc\033def"
+  ''',
+  '''
+  "abc\033def";
+  '''
+
+compare "don't return unset",
+  """
+  ( $x ) -> unset $x['a'];
+  """,
+  """
+  (function($x) {
+    unset($x['a']);
+  });
+  """
+
+compare "(unset) vs unset",
+  '''
+  (unset) $x
+  unset $x
+  ''',
+  """
+  (unset)($x);
+  unset($x);
+  """
+
+# compare "type cast w/ expr",
+#   '''
+#   (int) $x + $y
+#   ''',
+#   """
+#   (int)($x) + $y;
+#   """
+
+compare "type cast w/ paren expr",
+  '''
+  (int) ($x + $y)
+  (int)($x) + $y
+  ''',
+  """
+  (int)($x + $y);
+  (int)($x) + $y;
+  """
+
+compare "type cast",
+  '''
+  (int) $x
+  ''',
+  """
+  (int)($x);
+  """
+
+compare "static::$prop",
+  '''
+  static::$prop
+  ''',
+  """
+  static::$prop;
+  """
+
+compare "don't use $GLOBALS",
+  """
+  ->
+    $GLOBALS['a'] + $b
+  """,
+  """
+  (function() use (&$b) {
+    return $GLOBALS['a'] + $b;
+  });
+  """
+
+compare "else if expression",
+  '''
+  $x =
+    if $a
+      1
+    else if $b
+      2
+    else 3
+  ''',
+  """
+  $x = $a ? 1 : ($b ? 2 : (3));
+  """
+
+compare "assign to splatted array",
+  '''
+  [a, b..., c] = $v;
+  ''',
+  """
+  $a = $v[0]; $b = array_slice($v, 1, -1); $i = count($v) - 1; $c = $v[$i++];
+  """
+
+compare "splatted array",
+  '''
+  [@a, ( $b ?: [])...]
+  ''',
+  """
+  array_merge([$this->a], $b ?: []);
+  """
+
+compare "phpdoc block comment",
+  '''
+  ###
+  # Great test
+  #
+  # @dataProvider provider_test
+  ###
+  ''',
+  """
+  /**
+   * Great test
+   *
+   * @dataProvider provider_test
+   */
+  """
+
+compare "triple regex",
+  '''
+  ///
+    a*
+    b
+  ///
+  ''',
+  """
+  '/a*b/';
+  """
+
+compare "existy prop w/ chain",
+  '''
+  $c = $a?.b.c
+  ''',
+  '''
+  $c = isset( $a->b ) ? $a->b->c : null;
+  '''
+
+compare "trait",
+  '''
+  trait A
+    x: ->
+      3
+  ''',
+  """
+  trait A {
+    function x() {
+      return 3;
+    }
+  }
+  """
+
+compare "1 < $a < 3",
+  '''
+  1 < $a.b < 3
+  ''',
+  """
+  (1 < ($ref = $a->b) && $ref < 3);
+  """
+
+compare "use trait",
+  '''
+  class A
+    use B
+  ''',
+  """
+  class A {
+    use B;
+  }
+  """
+
+compare "backticked methods",
+  '''
+  class A
+    `function x() {}`
+  ''',
+  """
+  class A {
+    function x() {}
+  }
+  """
+
+compare "mixed obj w/ interpolated string",
+  '''
+  { a, "abc#{ $b }" }
+  ''',
+  """
+  ([ 'a' => $a, \"abc\" . $b ]);
+  """
+compare "namespaced name",
+  '''
+  $x = do Parse\ParseInstallation::query
+  ''',
+  '''
+  $x = Parse\ParseInstallation::query();
+  '''
+compare "deref list",
+  '''
+  [ a ] = $obj
+  ''',
+  """
+  $a = $obj[0];
+  """
+compare "deref list multiple",
+  '''
+  [ a, b ] = $obj
+  ''',
+  """
+  $a = $obj[0]; $b = $obj[1];
+  """
 
 compare "triple quote newline",
   '''
@@ -47,7 +436,7 @@ compare "use shouldn't pick up other method params",
     function a($start) {}
 
     function b() {
-      return function() use ($new_time) {
+      return function() use (&$new_time) {
         return $start = date_create($new_time);
       };
     }
@@ -224,7 +613,7 @@ compare "?= param w/ default",
   ( $x=5 ) -> $x ?= 3
   ''',
   '''
-  (function($x=5) { return isset( $x ) ? $x : $x = 3; });
+  (function($x=5) { return isset( $x ) ? $x : ($x = 3); });
   '''
 compare "assigned switch",
   '''
@@ -234,7 +623,7 @@ compare "assigned switch",
         3
   ''',
   '''
-  $x = call_user_func((function() use ($y) {
+  $x = call_user_func((function() use (&$y) {
     switch ($y) {
       case 5:
         return 3;
@@ -318,7 +707,7 @@ compare "automatic use",
   -> $a
   ''',
   '''
-  (function() use ($a) { return $a; });
+  (function() use (&$a) { return $a; });
   '''
 
 compare "obj literal adds quotes to keys",
@@ -464,7 +853,7 @@ compare "existy or",
   $b = $a ? 3
   ''',
   '''
-  $b = isset( $a ) ? $a : 3;
+  $b = isset( $a ) ? $a : (3);
   '''
 
 compare "existy prop",
@@ -592,7 +981,7 @@ compare "use from nested closure",
     -> $x
   ''',
   '''
-  (function() use ($x) { return function() use ($x) { return $x; }; });
+  (function() use (&$x) { return function() use (&$x) { return $x; }; });
   '''
 
 compare "use from nested closure don't use nested param",
@@ -601,7 +990,7 @@ compare "use from nested closure don't use nested param",
     ( $y ) -> $x + $y
   ''',
   '''
-  (function() use ($x) { return function($y) use ($x) { return $x + $y; }; });
+  (function() use (&$x) { return function($y) use (&$x) { return $x + $y; }; });
   '''
 
 

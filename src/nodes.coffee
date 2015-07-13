@@ -105,7 +105,7 @@ exports.Base = class Base
   cache: (o, level, isComplex) ->
     complex = if isComplex? then isComplex this else @isComplex()
     if complex
-      ref = new Literal o.scope.freeVariable 'ref'
+      ref = new Literal o.scope.freeVariable '$ref'
       sub = new Assign ref, this
       if level then [sub.compileToFragments(o, level), [@makeCode(ref.value)]] else [sub, ref]
     else
@@ -300,10 +300,15 @@ exports.Block = class Block extends Base
         fragments = node.compileToFragments o
         unless node.isStatement o
           fragments.unshift @makeCode "#{@tab}"
-          unless node instanceof Class or @_is_class_body and node instanceof Assign and node.value instanceof Code
+          unless node instanceof Class or @_is_class_body and ( node.is_backticked or node instanceof Assign and node.value instanceof Code )
             fragments.push @makeCode ";"
           if @_is_class_body and node instanceof Assign and not( node.value instanceof Code )
-            fragments.unshift @makeCode "public "
+            fragments.unshift @makeCode(
+              if node.variable?.base?.isCapsName?()
+                "const "
+              else
+                "public "
+            )
         compiledNodes.push fragments
       else
         compiledNodes.push node.compileToFragments o, LEVEL_LIST
@@ -332,9 +337,10 @@ exports.Block = class Block extends Base
     o.scope.parameter name for name in o.locals or []
     prelude   = []
     unless o.bare
-      preludeExps = for exp, i in @expressions
-        break unless exp.unwrap() instanceof Comment
-        exp
+      preludeExps = []
+      # preludeExps = for exp, i in @expressions
+      #   break unless exp.unwrap() instanceof Comment
+      #   exp
       rest = @expressions[preludeExps.length...]
       @expressions = preludeExps
       if preludeExps.length
@@ -390,7 +396,7 @@ exports.Block = class Block extends Base
 # JavaScript without translation, such as: strings, numbers,
 # `true`, `false`, `null`...
 exports.Literal = class Literal extends Base
-  constructor: (@value) ->
+  constructor: (@value, @is_backticked) ->
 
   makeReturn: ->
     if @isStatement() then this else super
@@ -400,6 +406,8 @@ exports.Literal = class Literal extends Base
 
   isVar: ->
     IS_VAR.test @value
+  isCapsName: ->
+    IS_CAPS_NAME.test @value
 
   isSimpleNumber: ->
     SIMPLENUM.test @value
@@ -417,11 +425,13 @@ exports.Literal = class Literal extends Base
     return this if @value is 'continue' and not o?.loop
 
   compileNode: (o) ->
-    # console.log @value
+    # console.log 'value', @value
     if do @isVar
       o.scope.add_free @value
     code = if @value is 'this'
       if o.scope.method?.bound then o.scope.method.context else '$this'
+    else if IS_REGEX.test @value
+      ensureQuoted @value
     # else if @value.reserved
     #   "\"#{@value}\""
     else
@@ -483,11 +493,15 @@ exports.Return = class Return extends Base
 # A value, variable or literal or parenthesized, indexed or dotted into,
 # or vanilla.
 exports.Value = class Value extends Base
-  constructor: (base, props, tag) ->
-    return base if not props and base instanceof Value
+  constructor: (base, props, tag, @is_abstract) ->
+    # return base if not props and base instanceof Value
+    if not props and base instanceof Value
+      base.is_abstract = @is_abstract
+      return base
     @base       = base
     @properties = props or []
     @[tag]      = true if tag
+    # console.log 'abstract value', base, base.constructor.name if @is_abstract
     return this
 
   children: ['base', 'properties']
@@ -566,15 +580,20 @@ exports.Value = class Value extends Base
   compileNode: (o) ->
     # console.log 'value props', @base, @properties if @properties?.length
     # console.log 'value', @base, @properties, do @isVar, o.scope
+    # console.log 'prop', @properties[1], @properties[1].constructor.name
     if @base.value and do @isVar and @properties[0]?.name?.value isnt 'prototype'
       o.scope.add_free @base.value
     @base.front = @front
     props = @properties
     fragments = @base.compileToFragments o, (if props.length then LEVEL_ACCESS else null)
+    # if @is_abstract
+    #   fragments.unshift @makeCode 'abstract '
     if (@base instanceof Parens or props.length) and SIMPLENUM.test fragmentsToText fragments
       fragments.push @makeCode '.'
     if @properties.length > 1 and @properties[0].name?.value is 'prototype'
       fragments.push @makeCode "::#{ @properties[1].name.value }"
+      if @properties.length > 2
+        fragments.push (property.compileToFragments o)... for property in @properties[2..]
     else
       for prop in props
         fragments.push (prop.compileToFragments o)...
@@ -588,13 +607,16 @@ exports.Value = class Value extends Base
         return ifn
       for prop, i in @properties when prop.soak
         prop.soak = off
-        fst = new Value @base, @properties[...i]
-        snd = new Value @base, @properties[i..]
-        if fst.isComplex()
-          ref = new Literal o.scope.freeVariable 'ref'
-          fst = new Parens new Assign ref, fst
-          snd.base = ref
-        return new If new Existence(snd), snd, soak: on
+        # fst = new Value @base, @properties[...i]
+        fst = new Value @base, @properties[..i]
+        # snd = new Value @base, @properties[i..]
+        snd = new Value @base, @properties[...]
+        # if fst.isComplex()
+        #   ref = new Literal o.scope.freeVariable '$ref'
+        #   fst = new Parens new Assign ref, fst
+        #   snd.base = ref
+        # return new If new Existence(snd), snd, soak: on
+        return new If new Existence(fst), snd, soak: on
       no
 
 #### Comment
@@ -608,8 +630,8 @@ exports.Comment = class Comment extends Base
   makeReturn:      THIS
 
   compileNode: (o, level) ->
-    comment = @comment.replace /^(\s*)# /gm, "$1 * "
-    code = "/*#{multident comment, @tab}#{if '\n' in comment then "\n#{@tab}" else ''} */"
+    comment = @comment.replace /^(\s*)#( |$)/gm, "$1 * $2"
+    code = "/**#{multident comment, @tab}#{if '\n' in comment then "\n#{@tab}" else ''} */"
     code = o.indent + code if (level or o.level) is LEVEL_TOP
     [@makeCode("\n"), @makeCode(code)]
 
@@ -724,15 +746,24 @@ exports.Call = class Call extends Base
       fragments.push @makeCode preface
     else
       if @isNew then fragments.push @makeCode 'new '
+      fragments.push @makeCode "(" if do @_is_cast
       fragments.push @variable.compileToFragments(o, LEVEL_ACCESS)...
+      fragments.push @makeCode ")" if do @_is_cast
       if @variable instanceof Value
         fragments.push @makeCode if do @_dont_paren then " " else "("
     fragments.push compiledArgs...
     fragments.push @makeCode ")" unless do @_dont_paren
     fragments
 
+  _is_cast: ->
+    @variable.base and @variable.base instanceof Parens and @variable.base.body?.expressions?[0]?.base?.value in ['int', 'integer', 'bool', 'boolean', 'float', 'double', 'real', 'string', 'array', 'object', 'unset', 'binary']
   _dont_paren: ->
-   @variable.base?.value in ['global']
+    @variable.base?.value in ['global', 'use']
+  _dont_return: ->
+    @variable.base?.value in ['unset']
+
+  makeReturn: ->
+    if do @_dont_return then this else super
 
   # If you call a function with a splat, it's converted into a JavaScript
   # `.apply()` call to allow an array of arguments to be passed.
@@ -758,22 +789,24 @@ exports.Call = class Call extends Base
 
     answer = []
     base = new Value @variable
-    if (name = base.properties.pop()) and base.isComplex()
-      ref = o.scope.freeVariable 'ref'
-      answer = answer.concat @makeCode("(#{ref} = "),
-        (base.compileToFragments o, LEVEL_LIST),
-        @makeCode(")"),
-        name.compileToFragments(o)
-    else
-      fun = base.compileToFragments o, LEVEL_ACCESS
-      fun = @wrapInBraces fun if SIMPLENUM.test fragmentsToText fun
-      if name
-        ref = fragmentsToText fun
-        fun.push (name.compileToFragments o)...
-      else
-        ref = 'null'
-      answer = answer.concat fun
-    answer = answer.concat @makeCode(".apply(#{ref}, "), splatArgs, @makeCode(")")
+    # console.log 'splat var', @variable, @variable.compileToFragments o
+    # if (name = base.properties.pop()) and base.isComplex()
+    #   ref = o.scope.freeVariable '$ref'
+    #   answer = answer.concat @makeCode("(#{ref} = "),
+    #     (base.compileToFragments o, LEVEL_LIST),
+    #     @makeCode(")"),
+    #     name.compileToFragments(o)
+    # else
+    #   fun = base.compileToFragments o, LEVEL_ACCESS
+    #   fun = @wrapInBraces fun if SIMPLENUM.test fragmentsToText fun
+    #   if name
+    #     ref = fragmentsToText fun
+    #     fun.push (name.compileToFragments o)...
+    #   else
+    #     ref = 'null'
+    #   answer = answer.concat fun
+    # answer = answer.concat @makeCode(".apply(#{ref}, "), splatArgs, @makeCode(")")
+    answer = answer.concat @makeCode("call_user_func_array('"), @variable.compileToFragments( o ), @makeCode("', "), splatArgs, @makeCode(")")
 
 #### Extends
 
@@ -966,7 +999,8 @@ exports.Obj = class Obj extends Base
     if @generated
       for node in props when node instanceof Value
         node.error 'cannot have an implicit value in an implicit object'
-    break for prop, dynamicIndex in props when (prop.variable or prop).base instanceof Parens
+    # break for prop, dynamicIndex in props when (prop.variable or prop).base instanceof Parens
+    dynamicIndex = props.length
     hasDynamic  = dynamicIndex < props.length
     idt         = o.indent += TAB
     lastNoncom  = @lastNonComment @properties
@@ -977,8 +1011,19 @@ exports.Obj = class Obj extends Base
     answer.push @makeCode "[#{if props.length is 0 or dynamicIndex is 0 then ']' else '\n'}"
     for prop, i in props
       prop.variable.base.value = ensureQuoted prop.variable.base.value unless prop.variable?.properties.length or not prop.variable?.base.value or starts prop.variable.base.value, '$'
-      if prop instanceof Value and not prop.this and ( IS_NAME.test( prop.base.value ) and not SIMPLENUM.test prop.base.value )
-        assigned_var = new Value new Literal "$#{ prop.base.value }"
+      if prop instanceof Value and not prop.this and prop.base.value and (
+        (IS_NAME.test( prop.base.value ) or
+         IS_DOT_NAME.test( prop.base.value ) or
+         IS_DOT_AT_NAME.test( prop.base.value )) and
+        not SIMPLENUM.test prop.base.value )
+        assigned_var = new Value new Literal(
+          if starts prop.base.value, '.@'
+            "$this->#{ prop.base.value.substr 2 }"
+          else if starts prop.base.value, '.'
+            "$#{ prop.base.value.substr 1 }"
+          else
+            "$#{ prop.base.value }" )
+        prop.base.value = ".#{ prop.base.value.substr 2 }" if starts prop.base.value, '.@'
         prop.base.value = ensureQuoted prop.base.value
         prop = new Assign prop, assigned_var, 'object'
       # if i is dynamicIndex
@@ -999,7 +1044,7 @@ exports.Obj = class Obj extends Base
         variable = new Literal ensureQuoted prop.properties[0].name.value
         prop = new Assign variable, prop, 'object'
       if prop not instanceof Comment
-        if i < dynamicIndex and not ( prop instanceof Value and not ( IS_NAME.test( prop.base.value ) and not SIMPLENUM.test prop.base.value ))
+        if i < dynamicIndex and not ( prop instanceof Value and not ( IS_NAME.test( prop.base.value ) and not SIMPLENUM.test( prop.base.value ) and not prop.base instanceof Parens ))
           if prop not instanceof Assign
             prop = new Assign prop, prop, 'object'
           (prop.variable.base or prop.variable).asKey = yes
@@ -1062,7 +1107,8 @@ exports.Arr = class Arr extends Base
 # Initialize a **Class** with its name, an optional superclass, and a
 # list of prototype property assignments.
 exports.Class = class Class extends Base
-  constructor: (@variable, @parent, @body = new Block) ->
+  constructor: (@variable, @parent, @body = new Block, @is_trait=no, @is_abstract=no) ->
+    @body = new Block unless @body
     @boundFuncs = []
     @body.classBody = yes
 
@@ -1122,7 +1168,7 @@ exports.Class = class Class extends Base
             func.static = yes
           else
             acc = if base.isComplex() then new Index base else new Access base
-            assign.variable = new Value(new Literal(name), [(new Access new Literal 'prototype'), acc])
+            assign.variable = new Value(new Literal(name), [(new Access new Literal 'prototype'), acc], null, assign.variable.is_abstract)
             if func instanceof Code and func.bound
               @boundFuncs.push base
               func.bound = no
@@ -1142,6 +1188,7 @@ exports.Class = class Class extends Base
           else if node instanceof Value and node.isObject(true)
             cont = false
             exps[i] = @addProperties node, name, o
+        # console.log 'class walkBody', (exp.constructor.name for exp in child.expressions), child.expressions[0][0].variable, (exp.constructor.name for exp in exps), exps[0][0].variable
         child.expressions = exps = flatten exps
       cont and child not instanceof Class
 
@@ -1201,11 +1248,11 @@ exports.Class = class Class extends Base
     #   func.params.push new Param superClass
     #   args.push @parent
 
-    # console.log 'class body.expressions', @body.expressions
     for expression in @body.expressions
       if expression.value instanceof Code
         expression.value._is_method = yes
         expression.value._is_static = expression.variable.properties[0]?.name.value isnt 'prototype'
+        expression.value._is_abstract = expression.variable.is_abstract
       else if expression.variable?.properties.length is 1
         expression.variable._is_static = yes
         expression.variable.base.value = expression.variable.properties[0].name.value
@@ -1220,7 +1267,7 @@ exports.Class = class Class extends Base
     # klass = new Assign @variable, klass if @variable
     # func.compileToFragments o
     # _body = Block.wrap [@body]
-    [@makeCode( "class #{ name } #{ if @parent then "extends #{ @parent.base.value }" else '' } {\n" ),
+    [@makeCode( "#{ if @is_abstract then 'abstract ' else ''}#{ if @is_trait then 'trait' else 'class' } #{ name } #{ if @parent then "extends #{ @parent.base.value }" else '' } {\n" ),
      @body.compileNode( o )...,
      # do _body.compileNode
      @makeCode( '}' )]
@@ -1285,7 +1332,7 @@ exports.Assign = class Assign extends Base
     compiledName =
       @variable.compileToFragments o, LEVEL_LIST
     compiledName.unshift @makeCode 'static ' if @variable._is_static
-    # console.log @variable if @context is 'object'
+    # console.log 'assign var', @variable if @context is 'object'
     return (compiledName.concat @makeCode(" => "), val) if @context is 'object'
     answer =
       if @value instanceof Code and @_is_class_body
@@ -1325,8 +1372,9 @@ exports.Assign = class Assign extends Base
           new Literal 0
       acc   = IDENTIFIER.test idx.unwrap().value or 0
       obj = new Value new Literal "$#{ obj.base.value }" unless obj.this
+      # console.log 'idx', idx, idx.constructor.name
       idx = new Value new Literal ensureQuoted idx.base.value if idx instanceof Value
-      idx = new Value new Literal ensureQuoted idx.value      if idx instanceof Literal
+      idx = new Value new Literal ensureQuoted idx.value      if idx instanceof Literal and not SIMPLENUM.test idx.value
       value = new Value value
       value.properties.push new Index idx
       if obj.unwrap().value in RESERVED
@@ -1357,12 +1405,15 @@ exports.Assign = class Assign extends Base
       if not expandedIdx and obj instanceof Splat
         name = obj.name.unwrap().value
         obj = obj.unwrap()
-        val = "#{olen} <= #{vvarText}.length ? #{ utility 'slice', o }.call(#{vvarText}, #{i}"
+        obj = new Value new Literal "$#{ obj.base.value }" unless obj.this
+        val = "array_slice(#{vvarText}, #{i}"
         if rest = olen - i - 1
           ivar = o.scope.freeVariable 'i', single: true
-          val += ", #{ivar} = #{vvarText}.length - #{rest}) : (#{ivar} = #{i}, [])"
+          # val += ", #{ivar} = count( #{vvarText} ) - #{rest}) : (#{ivar} = #{i}, [])"
+          val += ", -#{rest})"
         else
-          val += ") : []"
+          val += ")"
+        val += "; #{ivar} = count(#{vvarText}) - #{rest}" if rest
         val   = new Literal val
         expandedIdx = "#{ivar}++"
       else if not expandedIdx and obj instanceof Expansion
@@ -1388,12 +1439,12 @@ exports.Assign = class Assign extends Base
         # console.log 'obj', obj, obj.constructor.name, obj.base.constructor.name
         obj = new Value new Literal "$#{ obj.base.value }" unless obj.this
         idx = new Value new Literal ensureQuoted idx.base.value if idx instanceof Value
-        idx = new Value new Literal ensureQuoted idx.value      if idx instanceof Literal and not do idx.isSimpleNumber
+        idx = new Value new Literal ensureQuoted idx.value      if idx instanceof Literal and not do idx.isSimpleNumber and not expandedIdx
         val = new Value new Literal(vvarText), [new Index idx]
         # obj =
       if name? and name in RESERVED
         obj.error "assignment to a reserved word: #{obj.compile o}"
-      assigns.push new Assign(obj, val, null, param: @param, subpattern: yes).compileToFragments o, LEVEL_LIST
+      assigns.push new Assign(obj, val, null, param: @param, subpattern: yes).compileToFragments o, LEVEL_LIST unless name is '__IGNORED_ARG'
     assigns.push vvar unless top or @subpattern
     fragments = @joinFragmentArrays assigns, '; '
     if o.level < LEVEL_LIST then fragments else @wrapInBraces fragments
@@ -1497,8 +1548,9 @@ exports.Code = class Code extends Base
     for param in @params when param.splat or param instanceof Expansion
       for p in @params when p not instanceof Expansion and p.name.value
         o.scope.add p.name.value, 'var', yes
-      splats = new Assign new Value(new Arr(p.asReference o for p in @params)),
-                          new Value new Literal 'arguments'
+      # console.log 'splatting', @params
+      splats = new Assign new Value(new Arr((if p.isRef then new Value new Literal '__IGNORED_ARG' else p.asReference( o, yes )) for p in @params)),
+                          new Value new Literal '$__args'
       break
     # console.log 'code params', @params
     unless @_is_method
@@ -1531,9 +1583,12 @@ exports.Code = class Code extends Base
           lit = new Literal ref.name.value + ' == null'
           val = new Assign new Value(param.name), param.value, '='
           exprs.push new If lit, val
-      params.push ref unless splats or param.uses
+      params.push ref unless (splats and not ref.isRef) or param.uses
     wasEmpty = @body.isEmpty()
-    exprs.unshift splats if splats
+    if splats
+      exprs.unshift splats
+      exprs.unshift new Assign new Value( new Literal '$__args' ),
+                               new Literal 'func_get_args()'
     @body.expressions.unshift exprs... if exprs.length
     for exp, i in @body.expressions
       break unless exp instanceof If and (_var=exp.condition.value?.match( /^(\$\w+) == null$/ )[1]) and _param=@hasParamNamed _var
@@ -1552,7 +1607,7 @@ exports.Code = class Code extends Base
       node.error "multiple parameters named #{name}" if name in uniqs
       uniqs.push name
     @body.makeReturn() unless wasEmpty or @noReturn
-    code = "#{ if @_is_static then 'static ' else '' }function"
+    code = "#{ if @_is_abstract then 'abstract ' else '' }#{ if @_is_static then 'static ' else '' }function"
     code += '*' if @isGenerator
     if @name?.name?.value
       code += ' ' + @name.name.value # if @ctor
@@ -1568,11 +1623,14 @@ exports.Code = class Code extends Base
     do o.scope.add_uses_to_parent_free_vars
     if uses.length
       answer.push @makeCode 'use ('
-      answer.push @makeCode ["#{ use }" for use in uses].join ', '
+      answer.push @makeCode ["&#{ use }" for use in uses].join ', '
       answer.push @makeCode ')'
-    answer.push @makeCode ' {'
-    answer = answer.concat(@makeCode("\n"), compiled_body, @makeCode("\n#{@tab}")) unless @body.isEmpty()
-    answer.push @makeCode '}'
+    if @_is_abstract
+      answer.push @makeCode ';'
+    else
+      answer.push @makeCode ' {'
+      answer = answer.concat(@makeCode("\n"), compiled_body, @makeCode("\n#{@tab}")) unless @body.isEmpty()
+      answer.push @makeCode '}'
 
     return [@makeCode(@tab), answer...] if @ctor
     if @front or (o.level >= LEVEL_ACCESS) then @wrapInBraces answer else answer
@@ -1615,19 +1673,23 @@ exports.Param = class Param extends Base
     fragments.push ( if @_default then [@name.makeCode "=#{ @_default }"] else [] )...
     fragments
 
-  asReference: (o) ->
-    return @reference if @reference
+  asReference: (o, remove_$=no) ->
+    return @reference if @reference and not remove_$
     node = @name
+    # console.log 'node', node, node.constructor.name
     if node.this
       name = node.properties[0].name.value
       name = "_#{name}" if name.reserved
       node = new Literal o.scope.freeVariable name
     else if node.isComplex()
-      node = new Literal o.scope.freeVariable 'arg'
+      node = new Literal o.scope.freeVariable '$arg'
+    else if remove_$ and node instanceof Literal and starts node.value, '$'
+      node = new Literal node.value.substr 1
     node = new Value node
     node = new Splat node if @splat
     node.updateLocationDataIfMissing @locationData
-    @reference = node
+    @reference = node unless remove_$
+    node
 
   isComplex: ->
     @name.isComplex()
@@ -1701,17 +1763,19 @@ exports.Splat = class Splat extends Base
     for node, i in args
       compiledNode = node.compileToFragments o, LEVEL_LIST
       args[i] = if node instanceof Splat
-      then [].concat node.makeCode("#{ utility 'slice', o }.call("), compiledNode, node.makeCode(")")
+      # then [].concat node.makeCode("#{ utility 'slice', o }.call("), compiledNode, node.makeCode(")")
+      then [].concat compiledNode
       else [].concat node.makeCode("["), compiledNode, node.makeCode("]")
     if index is 0
       node = list[0]
       concatPart = (node.joinFragmentArrays args[1..], ', ')
-      return args[0].concat node.makeCode(".concat("), concatPart, node.makeCode(")")
+      # return args[0].concat node.makeCode(".concat("), concatPart, node.makeCode(")")
+      return [node.makeCode("array_merge("), args[0], concatPart..., node.makeCode(")")]
     base = (node.compileToFragments o, LEVEL_LIST for node in list[...index])
     base = list[0].joinFragmentArrays base, ', '
     concatPart = list[index].joinFragmentArrays args, ', '
     [..., last] = list
-    [].concat list[0].makeCode("["), base, list[index].makeCode("].concat("), concatPart, last.makeCode(")")
+    [].concat list[0].makeCode("array_merge(["), base, list[index].makeCode("], "), concatPart, last.makeCode(")")
 
 #### Expansion
 
@@ -2184,7 +2248,7 @@ exports.For = class For extends While
     else
       svar    = @source.compile o, LEVEL_LIST
       if (name or @own) and not IDENTIFIER.test svar
-        defPart    += "#{@tab}#{ref = scope.freeVariable 'ref'} = #{svar};\n"
+        defPart    += "#{@tab}#{ref = scope.freeVariable '$ref'} = #{svar};\n"
         svar       = ref
       # if name and not @pattern
       #   namePart   = "#{name} = #{svar}[#{kvar}]"
@@ -2222,7 +2286,7 @@ exports.For = class For extends While
     defPartFragments = [].concat @makeCode(defPart), @pluckDirectCall(o, body)
     varPart = "\n#{idt1}#{namePart};" if namePart
     if @object
-      forPartFragments   = [@makeCode("#{svar} as #{kvar}#{ if name then " => #{ name }" else '' }")]
+      forPartFragments   = [@makeCode("#{svar} as #{ if @index.is_ref then '&' else '' }#{kvar}#{ if name then " => #{ if @name.is_ref then '&' else '' }#{ name }" else '' }")]
       guardPart = "\n#{idt1}if (!#{utility 'hasProp', o}.call(#{svar}, #{kvar})) continue;" if @own
     bodyFragments = body.compileToFragments merge(o, indent: idt1), LEVEL_TOP
     if bodyFragments and (bodyFragments.length > 0)
@@ -2368,7 +2432,7 @@ exports.If = class If extends Base
   compileExpression: (o) ->
     cond = @condition.compileToFragments o, LEVEL_COND
     body = @bodyNode().compileToFragments o, LEVEL_LIST
-    alt  = if @elseBodyNode() then @elseBodyNode().compileToFragments(o, LEVEL_LIST) else [@makeCode('null')]
+    alt  = if @elseBodyNode() then @wrapInBraces @elseBodyNode().compileToFragments(o, LEVEL_LIST) else [@makeCode('null')]
     fragments = cond.concat @makeCode(" ? "), body, @makeCode(" : "), alt
     if o.level >= LEVEL_COND then @wrapInBraces fragments else fragments
 
@@ -2449,6 +2513,9 @@ IS_STRING = /^['"]/
 IS_REGEX = /^\//
 IS_VAR = /^\$\w+$/
 IS_NAME = /^\w+$/
+IS_CAPS_NAME = /^[A-Z_]+$/
+IS_DOT_NAME = /^\.\w+$/
+IS_DOT_AT_NAME = /^\.@\w+$/
 
 # Helper Functions
 # ----------------

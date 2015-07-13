@@ -82,7 +82,7 @@ Generate a temporary variable name at the given index.
 
       temporary: (name, index, single=false) ->
         if single
-          (index + parseInt name, 36).toString(36).replace /\d/g, 'a'
+          '$' + (index + parseInt name, 36).toString(36).replace /\d/g, 'a'
         else
           name + (index or '')
 
@@ -142,6 +142,7 @@ Does this scope have any declared variables?
         no
       special_or_global: ( name ) ->
         return yes if name is 'this'
+        return yes if name is '$GLOBALS'
         no
 
 Return the list of variables first declared in this scope.

@@ -692,7 +692,8 @@ exports.Lexer = class Lexer
     match = INVALID_ESCAPE.exec str
     return unless match
     [[], before, octal, hex, unicode] = match
-    return if options.isRegex and octal and octal.charAt(0) isnt '0'
+    # return if options.isRegex and octal and octal.charAt(0) isnt '0'
+    return if octal
     message =
       if octal
         "octal escape sequences are not allowed"
@@ -708,15 +709,16 @@ exports.Lexer = class Lexer
     body = '(?:)' if body is '' and options.delimiter is '/'
     regex = ///
         (\\\\)                               # escaped backslash
-      | (\\0(?=[1-7]))                       # nul character mistaken as octal escape
+      # | (\\0(?=[1-7]))                       # nul character mistaken as octal escape
       | \\?(#{options.delimiter})            # (possibly escaped) delimiter
       | \\?(?: (\n)|(\r)|(\u2028)|(\u2029) ) # (possibly escaped) newlines
       | (\\.)                                # other escapes
     ///g
-    body = body.replace regex, (match, backslash, nul, delimiter, lf, cr, ls, ps, other) -> switch
+    body = body.replace regex, (match, backslash, #nul,
+                                delimiter, lf, cr, ls, ps, other) -> switch
       # Ignore escaped backslashes.
       when backslash then (if options.double then backslash + backslash else backslash)
-      when nul       then '\\x00'
+      # when nul       then '\\x00'
       when delimiter then "\\#{delimiter}"
       # when lf        then '\\n'
       when lf        then '\n'
@@ -746,7 +748,7 @@ JS_KEYWORDS = [
   'new', 'delete', 'typeof', 'in', 'instanceof'
   'return', 'throw', 'break', 'continue', 'debugger', 'yield'
   'if', 'else', 'switch', 'for', 'while', 'do', 'try', 'catch', 'finally'
-  'class', 'extends', 'super'
+  'class', 'extends', 'super', 'trait', 'abstract'
 ]
 
 # CoffeeScript-only keywords.
@@ -772,7 +774,7 @@ COFFEE_KEYWORDS = COFFEE_KEYWORDS.concat COFFEE_ALIASES
 RESERVED = [
   'case', 'default', 'function', 'var', 'void', 'with', 'const', 'let', 'enum'
   'export', 'import', 'native', 'implements', 'interface', 'package', 'private'
-  'protected', 'public', 'static'
+  'protected', 'public', #'static'
 ]
 
 STRICT_PROSCRIBED = ['arguments', 'eval', 'yield*']
@@ -790,7 +792,7 @@ BOM = 65279
 # Token matching regexes.
 IDENTIFIER = /// ^
   (?!\d)
-  ( (?: (?!\s)[$\w\x7f-\uffff] )+ )
+  ( (?: (?!\s)[$\\\w\x7f-\uffff] )+ )
   ( [^\n\S]* : (?!:) )?  # Is this a property name?
 ///
 

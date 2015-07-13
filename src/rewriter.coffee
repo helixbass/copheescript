@@ -109,7 +109,7 @@ class exports.Rewriter
   # `@<x>:`, `<x>:` or `<EXPRESSION_START><x>...<EXPRESSION_END>:`,
   # skipping over 'HERECOMMENT's.
   looksObjectish: (j) ->
-    return yes if @indexOfTag(j, '@', null, ':') > -1 or @indexOfTag(j, null, ':') > -1
+    return yes if @indexOfTag(j, '@', null, ':') > -1 or @indexOfTag(j, null, ':') > -1 or @indexOfTag(j, 'ABSTRACT', '@', null, ':') > -1 or @indexOfTag(j, 'ABSTRACT', null, ':') > -1
     index = @indexOfTag(j, EXPRESSION_START)
     if index > -1
       end = null
@@ -184,7 +184,7 @@ class exports.Rewriter
 
       # Don't end an implicit call on next indent if any of these are in an argument
       if inImplicitCall() and tag in ['IF', 'TRY', 'FINALLY', 'CATCH',
-        'CLASS', 'SWITCH']
+        'CLASS', 'TRAIT', 'SWITCH']
         stack.push ['CONTROL', i, ours: true]
         return forward(1)
 
@@ -255,7 +255,7 @@ class exports.Rewriter
       # that creates grammatical ambiguities.
       if tag in IMPLICIT_FUNC and
          @indexOfTag(i + 1, 'INDENT', null, ':') > -1 and
-         not @findTagsBackwards(i, ['CLASS', 'EXTENDS', 'IF', 'CATCH',
+         not @findTagsBackwards(i, ['CLASS', 'TRAIT', 'EXTENDS', 'IF', 'CATCH',
           'SWITCH', 'LEADING_WHEN', 'FOR', 'WHILE', 'UNTIL'])
         startImplicitCall i + 1
         stack.push ['INDENT', i + 2]
@@ -266,7 +266,9 @@ class exports.Rewriter
         # Go back to the (implicit) start of the object
         s = switch
           when @tag(i - 1) in EXPRESSION_END then start[1]
+          when @tag(i - 2) is '@' and @tag(i - 3) is 'ABSTRACT' then i - 3
           when @tag(i - 2) is '@' then i - 2
+          when @tag(i - 2) is 'ABSTRACT' then i - 2
           else i - 1
         s -= 2 while @tag(s - 2) is 'HERECOMMENT'
 
@@ -276,11 +278,13 @@ class exports.Rewriter
         startsLine = s is 0 or @tag(s - 1) in LINEBREAKS or tokens[s - 1].newLine
         # Are we just continuing an already declared object?
         if stackTop()
+          # console.log 'stackTop', stackTop(), @tokens
           [stackTag, stackIdx] = stackTop()
           if (stackTag is '{' or stackTag is 'INDENT' and @tag(stackIdx - 1) is '{') and
              (startsLine or @tag(s - 1) is ',' or @tag(s - 1) is '{')
             return forward(1)
 
+        # console.log 'starting implicit object', s
         startImplicitObject(s, !!startsLine)
         return forward(2)
 
@@ -484,7 +488,7 @@ IMPLICIT_FUNC    = ['IDENTIFIER', 'SUPER', ')', 'CALL_END', ']', 'INDEX_END', '@
 # If preceded by an `IMPLICIT_FUNC`, indicates a function invocation.
 IMPLICIT_CALL    = [
   'IDENTIFIER', 'NUMBER', 'STRING', 'STRING_START', 'JS', 'REGEX', 'REGEX_START'
-  'NEW', 'PARAM_START', 'CLASS', 'IF', 'TRY', 'SWITCH', 'THIS', 'BOOL', 'NULL'
+  'NEW', 'PARAM_START', 'CLASS', 'TRAIT', 'IF', 'TRY', 'SWITCH', 'THIS', 'BOOL', 'NULL'
   'UNDEFINED', 'UNARY', 'YIELD', 'UNARY_MATH', 'SUPER', 'THROW'
   '@', '->', '=>', '[', '(', '{', '--', '++'
 ]
