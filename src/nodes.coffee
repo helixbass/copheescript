@@ -546,9 +546,16 @@ exports.Value = class Value extends Base
     [..., lastProp] = @properties
     lastProp instanceof Slice
 
-  looksStatic: (className) ->
-    @base.value is className and @properties.length is 1 and
-      @properties[0].name?.value isnt 'prototype'
+  looksStatic: (className=null) ->
+    if className?
+      return no unless @base.value is className
+      
+    @properties.length is 1 and @properties[0].name?.value isnt 'prototype'
+
+  obj_method_array_str: ( o ) ->
+    base_compiled = @base.compile o
+    method_name = @properties[0].name.value
+    "[#{ base_compiled }, \"#{ method_name }\"]"
 
   # The value can be unwrapped as its inner node, if there are no attached
   # properties.
@@ -703,7 +710,7 @@ exports.Call = class Call extends Base
       if left.properties?.length
         base_compiled = left.base.compile o
         method_name = left.properties[0].name.value
-        left = new Literal "isset( #{ base_compiled } ) && is_callable( [#{ base_compiled }, \"#{ method_name }\"] )"
+        left = new Literal "isset( #{ base_compiled } ) && is_callable( #{ left.obj_method_array_str o } )"
       else
         left_compiled = left.compile o
         left = new Literal "isset( #{ left_compiled } ) && is_callable( #{ left_compiled } )"
@@ -806,7 +813,12 @@ exports.Call = class Call extends Base
     #     ref = 'null'
     #   answer = answer.concat fun
     # answer = answer.concat @makeCode(".apply(#{ref}, "), splatArgs, @makeCode(")")
-    answer = answer.concat @makeCode("call_user_func_array('"), @variable.compileToFragments( o ), @makeCode("', "), splatArgs, @makeCode(")")
+    answer = answer.concat @makeCode("call_user_func_array("),
+      if @variable.looksStatic?()
+        [@makeCode @variable.obj_method_array_str o]
+      else
+        [@makeCode("'"), @variable.compileToFragments( o )..., @makeCode "'"]
+    , @makeCode(", "), splatArgs, @makeCode(")")
 
 #### Extends
 

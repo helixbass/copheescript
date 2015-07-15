@@ -90,10 +90,12 @@ compare "splatted arg",
   '''
   A::b $a...
   f $b, $c...
+  $g.h $b, $c...
   ''',
   """
   call_user_func_array('A::b', $a);
   call_user_func_array('f', array_merge([$b], $c));
+  call_user_func_array([$g, \"h\"], array_merge([$b], $c));
   """
 
 compare "foreach &ref",

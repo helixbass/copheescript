@@ -1318,9 +1318,16 @@ or vanilla.</p>
     [..., lastProp] = <span class="hljs-property">@properties</span>
     lastProp <span class="hljs-keyword">instanceof</span> Slice
 
-  <span class="hljs-attribute">looksStatic</span>: <span class="hljs-function"><span class="hljs-params">(className)</span> -&gt;</span>
-    <span class="hljs-property">@base</span>.value <span class="hljs-keyword">is</span> className <span class="hljs-keyword">and</span> <span class="hljs-property">@properties</span>.length <span class="hljs-keyword">is</span> <span class="hljs-number">1</span> <span class="hljs-keyword">and</span>
-      <span class="hljs-property">@properties</span>[<span class="hljs-number">0</span>].name?.value <span class="hljs-keyword">isnt</span> <span class="hljs-string">'prototype'</span></pre></div></div>
+  <span class="hljs-attribute">looksStatic</span>: <span class="hljs-function"><span class="hljs-params">(className=<span class="hljs-literal">null</span>)</span> -&gt;</span>
+    <span class="hljs-keyword">if</span> className?
+      <span class="hljs-keyword">return</span> <span class="hljs-literal">no</span> <span class="hljs-keyword">unless</span> <span class="hljs-property">@base</span>.value <span class="hljs-keyword">is</span> className
+      
+    <span class="hljs-property">@properties</span>.length <span class="hljs-keyword">is</span> <span class="hljs-number">1</span> <span class="hljs-keyword">and</span> <span class="hljs-property">@properties</span>[<span class="hljs-number">0</span>].name?.value <span class="hljs-keyword">isnt</span> <span class="hljs-string">'prototype'</span>
+
+  <span class="hljs-attribute">obj_method_array_str</span>: <span class="hljs-function"><span class="hljs-params">( o )</span> -&gt;</span>
+    base_compiled = <span class="hljs-property">@base</span>.compile o
+    method_name = <span class="hljs-property">@properties</span>[<span class="hljs-number">0</span>].name.value
+    <span class="hljs-string">"[<span class="hljs-subst">#{ base_compiled }</span>, \"<span class="hljs-subst">#{ method_name }</span>\"]"</span></pre></div></div>
             
         </li>
         
@@ -1695,7 +1702,7 @@ method.</p>
       <span class="hljs-keyword">if</span> left.properties?.length
         base_compiled = left.base.compile o
         method_name = left.properties[<span class="hljs-number">0</span>].name.value
-        left = <span class="hljs-keyword">new</span> Literal <span class="hljs-string">"isset( <span class="hljs-subst">#{ base_compiled }</span> ) &amp;&amp; is_callable( [<span class="hljs-subst">#{ base_compiled }</span>, \"<span class="hljs-subst">#{ method_name }</span>\"] )"</span>
+        left = <span class="hljs-keyword">new</span> Literal <span class="hljs-string">"isset( <span class="hljs-subst">#{ base_compiled }</span> ) &amp;&amp; is_callable( <span class="hljs-subst">#{ left.obj_method_array_str o }</span> )"</span>
       <span class="hljs-keyword">else</span>
         left_compiled = left.compile o
         left = <span class="hljs-keyword">new</span> Literal <span class="hljs-string">"isset( <span class="hljs-subst">#{ left_compiled }</span> ) &amp;&amp; is_callable( <span class="hljs-subst">#{ left_compiled }</span> )"</span>
@@ -1834,7 +1841,12 @@ answer = answer.concat @makeCode(“.apply(#{ref}, “), splatArgs, @makeCode(�
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>    answer = answer.concat <span class="hljs-property">@makeCode</span>(<span class="hljs-string">"call_user_func_array('"</span>), <span class="hljs-property">@variable</span>.compileToFragments( o ), <span class="hljs-property">@makeCode</span>(<span class="hljs-string">"', "</span>), splatArgs, <span class="hljs-property">@makeCode</span>(<span class="hljs-string">")"</span>)</pre></div></div>
+            <div class="content"><div class='highlight'><pre>    answer = answer.concat <span class="hljs-property">@makeCode</span>(<span class="hljs-string">"call_user_func_array("</span>),
+      <span class="hljs-keyword">if</span> <span class="hljs-property">@variable</span>.looksStatic?()
+        [<span class="hljs-property">@makeCode</span> <span class="hljs-property">@variable</span>.obj_method_array_str o]
+      <span class="hljs-keyword">else</span>
+        [<span class="hljs-property">@makeCode</span>(<span class="hljs-string">"'"</span>), <span class="hljs-property">@variable</span>.compileToFragments( o )..., <span class="hljs-property">@makeCode</span> <span class="hljs-string">"'"</span>]
+    , <span class="hljs-property">@makeCode</span>(<span class="hljs-string">", "</span>), splatArgs, <span class="hljs-property">@makeCode</span>(<span class="hljs-string">")"</span>)</pre></div></div>
             
         </li>
         
