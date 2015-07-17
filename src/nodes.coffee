@@ -2084,8 +2084,8 @@ exports.In = class In extends Base
 
   compileLoopTest: (o) ->
     [sub, ref] = @object.cache o, LEVEL_LIST
-    fragments = [].concat @makeCode(utility('indexOf', o) + ".call("), @array.compileToFragments(o, LEVEL_LIST),
-      @makeCode(", "), ref, @makeCode(") " + if @negated then '< 0' else '>= 0')
+    fragments = [].concat @makeCode("in_array("), ref,
+      @makeCode(", "), @array.compileToFragments(o, LEVEL_LIST), @makeCode(")")
     return fragments if fragmentsToText(sub) is fragmentsToText(ref)
     fragments = sub.concat @makeCode(', '), fragments
     if o.level < LEVEL_LIST then fragments else @wrapInBraces fragments

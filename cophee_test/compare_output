@@ -23,6 +23,13 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "element in non-literal array",
+  '''
+  $a in $b()
+  ''',
+  """
+  in_array($a, $b());
+  """
 compare "destructured param",
   '''
   ([a, b]) ->

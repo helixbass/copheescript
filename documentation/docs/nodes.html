@@ -4611,8 +4611,8 @@ else</p>
 
   <span class="hljs-attribute">compileLoopTest</span>: <span class="hljs-function"><span class="hljs-params">(o)</span> -&gt;</span>
     [sub, ref] = <span class="hljs-property">@object</span>.cache o, LEVEL_LIST
-    fragments = [].concat <span class="hljs-property">@makeCode</span>(utility(<span class="hljs-string">'indexOf'</span>, o) + <span class="hljs-string">".call("</span>), <span class="hljs-property">@array</span>.compileToFragments(o, LEVEL_LIST),
-      <span class="hljs-property">@makeCode</span>(<span class="hljs-string">", "</span>), ref, <span class="hljs-property">@makeCode</span>(<span class="hljs-string">") "</span> + <span class="hljs-keyword">if</span> <span class="hljs-property">@negated</span> <span class="hljs-keyword">then</span> <span class="hljs-string">'&lt; 0'</span> <span class="hljs-keyword">else</span> <span class="hljs-string">'&gt;= 0'</span>)
+    fragments = [].concat <span class="hljs-property">@makeCode</span>(<span class="hljs-string">"in_array("</span>), ref,
+      <span class="hljs-property">@makeCode</span>(<span class="hljs-string">", "</span>), <span class="hljs-property">@array</span>.compileToFragments(o, LEVEL_LIST), <span class="hljs-property">@makeCode</span>(<span class="hljs-string">")"</span>)
     <span class="hljs-keyword">return</span> fragments <span class="hljs-keyword">if</span> fragmentsToText(sub) <span class="hljs-keyword">is</span> fragmentsToText(ref)
     fragments = sub.concat <span class="hljs-property">@makeCode</span>(<span class="hljs-string">', '</span>), fragments
     <span class="hljs-keyword">if</span> o.level &lt; LEVEL_LIST <span class="hljs-keyword">then</span> fragments <span class="hljs-keyword">else</span> <span class="hljs-property">@wrapInBraces</span> fragments
