@@ -2083,12 +2083,13 @@ exports.In = class In extends Base
     if o.level < LEVEL_OP then tests else @wrapInBraces tests
 
   compileLoopTest: (o) ->
-    [sub, ref] = @object.cache o, LEVEL_LIST
-    fragments = [].concat @makeCode("in_array("), ref,
+    # [sub, ref] = @object.cache o, LEVEL_LIST
+    fragments = [].concat @makeCode("in_array("),# ref,
+      @object.compileToFragments(o, LEVEL_LIST),
       @makeCode(", "), @array.compileToFragments(o, LEVEL_LIST), @makeCode(")")
-    return fragments if fragmentsToText(sub) is fragmentsToText(ref)
-    fragments = sub.concat @makeCode(', '), fragments
-    if o.level < LEVEL_LIST then fragments else @wrapInBraces fragments
+    # return fragments if fragmentsToText(sub) is fragmentsToText(ref)
+    # fragments = sub.concat @makeCode(', '), fragments
+    # if o.level < LEVEL_LIST then fragments else @wrapInBraces fragments
 
   toString: (idt) ->
     super idt, @constructor.name + if @negated then '!' else ''

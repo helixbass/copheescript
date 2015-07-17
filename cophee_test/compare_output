@@ -26,9 +26,20 @@ end
 compare "element in non-literal array",
   '''
   $a in $b()
+  $a[1] in $b()
   ''',
   """
   in_array($a, $b());
+  in_array($a[1], $b());
+  """
+compare "element in literal array",
+  '''
+  $a in [1, 2]
+  $a[1] in [1, 2]
+  ''',
+  """
+  $a === 1 || $a === 2;
+  ($ref = $a[1]) === 1 || $ref === 2;
   """
 compare "destructured param",
   '''
