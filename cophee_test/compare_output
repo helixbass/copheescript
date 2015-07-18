@@ -23,6 +23,21 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "unless element in array",
+  '''
+  unless $a in $b()
+    $c
+  unless $a in [1, 2]
+    $c
+  ''',
+  """
+  if (!in_array($a, $b())) {
+    $c;
+  }
+  if (!($a === 1 || $a === 2)) {
+    $c;
+  }
+  """
 compare "element in non-literal array",
   '''
   $a in $b()

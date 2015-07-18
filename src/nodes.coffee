@@ -2062,7 +2062,7 @@ exports.In = class In extends Base
 
   children: ['object', 'array']
 
-  invert: NEGATE
+  # invert: NEGATE
 
   compileNode: (o) ->
     if @array instanceof Value and @array.isArray() and @array.base.objects.length
