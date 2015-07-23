@@ -1671,14 +1671,16 @@ exports.Param = class Param extends Base
     if (name = @name.unwrapAll().value) in STRICT_PROSCRIBED
       @name.error "parameter name \"#{name}\" is not allowed"
 
-    @isRef = yes if typeof @name.value is 'string' and starts @name.value, '&'
+    if typeof @name.value is 'string' and starts @name.value, '&'
+      @isRef = yes
+      @name.value = @name.value.substr 1
 
   children: ['name', 'value']
 
   compileToFragments: (o) ->
     fragments = []
     fragments.push @name.makeCode "#{ @type.value } " if @type
-    fragments.push @name.makeCode "&" if @isRef and not starts @name.value, '&'
+    fragments.push @name.makeCode "&" if @isRef
     unless starts( @name.value, '$' ) or starts( @name.value, '&' )
       type = @name.value.substr 0, @name.value.indexOf '_$'
       @name.value = @name.value.substr 1 + @name.value.indexOf '_$'

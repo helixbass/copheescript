@@ -104,11 +104,13 @@ compare "class const",
 compare "preserve ref w/ splatted args",
   '''
   ( &$a, $b... ) ->
+    $a
   ''',
   """
   (function(&$a) {
     $__args = func_get_args();
     $b = array_slice($__args, 1);
+    return $a;
   });
   """
 compare "{ .col }",

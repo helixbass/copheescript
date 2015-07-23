@@ -3765,14 +3765,16 @@ as well as be a splat, gathering up a group of parameters into an array.</p>
     <span class="hljs-keyword">if</span> (name = <span class="hljs-property">@name</span>.unwrapAll().value) <span class="hljs-keyword">in</span> STRICT_PROSCRIBED
       <span class="hljs-property">@name</span>.error <span class="hljs-string">"parameter name \"<span class="hljs-subst">#{name}</span>\" is not allowed"</span>
 
-    <span class="hljs-property">@isRef</span> = <span class="hljs-literal">yes</span> <span class="hljs-keyword">if</span> <span class="hljs-keyword">typeof</span> <span class="hljs-property">@name</span>.value <span class="hljs-keyword">is</span> <span class="hljs-string">'string'</span> <span class="hljs-keyword">and</span> starts <span class="hljs-property">@name</span>.value, <span class="hljs-string">'&amp;'</span>
+    <span class="hljs-keyword">if</span> <span class="hljs-keyword">typeof</span> <span class="hljs-property">@name</span>.value <span class="hljs-keyword">is</span> <span class="hljs-string">'string'</span> <span class="hljs-keyword">and</span> starts <span class="hljs-property">@name</span>.value, <span class="hljs-string">'&amp;'</span>
+      <span class="hljs-property">@isRef</span> = <span class="hljs-literal">yes</span>
+      <span class="hljs-property">@name</span>.value = <span class="hljs-property">@name</span>.value.substr <span class="hljs-number">1</span>
 
   <span class="hljs-attribute">children</span>: [<span class="hljs-string">'name'</span>, <span class="hljs-string">'value'</span>]
 
   <span class="hljs-attribute">compileToFragments</span>: <span class="hljs-function"><span class="hljs-params">(o)</span> -&gt;</span>
     fragments = []
     fragments.push <span class="hljs-property">@name</span>.makeCode <span class="hljs-string">"<span class="hljs-subst">#{ <span class="hljs-property">@type</span>.value }</span> "</span> <span class="hljs-keyword">if</span> <span class="hljs-property">@type</span>
-    fragments.push <span class="hljs-property">@name</span>.makeCode <span class="hljs-string">"&amp;"</span> <span class="hljs-keyword">if</span> <span class="hljs-property">@isRef</span> <span class="hljs-keyword">and</span> <span class="hljs-keyword">not</span> starts <span class="hljs-property">@name</span>.value, <span class="hljs-string">'&amp;'</span>
+    fragments.push <span class="hljs-property">@name</span>.makeCode <span class="hljs-string">"&amp;"</span> <span class="hljs-keyword">if</span> <span class="hljs-property">@isRef</span>
     <span class="hljs-keyword">unless</span> starts( <span class="hljs-property">@name</span>.value, <span class="hljs-string">'$'</span> ) <span class="hljs-keyword">or</span> starts( <span class="hljs-property">@name</span>.value, <span class="hljs-string">'&amp;'</span> )
       type = <span class="hljs-property">@name</span>.value.substr <span class="hljs-number">0</span>, <span class="hljs-property">@name</span>.value.indexOf <span class="hljs-string">'_$'</span>
       <span class="hljs-property">@name</span>.value = <span class="hljs-property">@name</span>.value.substr <span class="hljs-number">1</span> + <span class="hljs-property">@name</span>.value.indexOf <span class="hljs-string">'_$'</span>
