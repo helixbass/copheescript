@@ -3765,13 +3765,15 @@ as well as be a splat, gathering up a group of parameters into an array.</p>
     <span class="hljs-keyword">if</span> (name = <span class="hljs-property">@name</span>.unwrapAll().value) <span class="hljs-keyword">in</span> STRICT_PROSCRIBED
       <span class="hljs-property">@name</span>.error <span class="hljs-string">"parameter name \"<span class="hljs-subst">#{name}</span>\" is not allowed"</span>
 
+    <span class="hljs-property">@isRef</span> = <span class="hljs-literal">yes</span> <span class="hljs-keyword">if</span> <span class="hljs-keyword">typeof</span> <span class="hljs-property">@name</span>.value <span class="hljs-keyword">is</span> <span class="hljs-string">'string'</span> <span class="hljs-keyword">and</span> starts <span class="hljs-property">@name</span>.value, <span class="hljs-string">'&amp;'</span>
+
   <span class="hljs-attribute">children</span>: [<span class="hljs-string">'name'</span>, <span class="hljs-string">'value'</span>]
 
   <span class="hljs-attribute">compileToFragments</span>: <span class="hljs-function"><span class="hljs-params">(o)</span> -&gt;</span>
     fragments = []
     fragments.push <span class="hljs-property">@name</span>.makeCode <span class="hljs-string">"<span class="hljs-subst">#{ <span class="hljs-property">@type</span>.value }</span> "</span> <span class="hljs-keyword">if</span> <span class="hljs-property">@type</span>
-    fragments.push <span class="hljs-property">@name</span>.makeCode <span class="hljs-string">"&amp;"</span> <span class="hljs-keyword">if</span> <span class="hljs-property">@isRef</span>
-    <span class="hljs-keyword">unless</span> starts <span class="hljs-property">@name</span>.value, <span class="hljs-string">'$'</span>
+    fragments.push <span class="hljs-property">@name</span>.makeCode <span class="hljs-string">"&amp;"</span> <span class="hljs-keyword">if</span> <span class="hljs-property">@isRef</span> <span class="hljs-keyword">and</span> <span class="hljs-keyword">not</span> starts <span class="hljs-property">@name</span>.value, <span class="hljs-string">'&amp;'</span>
+    <span class="hljs-keyword">unless</span> starts( <span class="hljs-property">@name</span>.value, <span class="hljs-string">'$'</span> ) <span class="hljs-keyword">or</span> starts( <span class="hljs-property">@name</span>.value, <span class="hljs-string">'&amp;'</span> )
       type = <span class="hljs-property">@name</span>.value.substr <span class="hljs-number">0</span>, <span class="hljs-property">@name</span>.value.indexOf <span class="hljs-string">'_$'</span>
       <span class="hljs-property">@name</span>.value = <span class="hljs-property">@name</span>.value.substr <span class="hljs-number">1</span> + <span class="hljs-property">@name</span>.value.indexOf <span class="hljs-string">'_$'</span>
       fragments.push <span class="hljs-property">@name</span>.makeCode <span class="hljs-string">"<span class="hljs-subst">#{ type }</span> "</span>
@@ -3818,6 +3820,8 @@ as well as be a splat, gathering up a group of parameters into an array.</p>
       node = <span class="hljs-keyword">new</span> Literal o.scope.freeVariable <span class="hljs-string">'$arg'</span>
     <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> remove_$ <span class="hljs-keyword">and</span> node <span class="hljs-keyword">instanceof</span> Literal <span class="hljs-keyword">and</span> starts node.value, <span class="hljs-string">'$'</span>
       node = <span class="hljs-keyword">new</span> Literal node.value.substr <span class="hljs-number">1</span>
+    <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> remove_$ <span class="hljs-keyword">and</span> node <span class="hljs-keyword">instanceof</span> Literal <span class="hljs-keyword">and</span> starts node.value, <span class="hljs-string">'&amp;$'</span>
+      node = <span class="hljs-keyword">new</span> Literal node.value.substr <span class="hljs-number">2</span>
     node = <span class="hljs-keyword">new</span> Value node
     node = <span class="hljs-keyword">new</span> Splat node <span class="hljs-keyword">if</span> <span class="hljs-property">@splat</span>
     node.updateLocationDataIfMissing <span class="hljs-property">@locationData</span>
@@ -4735,7 +4739,7 @@ is optional, the <em>catch</em> is not.</p>
             </div>
             
             <div class="content"><div class='highlight'><pre>
-      <span class="hljs-keyword">unless</span> starts <span class="hljs-property">@errorVariable</span>.value, <span class="hljs-string">'$'</span>
+      <span class="hljs-keyword">unless</span> starts( <span class="hljs-property">@errorVariable</span>.value, <span class="hljs-string">'$'</span> ) <span class="hljs-keyword">or</span> starts( <span class="hljs-property">@errorVariable</span>.value, <span class="hljs-string">'&amp;'</span> )
         <span class="hljs-property">@errorVariableType</span> = <span class="hljs-attribute">value</span>: <span class="hljs-property">@errorVariable</span>.value.substr <span class="hljs-number">0</span>, <span class="hljs-property">@errorVariable</span>.value.indexOf <span class="hljs-string">'_$'</span>
         <span class="hljs-property">@errorVariable</span>.value = <span class="hljs-property">@errorVariable</span>.value.substr <span class="hljs-number">1</span> + <span class="hljs-property">@errorVariable</span>.value.indexOf <span class="hljs-string">'_$'</span>
       [].concat <span class="hljs-property">@makeCode</span>(<span class="hljs-string">" catch ("</span>), <span class="hljs-property">@makeCode</span>( <span class="hljs-keyword">if</span> <span class="hljs-property">@errorVariableType</span>?.value <span class="hljs-keyword">then</span> <span class="hljs-string">"<span class="hljs-subst">#{ <span class="hljs-property">@errorVariableType</span>.value }</span> "</span> <span class="hljs-keyword">else</span> <span class="hljs-string">''</span> ), <span class="hljs-property">@errorVariable</span>.compileToFragments(o), <span class="hljs-property">@makeCode</span>(<span class="hljs-string">") {\n"</span>),
@@ -5468,7 +5472,7 @@ LEVEL_ACCESS = <span class="hljs-number">6</span>  <span class="hljs-comment"># 
             
             <div class="content"><div class='highlight'><pre>TAB = <span class="hljs-string">'  '</span>
 
-IDENTIFIER = <span class="hljs-regexp">/// ^ (?!\d) [$\w\x7f-\uffff]+ $ ///</span>
+IDENTIFIER = <span class="hljs-regexp">/// ^ (?!\d) [&amp;$\w\x7f-\uffff]+ $ ///</span>
 SIMPLENUM  = <span class="hljs-regexp">/^[+-]?\d+$/</span>
 HEXNUM = <span class="hljs-regexp">/^[+-]?0x[\da-f]+/i</span>
 NUMBER    = <span class="hljs-regexp">///^[+-]?(?:

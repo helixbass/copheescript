@@ -1671,13 +1671,15 @@ exports.Param = class Param extends Base
     if (name = @name.unwrapAll().value) in STRICT_PROSCRIBED
       @name.error "parameter name \"#{name}\" is not allowed"
 
+    @isRef = yes if typeof @name.value is 'string' and starts @name.value, '&'
+
   children: ['name', 'value']
 
   compileToFragments: (o) ->
     fragments = []
     fragments.push @name.makeCode "#{ @type.value } " if @type
-    fragments.push @name.makeCode "&" if @isRef
-    unless starts @name.value, '$'
+    fragments.push @name.makeCode "&" if @isRef and not starts @name.value, '&'
+    unless starts( @name.value, '$' ) or starts( @name.value, '&' )
       type = @name.value.substr 0, @name.value.indexOf '_$'
       @name.value = @name.value.substr 1 + @name.value.indexOf '_$'
       fragments.push @name.makeCode "#{ type } "
@@ -1698,6 +1700,8 @@ exports.Param = class Param extends Base
       node = new Literal o.scope.freeVariable '$arg'
     else if remove_$ and node instanceof Literal and starts node.value, '$'
       node = new Literal node.value.substr 1
+    else if remove_$ and node instanceof Literal and starts node.value, '&$'
+      node = new Literal node.value.substr 2
     node = new Value node
     node = new Splat node if @splat
     node.updateLocationDataIfMissing @locationData
@@ -2122,7 +2126,7 @@ exports.Try = class Try extends Base
       # placeholder = new Literal '_error'
       # @recovery.unshift new Assign @errorVariable, placeholder if @errorVariable
 
-      unless starts @errorVariable.value, '$'
+      unless starts( @errorVariable.value, '$' ) or starts( @errorVariable.value, '&' )
         @errorVariableType = value: @errorVariable.value.substr 0, @errorVariable.value.indexOf '_$'
         @errorVariable.value = @errorVariable.value.substr 1 + @errorVariable.value.indexOf '_$'
       [].concat @makeCode(" catch ("), @makeCode( if @errorVariableType?.value then "#{ @errorVariableType.value } " else '' ), @errorVariable.compileToFragments(o), @makeCode(") {\n"),
@@ -2514,7 +2518,7 @@ LEVEL_ACCESS = 6  # ...[0]
 # Tabs are two spaces for pretty printing.
 TAB = '  '
 
-IDENTIFIER = /// ^ (?!\d) [$\w\x7f-\uffff]+ $ ///
+IDENTIFIER = /// ^ (?!\d) [&$\w\x7f-\uffff]+ $ ///
 SIMPLENUM  = /^[+-]?\d+$/
 HEXNUM = /^[+-]?0x[\da-f]+/i
 NUMBER    = ///^[+-]?(?:

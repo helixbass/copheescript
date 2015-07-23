@@ -1747,7 +1747,7 @@ be used as identifiers or properties.</p>
             
             <div class="content"><div class='highlight'><pre>IDENTIFIER = <span class="hljs-regexp">/// ^
   (?!\d)
-  ( (?: (?!\s)[$\\\w\x7f-\uffff] )+ )
+  ( (?: (?!\s)[&amp;$\\\w\x7f-\uffff] )+ )
   ( [^\n\S]* : (?!:) )?  <span class="hljs-comment"># Is this a property name?</span>
 ///</span>
 

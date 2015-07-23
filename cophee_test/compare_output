@@ -23,6 +23,19 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "method returning ref",
+  '''
+  class A
+    &b: ->
+    @&c: ->
+  ''',
+  """
+  class A {
+    function &b() {}
+
+    static function &c() {}
+  }
+  """
 compare "object literal",
   '''
   {{ a: 1 }}
