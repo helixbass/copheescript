@@ -1001,7 +1001,7 @@ exports.Slice = class Slice extends Base
 
 # An object literal, nothing fancy.
 exports.Obj = class Obj extends Base
-  constructor: (props, @generated = false) ->
+  constructor: (props, @generated = false, @is_obj=false) ->
     @objects = @properties = props or []
 
   children: ['properties']
@@ -1020,6 +1020,7 @@ exports.Obj = class Obj extends Base
     # if hasDynamic
     #   oref = o.scope.freeVariable 'obj'
     #   answer.push @makeCode "(\n#{idt}#{oref} = "
+    answer.push @makeCode "(object) " if @is_obj
     answer.push @makeCode "[#{if props.length is 0 or dynamicIndex is 0 then ']' else '\n'}"
     for prop, i in props
       prop.variable.base.value = ensureQuoted prop.variable.base.value unless prop.variable?.properties.length or not prop.variable?.base.value or starts prop.variable.base.value, '$'
