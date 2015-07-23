@@ -28,6 +28,9 @@ Adds a new variable or overrides an existing one.
 
       add: (name, type, immediate) ->
         # console.log 'add', name
+        name = name?.base?.value ? name?.name?.base?.value unless typeof name is 'string'
+        name = name.substr space_index + 1 if space_index = name.indexOf ' $'
+        name = name.substr 1 if '&' is name.substr( 0, 1 )
         return @parent.add name, type, immediate if @shared and not immediate
         if Object::hasOwnProperty.call @positions, name
           @variables[@positions[name]].type = type
@@ -136,9 +139,14 @@ Does this scope have any declared variables?
         @parent.add_free free_var.name, free_var.type for free_var in do @_uses
         
       in_variables: ( name ) ->
+        name = name.substr 1 if name.substr( 0, 1 ) is '&'
+
         return yes if name of @positions
         for _var in @variables
-          return yes if _var.name?.base?.value is name
+          val = _var.name?.base?.value
+          return no unless val
+          return yes if val is name
+          return yes if val.substr( 0, 1 ) is '&' and val.substr( 1 ) is name
         no
       special_or_global: ( name ) ->
         return yes if name is 'this'

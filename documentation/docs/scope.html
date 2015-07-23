@@ -193,7 +193,10 @@ and therefore should be avoided when generating variables.</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>    <span class="hljs-keyword">return</span> <span class="hljs-property">@parent</span>.add name, type, immediate <span class="hljs-keyword">if</span> <span class="hljs-property">@shared</span> <span class="hljs-keyword">and</span> <span class="hljs-keyword">not</span> immediate
+            <div class="content"><div class='highlight'><pre>    name = name?.base?.value ? name?.name?.base?.value <span class="hljs-keyword">unless</span> <span class="hljs-keyword">typeof</span> name <span class="hljs-keyword">is</span> <span class="hljs-string">'string'</span>
+    name = name.substr space_index + <span class="hljs-number">1</span> <span class="hljs-keyword">if</span> space_index = name.indexOf <span class="hljs-string">' $'</span>
+    name = name.substr <span class="hljs-number">1</span> <span class="hljs-keyword">if</span> <span class="hljs-string">'&amp;'</span> <span class="hljs-keyword">is</span> name.substr( <span class="hljs-number">0</span>, <span class="hljs-number">1</span> )
+    <span class="hljs-keyword">return</span> <span class="hljs-property">@parent</span>.add name, type, immediate <span class="hljs-keyword">if</span> <span class="hljs-property">@shared</span> <span class="hljs-keyword">and</span> <span class="hljs-keyword">not</span> immediate
     <span class="hljs-keyword">if</span> <span class="hljs-attribute">Object</span>::hasOwnProperty.call <span class="hljs-property">@positions</span>, name
       <span class="hljs-property">@variables</span>[<span class="hljs-property">@positions</span>[name]].type = type
     <span class="hljs-keyword">else</span>
@@ -477,9 +480,14 @@ console.log ‘free vars’, @free_variables</p>
     <span class="hljs-property">@parent</span>.add_free free_var.name, free_var.type <span class="hljs-keyword">for</span> free_var <span class="hljs-keyword">in</span> <span class="hljs-keyword">do</span> <span class="hljs-property">@_uses</span>
     
   <span class="hljs-attribute">in_variables</span>: <span class="hljs-function"><span class="hljs-params">( name )</span> -&gt;</span>
+    name = name.substr <span class="hljs-number">1</span> <span class="hljs-keyword">if</span> name.substr( <span class="hljs-number">0</span>, <span class="hljs-number">1</span> ) <span class="hljs-keyword">is</span> <span class="hljs-string">'&amp;'</span>
+
     <span class="hljs-keyword">return</span> <span class="hljs-literal">yes</span> <span class="hljs-keyword">if</span> name <span class="hljs-keyword">of</span> <span class="hljs-property">@positions</span>
     <span class="hljs-keyword">for</span> _var <span class="hljs-keyword">in</span> <span class="hljs-property">@variables</span>
-      <span class="hljs-keyword">return</span> <span class="hljs-literal">yes</span> <span class="hljs-keyword">if</span> _var.name?.base?.value <span class="hljs-keyword">is</span> name
+      val = _var.name?.base?.value
+      <span class="hljs-keyword">return</span> <span class="hljs-literal">no</span> <span class="hljs-keyword">unless</span> val
+      <span class="hljs-keyword">return</span> <span class="hljs-literal">yes</span> <span class="hljs-keyword">if</span> val <span class="hljs-keyword">is</span> name
+      <span class="hljs-keyword">return</span> <span class="hljs-literal">yes</span> <span class="hljs-keyword">if</span> val.substr( <span class="hljs-number">0</span>, <span class="hljs-number">1</span> ) <span class="hljs-keyword">is</span> <span class="hljs-string">'&amp;'</span> <span class="hljs-keyword">and</span> val.substr( <span class="hljs-number">1</span> ) <span class="hljs-keyword">is</span> name
     <span class="hljs-literal">no</span>
   <span class="hljs-attribute">special_or_global</span>: <span class="hljs-function"><span class="hljs-params">( name )</span> -&gt;</span>
     <span class="hljs-keyword">return</span> <span class="hljs-literal">yes</span> <span class="hljs-keyword">if</span> name <span class="hljs-keyword">is</span> <span class="hljs-string">'this'</span>

@@ -23,6 +23,50 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "pseudo-typed param",
+  '''
+  ( Wrap_$b ) -> $b
+  ''',
+  '''
+  (function(Wrap $b) { return $b; });
+  '''
+
+compare "preserve ref w/ splatted args",
+  '''
+  ( &$a, $b... ) ->
+    $a
+  ''',
+  """
+  (function(&$a) {
+    $__args = func_get_args();
+    $b = array_slice($__args, 1);
+    return $a;
+  });
+  """
+compare "?= param w/ default",
+  '''
+  ( $x=5 ) -> $x ?= 3
+  ''',
+  '''
+  (function($x=5) { return isset( $x ) ? $x : ($x = 3); });
+  '''
+compare "recognize ref var",
+  '''
+  ->
+    for &$item of $list
+      var_dump $item
+
+    no
+  ''',
+  """
+  (function() use (&$list) {
+    foreach ($list as &$item) {
+      var_dump($item);
+    }
+
+    return false;
+  });
+  """
 compare "method returning ref",
   '''
   class A
@@ -100,18 +144,6 @@ compare "class const",
   class A {
     const B = 1;
   }
-  """
-compare "preserve ref w/ splatted args",
-  '''
-  ( &$a, $b... ) ->
-    $a
-  ''',
-  """
-  (function(&$a) {
-    $__args = func_get_args();
-    $b = array_slice($__args, 1);
-    return $a;
-  });
   """
 compare "{ .col }",
   '''
@@ -670,13 +702,6 @@ compare "{ a }",
   ([ 'a' => $a ]);
   """
 
-compare "?= param w/ default",
-  '''
-  ( $x=5 ) -> $x ?= 3
-  ''',
-  '''
-  (function($x=5) { return isset( $x ) ? $x : ($x = 3); });
-  '''
 compare "assigned switch",
   '''
   $x =
@@ -802,14 +827,6 @@ compare "class static method",
   class A {
     static function b() {}
   }
-  '''
-
-compare "pseudo-typed param",
-  '''
-  ( Wrap_$b ) -> $b
-  ''',
-  '''
-  (function(Wrap $b) { return $b; });
   '''
 
 compare "reference class static prop",
