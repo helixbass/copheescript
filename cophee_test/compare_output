@@ -42,15 +42,16 @@ compare "accessor as obj key",
     $b->d => 6
   ]);
   """
-compare "interpolated triple regex w/ flags",
+compare "interpolated triple regex w/ flags, backslash",
   '''
   preg_replace ///
     a*
     #{ $b }
+    \s +
     ///i, "ABC"
   ''',
   """
-  preg_replace('/' . (\"a*\" . $b) . '/' . \"i\", \"ABC\");
+  preg_replace('/' . ('a*' . $b . '\\s+') . '/' . \"i\", \"ABC\");
   """
 compare "interpolated triple regex",
   '''
@@ -60,7 +61,7 @@ compare "interpolated triple regex",
   ///
   ''',
   """
-  '/' . (\"a*\" . $b) . '/';
+  '/' . ('a*' . $b) . '/';
   """
 
 compare "pseudo-typed param",

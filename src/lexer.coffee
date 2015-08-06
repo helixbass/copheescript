@@ -291,7 +291,8 @@ exports.Lexer = class Lexer
         # @token 'STRING_START', '(', 0, 0
         @token 'STRING', "'/'", 0, 0
         @token 'STR_CONCAT', 'STR_CONCAT'
-        @mergeInterpolationTokens tokens, {delimiter: '"', double: yes}, @formatHeregex
+        # @mergeInterpolationTokens tokens, {delimiter: '"', double: yes}, @formatHeregex
+        @mergeInterpolationTokens tokens, {delimiter: "'"}, @formatHeregex
         @token 'STR_CONCAT', 'STR_CONCAT'
         @token 'STRING', "'/'", 0, 0
         if flags
