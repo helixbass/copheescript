@@ -422,9 +422,9 @@ compare "triple regex",
     b
   ///
   ''',
-  """
-  '/a*b/';
-  """
+  '''
+  "/a*b/";
+  '''
 
 compare "existy prop w/ chain",
   '''
