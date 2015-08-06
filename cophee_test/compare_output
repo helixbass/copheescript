@@ -23,6 +23,27 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "interpolated triple regex w/ flags",
+  '''
+  preg_replace ///
+    a*
+    #{ $b }
+    ///i, "ABC"
+  ''',
+  """
+  preg_replace('/' . (\"a*\" . $b) . '/' . \"i\", \"ABC\");
+  """
+compare "interpolated triple regex",
+  '''
+  ///
+    a*
+    #{ $b }
+  ///
+  ''',
+  """
+  '/' . (\"a*\" . $b) . '/';
+  """
+
 compare "pseudo-typed param",
   '''
   ( Wrap_$b ) -> $b
@@ -422,9 +443,9 @@ compare "triple regex",
     b
   ///
   ''',
-  '''
-  "/a*b/";
-  '''
+  """
+  '/a*b/';
+  """
 
 compare "existy prop w/ chain",
   '''

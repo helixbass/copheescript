@@ -286,13 +286,19 @@ exports.Lexer = class Lexer
         @token 'REGEX', "#{@makeDelimitedLiteral body, delimiter: '/'}#{flags}", 0, end, origin
       else
         @token 'REGEX_START', '(', 0, 0, origin
-        @token 'IDENTIFIER', 'RegExp', 0, 0
-        @token 'CALL_START', '(', 0, 0
+        # @token 'IDENTIFIER', 'RegExp', 0, 0
+        # @token 'CALL_START', '(', 0, 0
+        # @token 'STRING_START', '(', 0, 0
+        @token 'STRING', "'/'", 0, 0
+        @token 'STR_CONCAT', 'STR_CONCAT'
         @mergeInterpolationTokens tokens, {delimiter: '"', double: yes}, @formatHeregex
+        @token 'STR_CONCAT', 'STR_CONCAT'
+        @token 'STRING', "'/'", 0, 0
         if flags
-          @token ',', ',', index, 0
+          @token 'STR_CONCAT', 'STR_CONCAT'
           @token 'STRING', '"' + flags + '"', index, flags.length
-        @token ')', ')', end, 0
+        # @token ')', ')', end, 0
+        # @token 'STRING_END', ')'
         @token 'REGEX_END', ')', end, 0
 
     end

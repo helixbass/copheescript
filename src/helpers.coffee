@@ -194,10 +194,8 @@ exports.nameWhitespaceCharacter = (string) ->
     when '\t' then 'tab'
     else string
 
-exports.ensureQuoted = ( name, use_double_quotes=no ) ->
+exports.ensureQuoted = ( name ) ->
   return name if starts name, '"'
   return name if starts name, "'"
 
-  return "'#{ name }'" unless use_double_quotes
-
-  "\"#{ name }\""
+  "'#{ name }'"

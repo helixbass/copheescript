@@ -143,7 +143,7 @@ grammar =
 
   Regex: [
     o 'REGEX',                                  -> new Literal $1
-    o 'REGEX_START Invocation REGEX_END',       -> $2
+    o 'REGEX_START Expression REGEX_END',       -> $2
   ]
 
   # All of our immediate values. Generally these can be passed straight
