@@ -1051,8 +1051,8 @@ exports.Obj = class Obj extends Base
       indent = if prop instanceof Comment then '' else idt
       indent += TAB if hasDynamic and i < dynamicIndex
       # console.log 'obj prop', prop.variable
-      if prop instanceof Assign and prop.variable instanceof Value and prop.variable.hasProperties()
-        prop.variable.error 'Invalid object key'
+      # if prop instanceof Assign and prop.variable instanceof Value and prop.variable.hasProperties()
+      #   prop.variable.error 'Invalid object key'
       if prop instanceof Value and prop.this
         variable = new Literal ensureQuoted prop.properties[0].name.value
         prop = new Assign variable, prop, 'object'

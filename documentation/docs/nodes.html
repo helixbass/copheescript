@@ -2409,13 +2409,13 @@ is the index of the beginning.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-104">&#182;</a>
               </div>
-              <p>console.log ‘obj prop’, prop.variable</p>
+              <p>console.log ‘obj prop’, prop.variable
+if prop instanceof Assign and prop.variable instanceof Value and prop.variable.hasProperties()
+  prop.variable.error ‘Invalid object key’</p>
 
             </div>
             
-            <div class="content"><div class='highlight'><pre>      <span class="hljs-keyword">if</span> prop <span class="hljs-keyword">instanceof</span> Assign <span class="hljs-keyword">and</span> prop.variable <span class="hljs-keyword">instanceof</span> Value <span class="hljs-keyword">and</span> prop.variable.hasProperties()
-        prop.variable.error <span class="hljs-string">'Invalid object key'</span>
-      <span class="hljs-keyword">if</span> prop <span class="hljs-keyword">instanceof</span> Value <span class="hljs-keyword">and</span> prop.<span class="hljs-keyword">this</span>
+            <div class="content"><div class='highlight'><pre>      <span class="hljs-keyword">if</span> prop <span class="hljs-keyword">instanceof</span> Value <span class="hljs-keyword">and</span> prop.<span class="hljs-keyword">this</span>
         variable = <span class="hljs-keyword">new</span> Literal ensureQuoted prop.properties[<span class="hljs-number">0</span>].name.value
         prop = <span class="hljs-keyword">new</span> Assign variable, prop, <span class="hljs-string">'object'</span>
       <span class="hljs-keyword">if</span> prop <span class="hljs-keyword">not</span> <span class="hljs-keyword">instanceof</span> Comment

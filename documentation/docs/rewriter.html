@@ -663,11 +663,14 @@ that creates grammatical ambiguities.</p>
               <div class="pilwrap ">
                 <a class="pilcrow" href="#section-25">&#182;</a>
               </div>
-              <p>Go back to the (implicit) start of the object</p>
+              <p>console.log ‘tag :’, @tag(i - 1), @tag(i - 2)
+Go back to the (implicit) start of the object</p>
 
             </div>
             
             <div class="content"><div class='highlight'><pre>        s = <span class="hljs-keyword">switch</span>
+          <span class="hljs-keyword">when</span> <span class="hljs-property">@tag</span>(i - <span class="hljs-number">1</span>) <span class="hljs-keyword">is</span> <span class="hljs-string">'INDEX_END'</span> <span class="hljs-keyword">then</span> i - <span class="hljs-number">4</span>
+          <span class="hljs-keyword">when</span> <span class="hljs-property">@tag</span>(i - <span class="hljs-number">2</span>) <span class="hljs-keyword">is</span> <span class="hljs-string">'.'</span> <span class="hljs-keyword">and</span> <span class="hljs-property">@tag</span>(i - <span class="hljs-number">1</span>) <span class="hljs-keyword">is</span> <span class="hljs-string">'IDENTIFIER'</span> <span class="hljs-keyword">then</span> i - <span class="hljs-number">3</span>
           <span class="hljs-keyword">when</span> <span class="hljs-property">@tag</span>(i - <span class="hljs-number">1</span>) <span class="hljs-keyword">in</span> EXPRESSION_END <span class="hljs-keyword">then</span> start[<span class="hljs-number">1</span>]
           <span class="hljs-keyword">when</span> <span class="hljs-property">@tag</span>(i - <span class="hljs-number">2</span>) <span class="hljs-keyword">is</span> <span class="hljs-string">'@'</span> <span class="hljs-keyword">and</span> <span class="hljs-property">@tag</span>(i - <span class="hljs-number">3</span>) <span class="hljs-keyword">is</span> <span class="hljs-string">'ABSTRACT'</span> <span class="hljs-keyword">then</span> i - <span class="hljs-number">3</span>
           <span class="hljs-keyword">when</span> <span class="hljs-property">@tag</span>(i - <span class="hljs-number">2</span>) <span class="hljs-keyword">is</span> <span class="hljs-string">'@'</span> <span class="hljs-keyword">then</span> i - <span class="hljs-number">2</span>

@@ -263,8 +263,11 @@ class exports.Rewriter
 
       # Implicit objects start here
       if tag is ':'
+        # console.log 'tag :', @tag(i - 1), @tag(i - 2)
         # Go back to the (implicit) start of the object
         s = switch
+          when @tag(i - 1) is 'INDEX_END' then i - 4
+          when @tag(i - 2) is '.' and @tag(i - 1) is 'IDENTIFIER' then i - 3
           when @tag(i - 1) in EXPRESSION_END then start[1]
           when @tag(i - 2) is '@' and @tag(i - 3) is 'ABSTRACT' then i - 3
           when @tag(i - 2) is '@' then i - 2

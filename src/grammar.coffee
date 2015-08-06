@@ -170,8 +170,14 @@ grammar =
   AssignObj: [
     o 'ObjAssignable',                          -> new Value $1
     o 'ObjAssignable : Expression',             -> new Assign LOC(1)(new Value($1)), $3, 'object'
+    o 'Identifier Index : Expression',          -> new Assign LOC(1)(new Value($1, [$2])), $4, 'object'
+    o 'Identifier . Identifier : Expression',   -> new Assign LOC(1)(new Value($1, [new Access $3])), $5, 'object'
     o 'ObjAssignable :
        INDENT Expression OUTDENT',              -> new Assign LOC(1)(new Value($1)), $4, 'object'
+    o 'Identifier Index :
+       INDENT Expression OUTDENT',              -> new Assign LOC(1)(new Value($1, [$2])), $5, 'object'
+    o 'Identifier . Identifier :
+       INDENT Expression OUTDENT',              -> new Assign LOC(1)(new Value($1, [new Access $3])), $6, 'object'
     o 'ABSTRACT ObjAssignable : Expression',    -> new Assign LOC(1)(new Value($2, null, null, yes)), $4, 'object'
     o 'Comment'
     o '. Identifier',                           -> new Value new Literal ".#{ $2.value }"

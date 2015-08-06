@@ -23,6 +23,25 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "accessor as obj key",
+  """
+  {
+    $a['b']: 3
+    $a['c']:
+      4
+    $b.c: 5
+    $b.d:
+      6
+  }
+  """,
+  """
+  ([
+    $a['b'] => 3,
+    $a['c'] => 4,
+    $b->c => 5,
+    $b->d => 6
+  ]);
+  """
 compare "interpolated triple regex w/ flags",
   '''
   preg_replace ///
