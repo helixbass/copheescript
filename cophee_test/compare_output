@@ -23,6 +23,16 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "multi-index ?=",
+  '''
+  $a["b"]["c"] ?= 3
+  ''',
+  '''
+  if (!  isset( $a["b"]["c"] )) {
+    $a["b"]["c"] = 3;
+  }
+  '''
+
 compare "accessor as obj key",
   """
   {

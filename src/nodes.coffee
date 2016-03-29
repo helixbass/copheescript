@@ -567,7 +567,8 @@ exports.Value = class Value extends Base
   # `a()[b()] ?= c` -> `(_base = a())[_name = b()] ? _base[_name] = c`
   cacheReference: (o) ->
     [..., name] = @properties
-    if @properties.length < 2 and not @base.isComplex() and not name?.isComplex()
+    # if @properties.length < 2 and not @base.isComplex() and not name?.isComplex()
+    if not @base.isComplex() and not name?.isComplex()
       return [this, this]  # `a` `a.b`
     base = new Value @base, @properties[...-1]
     if base.isComplex()  # `a().b`
