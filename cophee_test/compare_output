@@ -23,6 +23,14 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "array slice",
+  '''
+  $start = $numbers[0..2]
+  ''',
+  '''
+  $start = array_slice( $numbers, 0, 3 );
+  '''
+
 compare "range for loop",
   '''
   for $num in [10..1]

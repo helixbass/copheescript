@@ -602,6 +602,10 @@ exports.Value = class Value extends Base
       fragments.push @makeCode "::#{ @properties[1].name.value }"
       if @properties.length > 2
         fragments.push (property.compileToFragments o)... for property in @properties[2..]
+    else if @isSplice()
+      [..., lastProp] = @properties
+      lastProp.compiledParentFragments = fragments
+      fragments = lastProp.compileToFragments o
     else
       for prop in props
         fragments.push (prop.compileToFragments o)...
@@ -999,7 +1003,12 @@ exports.Slice = class Slice extends Base
         else
           compiled = to.compileToFragments o, LEVEL_ACCESS
           "+#{fragmentsToText compiled} + 1 || 9e9"
-    [@makeCode ".slice(#{ fragmentsToText fromCompiled }#{ toStr or '' })"]
+    @compiledParentFragments.unshift @makeCode "array_slice( "
+    @compiledParentFragments.push @makeCode ", "
+    @compiledParentFragments.push fromCompiled...
+    @compiledParentFragments.push @makeCode "#{ toStr or '' } )"
+    @compiledParentFragments
+    # [@makeCode "array_slice(#{ fragmentsToText fromCompiled }#{ toStr or '' })"]
 
 #### Obj
 
@@ -2331,7 +2340,7 @@ exports.For = class For extends While
                       val.properties.length is 1 and
                       val.properties[0].name?.value in ['call', 'apply'])
       fn    = val.base?.unwrapAll() or val
-      ref   = new Literal o.scope.freeVariable 'fn'
+      ref   = new Literal o.scope.freeVariable '$fn'
       base  = new Value ref
       if val.base
         [val.base, base] = [base, val]

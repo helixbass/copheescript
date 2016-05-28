@@ -955,10 +955,10 @@ countdown = (function() {
       an object. Use <tt>of</tt> to signal comprehension over the properties of
       an object instead of the values in an array.
     </p>
-    <div class='code'><pre><code>yearsOld = <span class="attribute">max</span>: <span class="number">10</span>, <span class="attribute">ida</span>: <span class="number">9</span>, <span class="attribute">tim</span>: <span class="number">11</span>
+    <div class='code'><pre><code>$yearsOld = <span class="attribute">max</span>: <span class="number">10</span>, <span class="attribute">ida</span>: <span class="number">9</span>, <span class="attribute">tim</span>: <span class="number">11</span>
 
-ages = <span class="keyword">for</span> child, age <span class="keyword">of</span> yearsOld
-  <span class="string">"<span class="subst">#{child}</span> is <span class="subst">#{age}</span>"</span>
+$ages = <span class="keyword">for</span> $child, $age <span class="keyword">of</span> $yearsOld
+  <span class="string">"<span class="subst">#{ $child }</span> is <span class="subst">#{ $age }</span>"</span>
 </code></pre><pre><code><span class="keyword">var</span> age, ages, child, yearsOld;
 
 yearsOld = {
@@ -976,7 +976,7 @@ ages = (<span class="function"><span class="keyword">function</span><span class=
   }
   <span class="keyword">return</span> results;
 })();
-</code></pre><script>window.example11 = "yearsOld = max: 10, ida: 9, tim: 11\n\nages = for child, age of yearsOld\n  \"#{child} is #{age}\"\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example11);'>load</div><div class='minibutton ok' onclick='javascript: var age, ages, child, yearsOld;
+</code></pre><script>window.example11 = "$yearsOld = max: 10, ida: 9, tim: 11\n\n$ages = for $child, $age of $yearsOld\n  \"#{ $child } is #{ $age }\"\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example11);'>load</div><div class='minibutton ok' onclick='javascript: var age, ages, child, yearsOld;
 
 yearsOld = {
   max: 10,
@@ -1007,14 +1007,14 @@ ages = (function() {
       through the loop.
     </p>
     <div class='code'><pre><code><span class="comment"># Econ 101</span>
-<span class="keyword">if</span> <span class="keyword">this</span>.studyingEconomics
-  buy()  <span class="keyword">while</span> supply &gt; demand
-  sell() <span class="keyword">until</span> supply &gt; demand
+<span class="keyword">if</span> $<span class="keyword">this</span>.studyingEconomics
+  $buy()  <span class="keyword">while</span> $supply &gt; $demand
+  $sell() <span class="keyword">until</span> $supply &gt; $demand
 
 <span class="comment"># Nursery Rhyme</span>
-num = <span class="number">6</span>
-lyrics = <span class="keyword">while</span> num -= <span class="number">1</span>
-  <span class="string">"<span class="subst">#{num}</span> little monkeys, jumping on the bed.
+$num = <span class="number">6</span>
+$lyrics = <span class="keyword">while</span> $num -= <span class="number">1</span>
+  <span class="string">"<span class="subst">#{ $num }</span> little monkeys, jumping on the bed.
     One fell out and bumped his head."</span>
 </code></pre><pre><code><span class="keyword">var</span> lyrics, num;
 
@@ -1037,7 +1037,7 @@ lyrics = (<span class="function"><span class="keyword">function</span><span clas
   }
   <span class="keyword">return</span> results;
 })();
-</code></pre><script>window.example12 = "# Econ 101\nif this.studyingEconomics\n  buy()  while supply > demand\n  sell() until supply > demand\n\n# Nursery Rhyme\nnum = 6\nlyrics = while num -= 1\n  \"#{num} little monkeys, jumping on the bed.\n    One fell out and bumped his head.\"\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example12);'>load</div><div class='minibutton ok' onclick='javascript: var lyrics, num;
+</code></pre><script>window.example12 = "# Econ 101\nif $this.studyingEconomics\n  $buy()  while $supply > $demand\n  $sell() until $supply > $demand\n\n# Nursery Rhyme\n$num = 6\n$lyrics = while $num -= 1\n  \"#{ $num } little monkeys, jumping on the bed.\n    One fell out and bumped his head.\"\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example12);'>load</div><div class='minibutton ok' onclick='javascript: var lyrics, num;
 
 if (this.studyingEconomics) {
   while (supply > demand) {
@@ -1072,10 +1072,11 @@ lyrics = (function() {
       provides the <tt>do</tt> keyword, which immediately invokes a passed function,
       forwarding any arguments.
     </p>
-    <div class='code'><pre><code><span class="keyword">for</span> filename <span class="keyword">in</span> list
-  <span class="keyword">do</span> <span class="function"><span class="params">(filename)</span> -&gt;</span>
-    fs.readFile filename, <span class="function"><span class="params">(err, contents)</span> -&gt;</span>
-      compile filename, contents.toString()</code></pre><pre><code><span class="keyword">var</span> filename, fn, i, len;
+    <div class='code'><pre><code><span class="keyword">for</span> $filename <span class="keyword">in</span> $list
+  <span class="keyword">do</span> <span class="function"><span class="params">( $filename )</span> -&gt;</span>
+    $fs.readFile $filename, <span class="function"><span class="params">( $err, $contents )</span> -&gt;</span>
+      $compile $filename, $contents.toString()
+</code></pre><pre><code><span class="keyword">var</span> filename, fn, i, len;
 
 fn = <span class="function"><span class="keyword">function</span><span class="params">(filename)</span> {</span>
   <span class="keyword">return</span> fs.readFile(filename, <span class="function"><span class="keyword">function</span><span class="params">(err, contents)</span> {</span>
@@ -1086,7 +1087,7 @@ fn = <span class="function"><span class="keyword">function</span><span class="pa
   filename = list[i];
   fn(filename);
 }
-</code></pre><script>window.example13 = "for filename in list\n  do (filename) ->\n    fs.readFile filename, (err, contents) ->\n      compile filename, contents.toString()"</script><div class='minibutton load' onclick='javascript: loadConsole(example13);'>load</div><br class='clear' /></div>
+</code></pre><script>window.example13 = "for $filename in $list\n  do ( $filename ) ->\n    $fs.readFile $filename, ( $err, $contents ) ->\n      $compile $filename, $contents.toString()\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example13);'>load</div><br class='clear' /></div>
 
     <p>
       <span id="slices" class="bookmark"></span>
@@ -1097,15 +1098,15 @@ fn = <span class="function"><span class="keyword">function</span><span class="pa
       Slices indices have useful defaults. An omitted first index defaults to
       zero and an omitted second index defaults to the size of the array.
     </p>
-    <div class='code'><pre><code>numbers = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>, <span class="number">8</span>, <span class="number">9</span>]
+    <div class='code'><pre><code>$numbers = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>, <span class="number">8</span>, <span class="number">9</span>]
 
-start   = numbers[<span class="number">0.</span><span class="number">.2</span>]
+$start   = $numbers[<span class="number">0.</span><span class="number">.2</span>]
 
-middle  = numbers[<span class="number">3.</span>..-<span class="number">2</span>]
+$middle  = $numbers[<span class="number">3.</span>..-<span class="number">2</span>]
 
-end     = numbers[-<span class="number">2.</span>.]
+$end     = $numbers[-<span class="number">2.</span>.]
 
-copy    = numbers[..]
+$copy    = $numbers[..]
 </code></pre><pre><code><span class="keyword">var</span> copy, end, middle, numbers, start;
 
 numbers = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>, <span class="number">8</span>, <span class="number">9</span>];
@@ -1117,7 +1118,7 @@ middle = numbers.slice(<span class="number">3</span>, -<span class="number">2</s
 end = numbers.slice(-<span class="number">2</span>);
 
 copy = numbers.slice(<span class="number">0</span>);
-</code></pre><script>window.example14 = "numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9]\n\nstart   = numbers[0..2]\n\nmiddle  = numbers[3...-2]\n\nend     = numbers[-2..]\n\ncopy    = numbers[..]\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example14);'>load</div><div class='minibutton ok' onclick='javascript: var copy, end, middle, numbers, start;
+</code></pre><script>window.example14 = "$numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9]\n\n$start   = $numbers[0..2]\n\n$middle  = $numbers[3...-2]\n\n$end     = $numbers[-2..]\n\n$copy    = $numbers[..]\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example14);'>load</div><div class='minibutton ok' onclick='javascript: var copy, end, middle, numbers, start;
 
 numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
