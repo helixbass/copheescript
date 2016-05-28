@@ -169,7 +169,7 @@ task 'build:browser', 'rebuild the merged script for inclusion in the browser', 
 
 task 'doc:site', 'watch and continually rebuild the documentation for the website', ->
   source = 'documentation/index.html.js'
-  exec 'bin/coffee -bc -o documentation/js documentation/coffee/*.coffee'
+  # exec 'bin/coffee -bc -o documentation/js documentation/coffee/*.coffee'
 
   do renderIndex = ->
     codeSnippetCounter = 0

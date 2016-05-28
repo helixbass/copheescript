@@ -817,6 +817,8 @@ exports.Call = class Call extends Base
     answer = answer.concat @makeCode("call_user_func_array("),
       if @variable.looksStatic?()
         [@makeCode @variable.obj_method_array_str o]
+      else if @variable.isVar?()
+        [@variable.compileToFragments( o )...]
       else
         [@makeCode("'"), @variable.compileToFragments( o )..., @makeCode "'"]
     , @makeCode(", "), splatArgs, @makeCode(")")

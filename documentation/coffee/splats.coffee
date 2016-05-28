@@ -1,11 +1,11 @@
-gold = silver = rest = "unknown"
+$gold = $silver = $rest = "unknown"
 
-awardMedals = (first, second, others...) ->
-  gold   = first
-  silver = second
-  rest   = others
+$awardMedals = ( $first, $second, $others... ) ->
+  $gold   = $first
+  $silver = $second
+  $rest   = $others
 
-contenders = [
+$contenders = [
   "Michael Phelps"
   "Liu Xiang"
   "Yao Ming"
@@ -18,10 +18,10 @@ contenders = [
   "Usain Bolt"
 ]
 
-awardMedals contenders...
+$awardMedals $contenders...
 
-alert "Gold: " + gold
-alert "Silver: " + silver
-alert "The Field: " + rest
+echo "Gold: " + $gold
+echo "Silver: " + $silver
+echo "The Field: " + $rest
 
 

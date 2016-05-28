@@ -1,14 +1,16 @@
-song = ["do", "re", "mi", "fa", "so"]
+$song = ["do", "re", "mi", "fa", "so"]
 
-singers = {Jagger: "Rock", Elvis: "Roll"}
+$singers = { Jagger: "Rock", Elvis: "Roll" }
 
-bitlist = [
+$singers_obj = {{ Jagger: "Rock", Elvis: "Roll" }}
+
+$bitlist = [
   1, 0, 1
   0, 0, 1
   1, 1, 0
 ]
 
-kids =
+$kids =
   brother:
     name: "Max"
     age:  11

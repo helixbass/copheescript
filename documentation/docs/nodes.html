@@ -1858,6 +1858,8 @@ answer = answer.concat @makeCode(“.apply(#{ref}, “), splatArgs, @makeCode(�
             <div class="content"><div class='highlight'><pre>    answer = answer.concat <span class="hljs-property">@makeCode</span>(<span class="hljs-string">"call_user_func_array("</span>),
       <span class="hljs-keyword">if</span> <span class="hljs-property">@variable</span>.looksStatic?()
         [<span class="hljs-property">@makeCode</span> <span class="hljs-property">@variable</span>.obj_method_array_str o]
+      <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> <span class="hljs-property">@variable</span>.isVar?()
+        [<span class="hljs-property">@variable</span>.compileToFragments( o )...]
       <span class="hljs-keyword">else</span>
         [<span class="hljs-property">@makeCode</span>(<span class="hljs-string">"'"</span>), <span class="hljs-property">@variable</span>.compileToFragments( o )..., <span class="hljs-property">@makeCode</span> <span class="hljs-string">"'"</span>]
     , <span class="hljs-property">@makeCode</span>(<span class="hljs-string">", "</span>), splatArgs, <span class="hljs-property">@makeCode</span>(<span class="hljs-string">")"</span>)</pre></div></div>
