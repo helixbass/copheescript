@@ -1134,18 +1134,19 @@ copy = numbers.slice(0);
       The same syntax can be used with assignment to replace a segment of an array
       with new values, splicing it.
     </p>
-    <div class='code'><pre><code>numbers = [<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>, <span class="number">8</span>, <span class="number">9</span>]
+    <div class='code'><pre><code>$numbers = [<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>, <span class="number">8</span>, <span class="number">9</span>]
 
-numbers[<span class="number">3.</span><span class="number">.6</span>] = [-<span class="number">3</span>, -<span class="number">4</span>, -<span class="number">5</span>, -<span class="number">6</span>]
+$numbers[<span class="number">3.</span><span class="number">.6</span>] = [-<span class="number">3</span>, -<span class="number">4</span>, -<span class="number">5</span>, -<span class="number">6</span>]
 
 
 
- </code></pre><pre><code><span class="keyword">var</span> numbers, ref;
+ 
+</code></pre><pre><code><span class="keyword">var</span> numbers, ref;
 
 numbers = [<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>, <span class="number">8</span>, <span class="number">9</span>];
 
 [].splice.apply(numbers, [<span class="number">3</span>, <span class="number">4</span>].concat(ref = [-<span class="number">3</span>, -<span class="number">4</span>, -<span class="number">5</span>, -<span class="number">6</span>])), ref;
-</code></pre><script>window.example15 = "numbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]\n\nnumbers[3..6] = [-3, -4, -5, -6]\n\n\n\n "</script><div class='minibutton load' onclick='javascript: loadConsole(example15);'>load</div><div class='minibutton ok' onclick='javascript: var numbers, ref;
+</code></pre><script>window.example15 = "$numbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]\n\n$numbers[3..6] = [-3, -4, -5, -6]\n\n\n\n \n"</script><div class='minibutton load' onclick='javascript: loadConsole(example15);'>load</div><div class='minibutton ok' onclick='javascript: var numbers, ref;
 
 numbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 

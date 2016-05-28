@@ -1517,8 +1517,8 @@ exports.Assign = class Assign extends Base
         to += ' + 1' unless exclusive
     else
       to = "9e9"
-    [valDef, valRef] = @value.cache o, LEVEL_LIST
-    answer = [].concat @makeCode("[].splice.apply(#{name}, [#{fromDecl}, #{to}].concat("), valDef, @makeCode(")), "), valRef
+    # [valDef, valRef] = @value.cache o, LEVEL_LIST
+    answer = [].concat @makeCode("array_splice( #{name}, #{fromDecl}, #{to}, "), @value.compileToFragments(), @makeCode " )"
     if o.level > LEVEL_TOP then @wrapInBraces answer else answer
 
 #### Code
