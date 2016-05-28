@@ -910,6 +910,7 @@ exports.Range = class Range extends Base
     idx      = del o, 'index'
     idxName  = del o, 'name'
     namedIndex = idxName and idxName isnt idx
+    idx = idxName
     varPart  = "#{idx} = #{@fromC}"
     varPart += ", #{@toC}" if @toC isnt @toVar
     varPart += ", #{@step}" if @step isnt @stepVar
@@ -929,9 +930,9 @@ exports.Range = class Range extends Base
     stepPart = if @stepVar
       "#{idx} += #{@stepVar}"
     else if known
-      if namedIndex
-        if from <= to then "++#{idx}" else "--#{idx}"
-      else
+      # if namedIndex
+      #   if from <= to then "++#{idx}" else "--#{idx}"
+      # else
         if from <= to then "#{idx}++" else "#{idx}--"
     else
       if namedIndex
@@ -939,8 +940,8 @@ exports.Range = class Range extends Base
       else
         "#{cond} ? #{idx}++ : #{idx}--"
 
-    varPart  = "#{idxName} = #{varPart}" if namedIndex
-    stepPart = "#{idxName} = #{stepPart}" if namedIndex
+    # varPart  = "#{idxName} = #{varPart}" if namedIndex
+    # stepPart = "#{idxName} = #{stepPart}" if namedIndex
 
     # The final loop body.
     [@makeCode "#{varPart}; #{condPart}; #{stepPart}"]
@@ -2314,7 +2315,7 @@ exports.For = class For extends While
     bodyFragments = body.compileToFragments merge(o, indent: idt1), LEVEL_TOP
     if bodyFragments and (bodyFragments.length > 0)
       bodyFragments = [].concat @makeCode("\n"), bodyFragments, @makeCode("\n")
-    [].concat defPartFragments, @makeCode("#{resultPart or ''}#{@tab}foreach ("),
+    [].concat defPartFragments, @makeCode("#{resultPart or ''}#{@tab}#{ if @object then 'foreach' else 'for' } ("),
       forPartFragments, @makeCode(") {#{guardPart}#{varPart}"), bodyFragments,
       @makeCode("#{@tab}}#{returnResult or ''}")
 
