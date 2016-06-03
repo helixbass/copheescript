@@ -1,7 +1,7 @@
-alert(
+echo(
   try
-    nonexistent / undefined
-  catch error
-    "And the error is ... #{error}"
+    $nonexistent / $undefined
+  catch $error
+    "And the error is ... #{ $error }"
 )
 

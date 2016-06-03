@@ -1,9 +1,9 @@
-solipsism = true if mind? and not world?
+$solipsism = true if $mind? and not $world?
 
-speed = 0
-speed ?= 15
+$speed = 0
+$speed ?= 15
 
-footprints = yeti ? "bear"
+$footprints = $yeti ? "bear"
 
 
 

@@ -1165,15 +1165,16 @@ numbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
       pushed down into each possible branch of execution in the function
       below.
     </p>
-    <div class='code'><pre><code><span class="function"><span class="title">grade</span> = <span class="params">(student)</span> -&gt;</span>
-  <span class="keyword">if</span> student.excellentWork
+    <div class='code'><pre><code><span class="function"><span class="title">$grade</span> = <span class="params">( $student )</span> -&gt;</span>
+  <span class="keyword">if</span> $student.excellentWork
     <span class="string">"A+"</span>
-  <span class="keyword">else</span> <span class="keyword">if</span> student.okayStuff
-    <span class="keyword">if</span> student.triedHard <span class="keyword">then</span> <span class="string">"B"</span> <span class="keyword">else</span> <span class="string">"B-"</span>
+  <span class="keyword">else</span> <span class="keyword">if</span> $student.okayStuff
+    <span class="keyword">if</span> $student.triedHard <span class="keyword">then</span> <span class="string">"B"</span> <span class="keyword">else</span> <span class="string">"B-"</span>
   <span class="keyword">else</span>
     <span class="string">"C"</span>
 
-eldest = <span class="keyword">if</span> <span class="number">24</span> &gt; <span class="number">21</span> <span class="keyword">then</span> <span class="string">"Liz"</span> <span class="keyword">else</span> <span class="string">"Ike"</span></code></pre><pre><code><span class="keyword">var</span> eldest, grade;
+$eldest = <span class="keyword">if</span> <span class="number">24</span> &gt; <span class="number">21</span> <span class="keyword">then</span> <span class="string">"Liz"</span> <span class="keyword">else</span> <span class="string">"Ike"</span>
+</code></pre><pre><code><span class="keyword">var</span> eldest, grade;
 
 grade = <span class="function"><span class="keyword">function</span><span class="params">(student)</span> {</span>
   <span class="keyword">if</span> (student.excellentWork) {
@@ -1190,7 +1191,7 @@ grade = <span class="function"><span class="keyword">function</span><span class=
 };
 
 eldest = <span class="number">24</span> &gt; <span class="number">21</span> ? <span class="string">"Liz"</span> : <span class="string">"Ike"</span>;
-</code></pre><script>window.example16 = "grade = (student) ->\n  if student.excellentWork\n    \"A+\"\n  else if student.okayStuff\n    if student.triedHard then \"B\" else \"B-\"\n  else\n    \"C\"\n\neldest = if 24 > 21 then \"Liz\" else \"Ike\""</script><div class='minibutton load' onclick='javascript: loadConsole(example16);'>load</div><div class='minibutton ok' onclick='javascript: var eldest, grade;
+</code></pre><script>window.example16 = "$grade = ( $student ) ->\n  if $student.excellentWork\n    \"A+\"\n  else if $student.okayStuff\n    if $student.triedHard then \"B\" else \"B-\"\n  else\n    \"C\"\n\n$eldest = if 24 > 21 then \"Liz\" else \"Ike\"\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example16);'>load</div><div class='minibutton ok' onclick='javascript: var eldest, grade;
 
 grade = function(student) {
   if (student.excellentWork) {
@@ -1217,13 +1218,13 @@ eldest = 24 > 21 ? "Liz" : "Ike";
       Because variable declarations occur at the top of scope, assignment can
       be used within expressions, even for variables that haven't been seen before:
     </p>
-    <div class='code'><pre><code>six = (one = <span class="number">1</span>) + (two = <span class="number">2</span>) + (three = <span class="number">3</span>)
+    <div class='code'><pre><code>$six = ($one = <span class="number">1</span>) + ($two = <span class="number">2</span>) + ($three = <span class="number">3</span>)
 
 
 </code></pre><pre><code><span class="keyword">var</span> one, six, three, two;
 
 six = (one = <span class="number">1</span>) + (two = <span class="number">2</span>) + (three = <span class="number">3</span>);
-</code></pre><script>window.example17 = "six = (one = 1) + (two = 2) + (three = 3)\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example17);'>load</div><div class='minibutton ok' onclick='javascript: var one, six, three, two;
+</code></pre><script>window.example17 = "$six = ($one = 1) + ($two = 2) + ($three = 3)\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example17);'>load</div><div class='minibutton ok' onclick='javascript: var one, six, three, two;
 
 six = (one = 1) + (two = 2) + (three = 3);
 ;alert(six);'>run: six</div><br class='clear' /></div>
@@ -1235,7 +1236,8 @@ six = (one = 1) + (two = 2) + (three = 3);
     </p>
     <div class='code'><pre><code><span class="comment"># The first ten global properties.</span>
 
-globals = (name <span class="keyword">for</span> name <span class="keyword">of</span> <span class="built_in">window</span>)[<span class="number">0.</span>.<span class="number">.10</span>]</code></pre><pre><code><span class="keyword">var</span> globals, name;
+$globals = ($name <span class="keyword">for</span> $name <span class="keyword">of</span> $<span class="built_in">window</span>)[<span class="number">0.</span>.<span class="number">.10</span>]
+</code></pre><pre><code><span class="keyword">var</span> globals, name;
 
 globals = ((<span class="function"><span class="keyword">function</span><span class="params">()</span> {</span>
   <span class="keyword">var</span> results;
@@ -1245,7 +1247,7 @@ globals = ((<span class="function"><span class="keyword">function</span><span cl
   }
   <span class="keyword">return</span> results;
 })()).slice(<span class="number">0</span>, <span class="number">10</span>);
-</code></pre><script>window.example18 = "# The first ten global properties.\n\nglobals = (name for name of window)[0...10]"</script><div class='minibutton load' onclick='javascript: loadConsole(example18);'>load</div><div class='minibutton ok' onclick='javascript: var globals, name;
+</code></pre><script>window.example18 = "# The first ten global properties.\n\n$globals = ($name for $name of $window)[0...10]\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example18);'>load</div><div class='minibutton ok' onclick='javascript: var globals, name;
 
 globals = ((function() {
   var results;
@@ -1260,11 +1262,11 @@ globals = ((function() {
       As well as silly things, like passing a <b>try/catch</b> statement directly
       into a function call:
     </p>
-    <div class='code'><pre><code>alert(
+    <div class='code'><pre><code>echo(
   <span class="keyword">try</span>
-    nonexistent / <span class="literal">undefined</span>
-  <span class="keyword">catch</span> error
-    <span class="string">"And the error is ... <span class="subst">#{error}</span>"</span>
+    $nonexistent / $<span class="literal">undefined</span>
+  <span class="keyword">catch</span> $error
+    <span class="string">"And the error is ... <span class="subst">#{ $error }</span>"</span>
 )
 
 </code></pre><pre><code><span class="keyword">var</span> error;
@@ -1277,7 +1279,7 @@ alert((<span class="function"><span class="keyword">function</span><span class="
     <span class="keyword">return</span> <span class="string">"And the error is ... "</span> + error;
   }
 })());
-</code></pre><script>window.example19 = "alert(\n  try\n    nonexistent / undefined\n  catch error\n    \"And the error is ... #{error}\"\n)\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example19);'>load</div><div class='minibutton ok' onclick='javascript: var error;
+</code></pre><script>window.example19 = "echo(\n  try\n    $nonexistent / $undefined\n  catch $error\n    \"And the error is ... #{ $error }\"\n)\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example19);'>load</div><div class='minibutton ok' onclick='javascript: var error;
 
 alert((function() {
   try {
@@ -1355,17 +1357,17 @@ alert((function() {
       <tr><td><tt>a %% b</tt></td><td><tt>(a % b + b) % b</tt></td></tr>
     </table>
 
-    <div class='code'><pre><code>launch() <span class="keyword">if</span> ignition <span class="keyword">is</span> <span class="literal">on</span>
+    <div class='code'><pre><code>$launch() <span class="keyword">if</span> $ignition <span class="keyword">is</span> <span class="literal">on</span>
 
-volume = <span class="number">10</span> <span class="keyword">if</span> band <span class="keyword">isnt</span> SpinalTap
+$volume = <span class="number">10</span> <span class="keyword">if</span> $band <span class="keyword">isnt</span> $SpinalTap
 
-letTheWildRumpusBegin() <span class="keyword">unless</span> answer <span class="keyword">is</span> <span class="literal">no</span>
+$letTheWildRumpusBegin() <span class="keyword">unless</span> $answer <span class="keyword">is</span> <span class="literal">no</span>
 
-<span class="keyword">if</span> car.speed &lt; limit <span class="keyword">then</span> accelerate()
+<span class="keyword">if</span> $car.speed &lt; $limit <span class="keyword">then</span> $accelerate()
 
-winner = <span class="literal">yes</span> <span class="keyword">if</span> pick <span class="keyword">in</span> [<span class="number">47</span>, <span class="number">92</span>, <span class="number">13</span>]
+$winner = <span class="literal">yes</span> <span class="keyword">if</span> $pick <span class="keyword">in</span> [<span class="number">47</span>, <span class="number">92</span>, <span class="number">13</span>]
 
-<span class="built_in">print</span> inspect <span class="string">"My name is <span class="subst">#{<span class="property">@name</span>}</span>"</span>
+var_dump <span class="string">"My name is <span class="subst">#{<span class="property">@name</span>}</span>"</span>
 </code></pre><pre><code><span class="keyword">var</span> volume, winner;
 
 <span class="keyword">if</span> (ignition === <span class="literal">true</span>) {
@@ -1389,7 +1391,7 @@ winner = <span class="literal">yes</span> <span class="keyword">if</span> pick <
 }
 
 print(inspect(<span class="string">"My name is "</span> + <span class="keyword">this</span>.name));
-</code></pre><script>window.example20 = "launch() if ignition is on\n\nvolume = 10 if band isnt SpinalTap\n\nletTheWildRumpusBegin() unless answer is no\n\nif car.speed < limit then accelerate()\n\nwinner = yes if pick in [47, 92, 13]\n\nprint inspect \"My name is #{@name}\"\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example20);'>load</div><br class='clear' /></div>
+</code></pre><script>window.example20 = "$launch() if $ignition is on\n\n$volume = 10 if $band isnt $SpinalTap\n\n$letTheWildRumpusBegin() unless $answer is no\n\nif $car.speed < $limit then $accelerate()\n\n$winner = yes if $pick in [47, 92, 13]\n\nvar_dump \"My name is #{@name}\"\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example20);'>load</div><br class='clear' /></div>
 
     <p>
       <b class="header">The Existential Operator</b>
@@ -1403,19 +1405,20 @@ print(inspect(<span class="string">"My name is "</span> + <span class="keyword">
       It can also be used for safer conditional assignment than <tt>||=</tt>
       provides, for cases where you may be handling numbers or strings.
     </p>
-    <div class='code'><pre><code>solipsism = <span class="literal">true</span> <span class="keyword">if</span> mind? <span class="keyword">and</span> <span class="keyword">not</span> world?
+    <div class='code'><pre><code>$solipsism = <span class="literal">true</span> <span class="keyword">if</span> $mind? <span class="keyword">and</span> <span class="keyword">not</span> $world?
 
-speed = <span class="number">0</span>
-speed ?= <span class="number">15</span>
+$speed = <span class="number">0</span>
+$speed ?= <span class="number">15</span>
 
-footprints = yeti ? <span class="string">"bear"</span>
-
-
+$footprints = $yeti ? <span class="string">"bear"</span>
 
 
 
 
- </code></pre><pre><code><span class="keyword">var</span> footprints, solipsism, speed;
+
+
+ 
+</code></pre><pre><code><span class="keyword">var</span> footprints, solipsism, speed;
 
 <span class="keyword">if</span> ((<span class="keyword">typeof</span> mind !== <span class="string">"undefined"</span> &amp;&amp; mind !== <span class="literal">null</span>) &amp;&amp; (<span class="keyword">typeof</span> world === <span class="string">"undefined"</span> || world === <span class="literal">null</span>)) {
   solipsism = <span class="literal">true</span>;
@@ -1428,7 +1431,7 @@ speed = <span class="number">0</span>;
 }
 
 footprints = <span class="keyword">typeof</span> yeti !== <span class="string">"undefined"</span> &amp;&amp; yeti !== <span class="literal">null</span> ? yeti : <span class="string">"bear"</span>;
-</code></pre><script>window.example21 = "solipsism = true if mind? and not world?\n\nspeed = 0\nspeed ?= 15\n\nfootprints = yeti ? \"bear\"\n\n\n\n\n\n\n "</script><div class='minibutton load' onclick='javascript: loadConsole(example21);'>load</div><div class='minibutton ok' onclick='javascript: var footprints, solipsism, speed;
+</code></pre><script>window.example21 = "$solipsism = true if $mind? and not $world?\n\n$speed = 0\n$speed ?= 15\n\n$footprints = $yeti ? \"bear\"\n\n\n\n\n\n\n \n"</script><div class='minibutton load' onclick='javascript: loadConsole(example21);'>load</div><div class='minibutton ok' onclick='javascript: var footprints, solipsism, speed;
 
 if ((typeof mind !== "undefined" && mind !== null) && (typeof world === "undefined" || world === null)) {
   solipsism = true;
@@ -1450,11 +1453,11 @@ footprints = typeof yeti !== "undefined" && yeti !== null ? yeti : "bear";
       result, if the chain is broken, <b>undefined</b> is returned instead of
       the <b>TypeError</b> that would be raised otherwise.
     </p>
-    <div class='code'><pre><code>zip = lottery.drawWinner?().address?.zipcode
+    <div class='code'><pre><code>$zip = $lottery.drawWinner?().address?.zipcode
 </code></pre><pre><code><span class="keyword">var</span> ref, zip;
 
 zip = <span class="keyword">typeof</span> lottery.drawWinner === <span class="string">"function"</span> ? (ref = lottery.drawWinner().address) != <span class="literal">null</span> ? ref.zipcode : <span class="keyword">void</span> <span class="number">0</span> : <span class="keyword">void</span> <span class="number">0</span>;
-</code></pre><script>window.example22 = "zip = lottery.drawWinner?().address?.zipcode\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example22);'>load</div><br class='clear' /></div>
+</code></pre><script>window.example22 = "$zip = $lottery.drawWinner?().address?.zipcode\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example22);'>load</div><br class='clear' /></div>
     <p>
       Soaking up nulls is similar to Ruby's
       <a href="https://rubygems.org/gems/andand">andand gem</a>, and to the
@@ -1490,24 +1493,24 @@ zip = <span class="keyword">typeof</span> lottery.drawWinner === <span class="st
     <div class='code'><pre><code><span class="class"><span class="keyword">class</span> <span class="title">Animal</span></span>
   <span class="attribute">constructor</span>: <span class="function"><span class="params">(<span class="property">@name</span>)</span> -&gt;</span>
 
-  <span class="attribute">move</span>: <span class="function"><span class="params">(meters)</span> -&gt;</span>
-    alert <span class="property">@name</span> + <span class="string">" moved <span class="subst">#{meters}</span>m."</span>
+  <span class="attribute">move</span>: <span class="function"><span class="params">( $meters )</span> -&gt;</span>
+    alert <span class="property">@name</span> + <span class="string">" moved <span class="subst">#{ $meters }</span>m."</span>
 
 <span class="class"><span class="keyword">class</span> <span class="title">Snake</span> <span class="keyword">extends</span> <span class="title">Animal</span></span>
   <span class="attribute">move</span>:<span class="function"> -&gt;</span>
-    alert <span class="string">"Slithering..."</span>
-    <span class="keyword">super</span> <span class="number">5</span>
+    echo <span class="string">"Slithering..."</span>
+    <span class="comment"># super 5</span>
 
 <span class="class"><span class="keyword">class</span> <span class="title">Horse</span> <span class="keyword">extends</span> <span class="title">Animal</span></span>
   <span class="attribute">move</span>:<span class="function"> -&gt;</span>
-    alert <span class="string">"Galloping..."</span>
-    <span class="keyword">super</span> <span class="number">45</span>
+    echo <span class="string">"Galloping..."</span>
+    <span class="comment"># super 45</span>
 
-sam = <span class="keyword">new</span> Snake <span class="string">"Sammy the Python"</span>
-tom = <span class="keyword">new</span> Horse <span class="string">"Tommy the Palomino"</span>
+$sam = <span class="keyword">new</span> Snake <span class="string">"Sammy the Python"</span>
+$tom = <span class="keyword">new</span> Horse <span class="string">"Tommy the Palomino"</span>
 
-sam.move()
-tom.move()
+$sam.move()
+$tom.move()
 
 
 
@@ -1568,7 +1571,7 @@ tom = <span class="keyword">new</span> Horse(<span class="string">"Tommy the Pal
 sam.move();
 
 tom.move();
-</code></pre><script>window.example23 = "class Animal\n  constructor: (@name) ->\n\n  move: (meters) ->\n    alert @name + \" moved #{meters}m.\"\n\nclass Snake extends Animal\n  move: ->\n    alert \"Slithering...\"\n    super 5\n\nclass Horse extends Animal\n  move: ->\n    alert \"Galloping...\"\n    super 45\n\nsam = new Snake \"Sammy the Python\"\ntom = new Horse \"Tommy the Palomino\"\n\nsam.move()\ntom.move()\n\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example23);'>load</div><div class='minibutton ok' onclick='javascript: var Animal, Horse, Snake, sam, tom,
+</code></pre><script>window.example23 = "class Animal\n  constructor: (@name) ->\n\n  move: ( $meters ) ->\n    alert @name + \" moved #{ $meters }m.\"\n\nclass Snake extends Animal\n  move: ->\n    echo \"Slithering...\"\n    # super 5\n\nclass Horse extends Animal\n  move: ->\n    echo \"Galloping...\"\n    # super 45\n\n$sam = new Snake \"Sammy the Python\"\n$tom = new Horse \"Tommy the Palomino\"\n\n$sam.move()\n$tom.move()\n\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example23);'>load</div><div class='minibutton ok' onclick='javascript: var Animal, Horse, Snake, sam, tom,
   extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
   hasProp = {}.hasOwnProperty;
 

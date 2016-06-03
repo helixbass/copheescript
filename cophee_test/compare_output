@@ -23,6 +23,20 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "super",
+  '''
+  class Snake extends Animal
+    move: ->
+      super 5
+  ''',
+  '''
+  class Snake extends Animal {
+  function move()  {
+    return parent::move(5);
+  }
+  }
+  '''
+
 compare "array splice",
   '''
   $numbers[3..6] = [-3, -4, -5, -6]

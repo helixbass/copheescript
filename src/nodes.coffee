@@ -751,12 +751,16 @@ exports.Call = class Call extends Base
       compiledArgs.push (arg.compileToFragments o, LEVEL_LIST)...
 
     fragments = []
-    fragments.push @makeCode "call_user_func(" unless @variable instanceof Value
     if @isSuper
-      preface = @superReference(o) + ".call(#{@superThis(o)}"
-      if compiledArgs.length then preface += ", "
-      fragments.push @makeCode preface
+      # preface = @superReference(o) + ".call(#{@superThis(o)}"
+      # if compiledArgs.length then preface += ", "
+      # fragments.push @makeCode preface
+      method_name = o.scope.namedMethod().name.name
+      fragments.push @makeCode "parent::"
+      fragments.push method_name.compileToFragments( o )...
+      fragments.push @makeCode "("
     else
+      fragments.push @makeCode "call_user_func(" unless @variable instanceof Value
       if @isNew then fragments.push @makeCode 'new '
       fragments.push @makeCode "(" if do @_is_cast
       fragments.push @variable.compileToFragments(o, LEVEL_ACCESS)...
@@ -770,9 +774,9 @@ exports.Call = class Call extends Base
   _is_cast: ->
     @variable.base and @variable.base instanceof Parens and @variable.base.body?.expressions?[0]?.base?.value in ['int', 'integer', 'bool', 'boolean', 'float', 'double', 'real', 'string', 'array', 'object', 'unset', 'binary']
   _dont_paren: ->
-    @variable.base?.value in ['global', 'use']
+    @variable?.base?.value in ['global', 'use']
   _dont_return: ->
-    @variable.base?.value in ['unset']
+    @variable?.base?.value in ['unset']
 
   makeReturn: ->
     if do @_dont_return then this else super
