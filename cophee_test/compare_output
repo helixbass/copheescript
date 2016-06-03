@@ -23,6 +23,14 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "destructured assignment",
+  """
+  {poet: {name, address: [street, city]}} = $futurists
+  """,
+  """
+  $ref = $futurists['poet']; $name = $ref['name']; $ref1 = $ref['address']; $street = $ref1[0]; $city = $ref1[1];
+  """
+
 compare "super",
   '''
   class Snake extends Animal

@@ -1401,7 +1401,8 @@ exports.Assign = class Assign extends Base
         else
           new Literal 0
       acc   = IDENTIFIER.test idx.unwrap().value or 0
-      obj = new Value new Literal "$#{ obj.base.value }" unless obj.this
+      # console.log { obj, name: obj.base.constructor.name }
+      obj = new Value new Literal "$#{ obj.base.value }" unless obj.base not instanceof Literal or obj.this
       # console.log 'idx', idx, idx.constructor.name
       idx = new Value new Literal ensureQuoted idx.base.value if idx instanceof Value
       idx = new Value new Literal ensureQuoted idx.value      if idx instanceof Literal and not SIMPLENUM.test idx.value
@@ -1467,7 +1468,7 @@ exports.Assign = class Assign extends Base
           acc = isObject and IDENTIFIER.test idx.unwrap().value or 0
         # console.log 'idx', idx, idx.constructor.name
         # console.log 'obj', obj, obj.constructor.name, obj.base.constructor.name
-        obj = new Value new Literal "$#{ obj.base.value }" unless obj.this
+        obj = new Value new Literal "$#{ obj.base.value }" unless obj.base not instanceof Literal or obj.this
         idx = new Value new Literal ensureQuoted idx.base.value if idx instanceof Value
         idx = new Value new Literal ensureQuoted idx.value      if idx instanceof Literal and not do idx.isSimpleNumber and not expandedIdx
         val = new Value new Literal(vvarText), [new Index idx]
@@ -1477,7 +1478,8 @@ exports.Assign = class Assign extends Base
       assigns.push new Assign(obj, val, null, param: @param, subpattern: yes).compileToFragments o, LEVEL_LIST unless name is '__IGNORED_ARG'
     assigns.push vvar unless top or @subpattern
     fragments = @joinFragmentArrays assigns, '; '
-    if o.level < LEVEL_LIST then fragments else @wrapInBraces fragments
+    # if o.level < LEVEL_LIST then fragments else @wrapInBraces fragments
+    fragments
 
   # When compiling a conditional assignment, take care to ensure that the
   # operands are only evaluated once, even though we have to reference them

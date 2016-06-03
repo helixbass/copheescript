@@ -1,8 +1,8 @@
 class Animal
-  constructor: (@name) ->
+  __construct: (@$name) ->
 
   move: ( $meters ) ->
-    alert @name + " moved #{ $meters }m."
+    echo "#{ @name } moved #{ $meters }m."
 
 class Snake extends Animal
   move: ->
