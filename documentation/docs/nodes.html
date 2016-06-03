@@ -3321,10 +3321,10 @@ for details.</p>
       <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> expandedIdx <span class="hljs-keyword">and</span> obj <span class="hljs-keyword">instanceof</span> Expansion
         <span class="hljs-keyword">if</span> rest = olen - i - <span class="hljs-number">1</span>
           <span class="hljs-keyword">if</span> rest <span class="hljs-keyword">is</span> <span class="hljs-number">1</span>
-            expandedIdx = <span class="hljs-string">"<span class="hljs-subst">#{vvarText}</span>.length - 1"</span>
+            expandedIdx = <span class="hljs-string">"count(<span class="hljs-subst">#{vvarText}</span>) - 1"</span>
           <span class="hljs-keyword">else</span>
             ivar = o.scope.freeVariable <span class="hljs-string">'i'</span>, <span class="hljs-attribute">single</span>: <span class="hljs-literal">true</span>
-            val = <span class="hljs-keyword">new</span> Literal <span class="hljs-string">"<span class="hljs-subst">#{ivar}</span> = <span class="hljs-subst">#{vvarText}</span>.length - <span class="hljs-subst">#{rest}</span>"</span>
+            val = <span class="hljs-keyword">new</span> Literal <span class="hljs-string">"<span class="hljs-subst">#{ivar}</span> = count(<span class="hljs-subst">#{vvarText}</span>) - <span class="hljs-subst">#{rest}</span>"</span>
             expandedIdx = <span class="hljs-string">"<span class="hljs-subst">#{ivar}</span>++"</span>
             assigns.push val.compileToFragments o, LEVEL_LIST
         <span class="hljs-keyword">continue</span>

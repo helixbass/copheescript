@@ -1450,10 +1450,10 @@ exports.Assign = class Assign extends Base
       else if not expandedIdx and obj instanceof Expansion
         if rest = olen - i - 1
           if rest is 1
-            expandedIdx = "#{vvarText}.length - 1"
+            expandedIdx = "count(#{vvarText}) - 1"
           else
             ivar = o.scope.freeVariable 'i', single: true
-            val = new Literal "#{ivar} = #{vvarText}.length - #{rest}"
+            val = new Literal "#{ivar} = count(#{vvarText}) - #{rest}"
             expandedIdx = "#{ivar}++"
             assigns.push val.compileToFragments o, LEVEL_LIST
         continue

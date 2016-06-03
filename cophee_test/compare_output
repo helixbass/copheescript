@@ -23,6 +23,22 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "expansion assignment multiple following",
+  '''
+  [first, ..., penultimate, last] = $text.split " "
+  ''',
+  '''
+  $ref = $text->split(" "); $first = $ref[0]; $i = count($ref) - 2; $penultimate = $ref[$i++]; $last = $ref[$i++];
+  '''
+
+compare "expansion assignment",
+  '''
+  [first, ..., last] = $text.split " "
+  ''',
+  '''
+  $ref = $text->split(" "); $first = $ref[0]; $last = $ref[count($ref) - 1];
+  '''
+
 compare "destructured assignment",
   """
   {poet: {name, address: [street, city]}} = $futurists

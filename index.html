@@ -1582,7 +1582,7 @@ $ref = $weatherReport("Berkeley, CA"); $city = $ref[0]; $temp = $ref[1]; $foreca
       Destructuring assignment can be used with any depth of array and object nesting,
       to help pull out deeply nested properties.
     </p>
-    <div class='code'><pre><code>futurists =
+    <div class='code'><pre><code>$futurists =
   <span class="attribute">sculptor</span>: <span class="string">"Umberto Boccioni"</span>
   <span class="attribute">painter</span>:  <span class="string">"Vladimir Burliuk"</span>
   <span class="attribute">poet</span>:
@@ -1592,11 +1592,11 @@ $ref = $weatherReport("Berkeley, CA"); $city = $ref[0]; $temp = $ref[1]; $foreca
       <span class="string">"Bellagio, Italy 22021"</span>
     ]
 
-{<span class="attribute">poet</span>: {name, <span class="attribute">address</span>: [street, city]}} = futurists
+{<span class="attribute">poet</span>: {name, <span class="attribute">address</span>: [street, city]}} = $futurists
 
 
 
-</code></pre><pre><code>futurists = [
+</code></pre><pre><code>$futurists = [
   <span class="string">'sculptor'</span> =&gt; <span class="string">"Umberto Boccioni"</span>,
   <span class="string">'painter'</span> =&gt; <span class="string">"Vladimir Burliuk"</span>,
   <span class="string">'poet'</span> =&gt; [
@@ -1605,8 +1605,8 @@ $ref = $weatherReport("Berkeley, CA"); $city = $ref[0]; $temp = $ref[1]; $foreca
   ]
 ];
 
-$<span class="literal">undefined</span> = futurists[<span class="string">'poet'</span>];
-</code></pre><script>window.example27 = "futurists =\n  sculptor: \"Umberto Boccioni\"\n  painter:  \"Vladimir Burliuk\"\n  poet:\n    name:   \"F.T. Marinetti\"\n    address: [\n      \"Via Roma 42R\"\n      \"Bellagio, Italy 22021\"\n    ]\n\n{poet: {name, address: [street, city]}} = futurists\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example27);'>load</div><div class='minibutton ok' onclick='javascript: futurists = [
+$ref = $futurists[<span class="string">'poet'</span>]; $name = $ref[<span class="string">'name'</span>]; $ref1 = $ref[<span class="string">'address'</span>]; $street = $ref1[<span class="number">0</span>]; $city = $ref1[<span class="number">1</span>];
+</code></pre><script>window.example27 = "$futurists =\n  sculptor: \"Umberto Boccioni\"\n  painter:  \"Vladimir Burliuk\"\n  poet:\n    name:   \"F.T. Marinetti\"\n    address: [\n      \"Via Roma 42R\"\n      \"Bellagio, Italy 22021\"\n    ]\n\n{poet: {name, address: [street, city]}} = $futurists\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example27);'>load</div><div class='minibutton ok' onclick='javascript: $futurists = [
   'sculptor' => "Umberto Boccioni",
   'painter' => "Vladimir Burliuk",
   'poet' => [
@@ -1615,43 +1615,43 @@ $<span class="literal">undefined</span> = futurists[<span class="string">'poet'<
   ]
 ];
 
-$undefined = futurists['poet'];
+$ref = $futurists['poet']; $name = $ref['name']; $ref1 = $ref['address']; $street = $ref1[0]; $city = $ref1[1];
 ;alert(name + "-" + street);'>run: name + "-" + street</div><br class='clear' /></div>
     <p>
       Destructuring assignment can even be combined with splats.
     </p>
-    <div class='code'><pre><code>tag = <span class="string">"&lt;impossible&gt;"</span>
+    <div class='code'><pre><code>$tag = <span class="string">"&lt;impossible&gt;"</span>
 
-[open, contents..., close] = tag.split(<span class="string">""</span>)
-
-
+[open, contents..., close] = $tag.split(<span class="string">""</span>)
 
 
 
 
-</code></pre><pre><code>tag = <span class="string">"&lt;impossible&gt;"</span>;
 
-$ref = tag-&gt;split(<span class="string">""</span>); $open = $ref[<span class="number">0</span>]; $contents = array_slice($ref, <span class="number">1</span>, -<span class="number">1</span>); $i = count($ref) - <span class="number">1</span>; $close = $ref[$i++];
-</code></pre><script>window.example28 = "tag = \"<impossible>\"\n\n[open, contents..., close] = tag.split(\"\")\n\n\n\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example28);'>load</div><div class='minibutton ok' onclick='javascript: tag = "<impossible>";
 
-$ref = tag->split(""); $open = $ref[0]; $contents = array_slice($ref, 1, -1); $i = count($ref) - 1; $close = $ref[$i++];
+</code></pre><pre><code>$tag = <span class="string">"&lt;impossible&gt;"</span>;
+
+$ref = $tag-&gt;split(<span class="string">""</span>); $open = $ref[<span class="number">0</span>]; $contents = array_slice($ref, <span class="number">1</span>, -<span class="number">1</span>); $i = count($ref) - <span class="number">1</span>; $close = $ref[$i++];
+</code></pre><script>window.example28 = "$tag = \"<impossible>\"\n\n[open, contents..., close] = $tag.split(\"\")\n\n\n\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example28);'>load</div><div class='minibutton ok' onclick='javascript: $tag = "<impossible>";
+
+$ref = $tag->split(""); $open = $ref[0]; $contents = array_slice($ref, 1, -1); $i = count($ref) - 1; $close = $ref[$i++];
 ;alert(contents.join(""));'>run: contents.join("")</div><br class='clear' /></div>
     <p>
       Expansion can be used to retrieve elements from the end of an array without having to assign the rest of its values. It works in function parameter lists as well.
     </p>
-    <div class='code'><pre><code>text = <span class="string">"Every literary critic believes he will
+    <div class='code'><pre><code>$text = <span class="string">"Every literary critic believes he will
         outwit history and have the last word"</span>
 
-[first, ..., last] = text.split <span class="string">" "</span>
+[first, ..., last] = $text.split <span class="string">" "</span>
 
 
 
-</code></pre><pre><code>text = <span class="string">"Every literary critic believes he will outwit history and have the last word"</span>;
+</code></pre><pre><code>$text = <span class="string">"Every literary critic believes he will outwit history and have the last word"</span>;
 
-$ref = text-&gt;split(<span class="string">" "</span>); $first = $ref[<span class="number">0</span>]; $last = $ref[$ref.length - <span class="number">1</span>];
-</code></pre><script>window.example29 = "text = \"Every literary critic believes he will\n        outwit history and have the last word\"\n\n[first, ..., last] = text.split \" \"\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example29);'>load</div><div class='minibutton ok' onclick='javascript: text = "Every literary critic believes he will outwit history and have the last word";
+$ref = $text-&gt;split(<span class="string">" "</span>); $first = $ref[<span class="number">0</span>]; $last = $ref[count($ref) - <span class="number">1</span>];
+</code></pre><script>window.example29 = "$text = \"Every literary critic believes he will\n        outwit history and have the last word\"\n\n[first, ..., last] = $text.split \" \"\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example29);'>load</div><div class='minibutton ok' onclick='javascript: $text = "Every literary critic believes he will outwit history and have the last word";
 
-$ref = text->split(" "); $first = $ref[0]; $last = $ref[$ref.length - 1];
+$ref = $text->split(" "); $first = $ref[0]; $last = $ref[count($ref) - 1];
 ;alert(first + " " + last);'>run: first + " " + last</div><br class='clear' /></div>
     <p>
       Destructuring assignment is also useful when combined with class constructors
