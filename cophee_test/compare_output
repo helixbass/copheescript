@@ -23,6 +23,14 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "call call",
+  """
+  $a( 3 )( 4 )
+  """,
+  """
+  call_user_func($a(3), 4);
+  """
+
 compare "floor division",
   """
   $a // 3

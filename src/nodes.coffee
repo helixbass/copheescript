@@ -767,6 +767,8 @@ exports.Call = class Call extends Base
       fragments.push @makeCode ")" if do @_is_cast
       if @variable instanceof Value
         fragments.push @makeCode if do @_dont_paren then " " else "("
+      else if compiledArgs.length
+        fragments.push @makeCode ", "
     fragments.push compiledArgs...
     fragments.push @makeCode ")" unless do @_dont_paren
     fragments

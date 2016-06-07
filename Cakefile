@@ -62,7 +62,8 @@ codeFor = ->
     name   = "example#{counter}"
     script = "<script>window.#{name} = #{JSON.stringify cs}</script>"
     load   = if showLoad then "<div class='minibutton load' onclick='javascript: loadConsole(#{name});'>load</div>" else ''
-    button = if executable then "<div class='minibutton ok' onclick='javascript: #{js};#{append}'>#{run}</div>" else ''
+    # button = if executable then "<div class='minibutton ok' onclick='javascript: #{js};#{append}'>#{run}</div>" else ''
+    button = ''
     "<div class='code'>#{cshtml}#{jshtml}#{script}#{load}#{button}<br class='clear' /></div>"
 
 monthNames = [

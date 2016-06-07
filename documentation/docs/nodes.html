@@ -1797,6 +1797,8 @@ fragments.push @makeCode preface</p>
       fragments.push <span class="hljs-property">@makeCode</span> <span class="hljs-string">")"</span> <span class="hljs-keyword">if</span> <span class="hljs-keyword">do</span> <span class="hljs-property">@_is_cast</span>
       <span class="hljs-keyword">if</span> <span class="hljs-property">@variable</span> <span class="hljs-keyword">instanceof</span> Value
         fragments.push <span class="hljs-property">@makeCode</span> <span class="hljs-keyword">if</span> <span class="hljs-keyword">do</span> <span class="hljs-property">@_dont_paren</span> <span class="hljs-keyword">then</span> <span class="hljs-string">" "</span> <span class="hljs-keyword">else</span> <span class="hljs-string">"("</span>
+      <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> compiledArgs.length
+        fragments.push <span class="hljs-property">@makeCode</span> <span class="hljs-string">", "</span>
     fragments.push compiledArgs...
     fragments.push <span class="hljs-property">@makeCode</span> <span class="hljs-string">")"</span> <span class="hljs-keyword">unless</span> <span class="hljs-keyword">do</span> <span class="hljs-property">@_dont_paren</span>
     fragments

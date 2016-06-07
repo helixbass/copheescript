@@ -49,7 +49,7 @@
     </div>
     <div class="navigation try">
       <div class="button">
-        Try CoffeeScript
+        Try CopheeScript
         <div class="repl_bridge"></div>
       </div>
       <div class="contents repl_wrapper">
@@ -93,19 +93,21 @@
     <span class="bookmark" id="top"></span>
 
     <p>
-      <b>CoffeeScript is a little language that compiles into JavaScript.</b>
-      Underneath that awkward Java-esque patina, JavaScript has always had
-      a gorgeous heart. CoffeeScript is an attempt to expose
-      the good parts of JavaScript in a simple way.
+      <b>CopheeScript is a little language that compiles into PHP.</b>
+      It derives from <a href='http://coffeescript.org'>CoffeeScript</a>,
+      a popular (and beautiful) language that compiles into JavaScript.
+      It adds a few PHP-specific features while aiming to support as much
+      CoffeeScript syntax as possible and similarly beautify your
+      server-side code.
     </p>
 
     <p>
-      The golden rule of CoffeeScript is: <i>"It's just JavaScript"</i>. The code
-      compiles one-to-one into the equivalent JS, and there is
-      no interpretation at runtime. You can use any existing JavaScript library
-      seamlessly from CoffeeScript (and vice-versa). The compiled output is
-      readable and pretty-printed, will work in every JavaScript runtime, and tends
-      to run as fast or faster than the equivalent handwritten JavaScript.
+      The golden rule of CopheeScript is: <i>"It's just PHP"</i>. The code
+      compiles one-to-one into the equivalent PHP, and there is
+      no interpretation at runtime. You can use any existing PHP library
+      seamlessly from CopheeScript (and vice-versa). The compiled output is
+      (somewhat) readable and pretty-printed. It targets PHP >= 5.4 (with a few
+      language features for newer PHP runtimes only).
     </p>
 
     <p>
@@ -120,7 +122,7 @@
       Overview
     </h2>
 
-    <p><i>CoffeeScript on the left, compiled JavaScript output on the right.</i></p>
+    <p><i>CopheeScript on the left, compiled PHP output on the right.</i></p>
 
     <%= codeFor('overview', 'cubes', false) %>
 
@@ -373,20 +375,19 @@ Expressions
       <i>
         This reference is structured so that it can be read from top to bottom,
         if you like. Later sections use ideas and syntax previously introduced.
-        Familiarity with JavaScript is assumed.
-        In all of the following examples, the source CoffeeScript is provided on
-        the left, and the direct compilation into JavaScript is on the right.
+        Familiarity with PHP is assumed.
+        In all of the following examples, the source CopheeScript is provided on
+        the left, and the direct compilation into PHP is on the right.
       </i>
     </p>
 
     <p>
       <i>
-        Many of the examples can be run (where it makes sense) by pressing the <b>run</b>
-        button on the right, and can be loaded into the "Try CoffeeScript"
+        Many of the examples can be loaded into the "Try CopheeScript"
         console by pressing the <b>load</b> button on the left.
       </i>
     <p>
-      First, the basics: CoffeeScript uses significant whitespace to delimit blocks of code.
+      First, the basics: CopheeScript uses significant whitespace to delimit blocks of code.
       You don't need to use semicolons <tt>;</tt> to terminate expressions,
       ending the line will do just as well (although semicolons can still
       be used to fit multiple expressions onto a single line).
@@ -400,7 +401,7 @@ Expressions
     <p>
       You don't need to use parentheses to invoke a function if you're passing
       arguments. The implicit call wraps forward to the end of the line or block expression.<br />
-      <tt>console.log sys.inspect object</tt> &rarr; <tt>console.log(sys.inspect(object));</tt>
+      <tt>var_dump array_keys $object</tt> &rarr; <tt>var_dump(array_keys($object));</tt>
     </p>
 
     <p>
@@ -413,9 +414,22 @@ Expressions
     <%= codeFor('functions', 'cube(5)') %>
     <p>
       Functions may also have default values for arguments, which will be used
-      if the incoming argument is missing (<tt>null</tt> or <tt>undefined</tt>).
+      if the incoming argument is missing.
     </p>
     <%= codeFor('default_args', 'fill("cup")') %>
+    <p>
+      To specify typed function arguments, you generally have to use the hacky syntax
+      <tt>Type_$arg</tt>. The only exception is that the final argument to a function
+      can use the expected whitespace-separated <tt>Type $arg</tt> syntax.
+    </p>
+    <%= codeFor('typed_args') %>
+    <p>
+      The "killer feature" of CopheeScript (especially when coding in a more
+      functional style) is auto-generated <tt>use</tt> clauses on closures.
+      This means that variables from outer scopes are able to be referenced
+      (and they are in fact always passed by reference) freely inside closures.
+    </p>
+    <%= codeFor('use') %>
 
     <p>
       <span id="objects_and_arrays" class="bookmark"></span>

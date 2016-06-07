@@ -14,7 +14,7 @@ $square = function($x)  {
 $list = [1, 2, 3, 4, 5];
 
 $math_hash = [
-  'root' => sqrt,
+  'root' => 'sqrt',
   'square' => $square,
   'cube' => function($x) use (&$square) {
     return $x * $square($x);
@@ -22,7 +22,7 @@ $math_hash = [
 ];
 
 $math = (object) [
-  'root' => sqrt,
+  'root' => 'sqrt',
   'square' => $square,
   'cube' => function($x) use (&$square) {
     return $x * $square($x);

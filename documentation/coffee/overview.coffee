@@ -13,13 +13,13 @@ $list = [1, 2, 3, 4, 5]
 
 # Hashes:
 $math_hash =
-  root:   sqrt
+  root:   'sqrt'
   square: $square
   cube:   ( $x ) -> $x * $square $x
 
 # Objects:
 $math = {{
-  root:   sqrt
+  root:   'sqrt'
   square: $square
   cube:   ( $x ) -> $x * $square $x
 }}
