@@ -4,6 +4,6 @@ $fn = function($filename) use (&$compile,&$fs) {
     return $compile($filename, $contents->toString());
   });
 };
-for ($i = 0, len = $list.length; $i < len; $i++) {
+foreach ($list as $filename) {
   $fn($filename);
 }

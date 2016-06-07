@@ -759,7 +759,7 @@ JS_KEYWORDS = [
 ]
 
 # CoffeeScript-only keywords.
-COFFEE_KEYWORDS = ['undefined', 'then', 'unless', 'until', 'loop', 'of', 'by', 'when']
+COFFEE_KEYWORDS = ['undefined', 'then', 'unless', 'until', 'loop', 'of', 'by', 'when', 'inn']
 
 COFFEE_ALIAS_MAP =
   and  : '&&'
@@ -915,7 +915,7 @@ COMPARE = ['==', '!=', '<', '>', '<=', '>=']
 MATH = ['*', '/', '%', '//', '%%']
 
 # Relational tokens that are negatable with `not` prefix.
-RELATION = ['IN', 'OF', 'INSTANCEOF']
+RELATION = ['IN', 'INN', 'OF', 'INSTANCEOF']
 
 # Boolean tokens.
 BOOL = ['TRUE', 'FALSE']

@@ -1,8 +1,8 @@
 try
-  allHellBreaksLoose()
-  catsAndDogsLivingTogether()
-catch error
-  print error
+  $allHellBreaksLoose()
+  $catsAndDogsLivingTogether()
+catch Exception $error
+  echo $error
 finally
-  cleanUp()
+  $cleanUp()
 

@@ -1,4 +1,4 @@
-OPERATOR = /// ^ (
+$operator = /// ^ (
   ?: [-=]>             # function
    | [-+*/%<>&|^!?=]=  # compound assign / compare
    | >>>=?             # zero-fill right shift

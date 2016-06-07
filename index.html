@@ -1030,7 +1030,7 @@ $lyrics = call_user_func((function() use (&$num) {
       provides the <tt>do</tt> keyword, which immediately invokes a passed function,
       forwarding any arguments.
     </p>
-    <div class='code'><pre><code><span class="keyword">for</span> $filename <span class="keyword">in</span> $list
+    <div class='code'><pre><code><span class="keyword">for</span> $filename <span class="keyword">of</span> $list
   <span class="keyword">do</span> <span class="function"><span class="params">( $filename )</span> -&gt;</span>
     $fs.readFile $filename, <span class="function"><span class="params">( $err, $contents )</span> -&gt;</span>
       $compile $filename, $contents.toString()
@@ -1039,10 +1039,10 @@ $lyrics = call_user_func((function() use (&$num) {
     <span class="keyword">return</span> $compile($filename, $contents-&gt;toString());
   });
 };
-<span class="keyword">for</span> ($i = <span class="number">0</span>, len = $list.length; $i &lt; len; $i++) {
+foreach ($list as $filename) {
   $fn($filename);
 }
-</code></pre><script>window.example13 = "for $filename in $list\n  do ( $filename ) ->\n    $fs.readFile $filename, ( $err, $contents ) ->\n      $compile $filename, $contents.toString()\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example13);'>load</div><br class='clear' /></div>
+</code></pre><script>window.example13 = "for $filename of $list\n  do ( $filename ) ->\n    $fs.readFile $filename, ( $err, $contents ) ->\n      $compile $filename, $contents.toString()\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example13);'>load</div><br class='clear' /></div>
 
     <p>
       <span id="slices" class="bookmark"></span>
@@ -1766,17 +1766,17 @@ window->ps || (window->ps = perfectSquares());
       snippets of JavaScript within your CoffeeScript, you can
       use backticks to pass it straight through.
     </p>
-    <div class='code'><pre><code>hi = `<span class="javascript"><span class="function"><span class="keyword">function</span><span class="params">()</span> {</span>
-  <span class="keyword">return</span> [document.title, <span class="string">"Hello JavaScript"</span>].join(<span class="string">": "</span>);
+    <div class='code'><pre><code>$hi = `<span class="javascript"><span class="function"><span class="keyword">function</span><span class="params">()</span> {</span>
+  <span class="keyword">return</span> ( <span class="literal">true</span> ? <span class="string">"Hello"</span> : <span class="string">"Goodbye"</span> ) . <span class="string">" PHP"</span>;
 }</span>`
 
 
 
-</code></pre><pre><code>hi = <span class="function"><span class="keyword">function</span><span class="params">()</span> {</span>
-  <span class="keyword">return</span> [document.title, <span class="string">"Hello JavaScript"</span>].join(<span class="string">": "</span>);
+</code></pre><pre><code>$hi = <span class="function"><span class="keyword">function</span><span class="params">()</span> {</span>
+  <span class="keyword">return</span> ( <span class="literal">true</span> ? <span class="string">"Hello"</span> : <span class="string">"Goodbye"</span> ) . <span class="string">" PHP"</span>;
 };
-</code></pre><script>window.example33 = "hi = `function() {\n  return [document.title, \"Hello JavaScript\"].join(\": \");\n}`\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example33);'>load</div><div class='minibutton ok' onclick='javascript: hi = function() {
-  return [document.title, "Hello JavaScript"].join(": ");
+</code></pre><script>window.example33 = "$hi = `function() {\n  return ( true ? \"Hello\" : \"Goodbye\" ) . \" PHP\";\n}`\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example33);'>load</div><div class='minibutton ok' onclick='javascript: $hi = function() {
+  return ( true ? "Hello" : "Goodbye" ) . " PHP";
 };
 ;alert(hi());'>run: hi()</div><br class='clear' /></div>
 
@@ -1795,68 +1795,69 @@ window->ps || (window->ps = perfectSquares());
       values for each <b>when</b> clause. If any of the values match, the clause
       runs.
     </p>
-    <div class='code'><pre><code><span class="keyword">switch</span> day
-  <span class="keyword">when</span> <span class="string">"Mon"</span> <span class="keyword">then</span> go work
-  <span class="keyword">when</span> <span class="string">"Tue"</span> <span class="keyword">then</span> go relax
-  <span class="keyword">when</span> <span class="string">"Thu"</span> <span class="keyword">then</span> go iceFishing
+    <div class='code'><pre><code><span class="keyword">switch</span> $day
+  <span class="keyword">when</span> <span class="string">"Mon"</span> <span class="keyword">then</span> $go $work
+  <span class="keyword">when</span> <span class="string">"Tue"</span> <span class="keyword">then</span> $go $relax
+  <span class="keyword">when</span> <span class="string">"Thu"</span> <span class="keyword">then</span> $go $iceFishing
   <span class="keyword">when</span> <span class="string">"Fri"</span>, <span class="string">"Sat"</span>
-    <span class="keyword">if</span> day <span class="keyword">is</span> bingoDay
-      go bingo
-      go dancing
-  <span class="keyword">when</span> <span class="string">"Sun"</span> <span class="keyword">then</span> go church
-  <span class="keyword">else</span> go work</code></pre><pre><code><span class="keyword">switch</span> (day) {
+    <span class="keyword">if</span> $day <span class="keyword">is</span> $bingoDay
+      $go $bingo
+      $go $dancing
+  <span class="keyword">when</span> <span class="string">"Sun"</span> <span class="keyword">then</span> $go $church
+  <span class="keyword">else</span> $go $work
+</code></pre><pre><code><span class="keyword">switch</span> ($day) {
   <span class="keyword">case</span> <span class="string">"Mon"</span>:
-    go(work);
+    $go($work);
     <span class="keyword">break</span>;
   <span class="keyword">case</span> <span class="string">"Tue"</span>:
-    go(relax);
+    $go($relax);
     <span class="keyword">break</span>;
   <span class="keyword">case</span> <span class="string">"Thu"</span>:
-    go(iceFishing);
+    $go($iceFishing);
     <span class="keyword">break</span>;
   <span class="keyword">case</span> <span class="string">"Fri"</span>:
   <span class="keyword">case</span> <span class="string">"Sat"</span>:
-    <span class="keyword">if</span> (day === bingoDay) {
-      go(bingo);
-      go(dancing);
+    <span class="keyword">if</span> ($day === $bingoDay) {
+      $go($bingo);
+      $go($dancing);
     }
     <span class="keyword">break</span>;
   <span class="keyword">case</span> <span class="string">"Sun"</span>:
-    go(church);
+    $go($church);
     <span class="keyword">break</span>;
   <span class="keyword">default</span>:
-    go(work);
+    $go($work);
 }
-</code></pre><script>window.example34 = "switch day\n  when \"Mon\" then go work\n  when \"Tue\" then go relax\n  when \"Thu\" then go iceFishing\n  when \"Fri\", \"Sat\"\n    if day is bingoDay\n      go bingo\n      go dancing\n  when \"Sun\" then go church\n  else go work"</script><div class='minibutton load' onclick='javascript: loadConsole(example34);'>load</div><br class='clear' /></div>
+</code></pre><script>window.example34 = "switch $day\n  when \"Mon\" then $go $work\n  when \"Tue\" then $go $relax\n  when \"Thu\" then $go $iceFishing\n  when \"Fri\", \"Sat\"\n    if $day is $bingoDay\n      $go $bingo\n      $go $dancing\n  when \"Sun\" then $go $church\n  else $go $work\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example34);'>load</div><br class='clear' /></div>
 
     <p>
       Switch statements can also be used without a control expression, turning them in to a cleaner alternative to if/else chains.
     </p>
-    <div class='code'><pre><code>score = <span class="number">76</span>
-grade = <span class="keyword">switch</span>
-  <span class="keyword">when</span> score &lt; <span class="number">60</span> <span class="keyword">then</span> <span class="string">'F'</span>
-  <span class="keyword">when</span> score &lt; <span class="number">70</span> <span class="keyword">then</span> <span class="string">'D'</span>
-  <span class="keyword">when</span> score &lt; <span class="number">80</span> <span class="keyword">then</span> <span class="string">'C'</span>
-  <span class="keyword">when</span> score &lt; <span class="number">90</span> <span class="keyword">then</span> <span class="string">'B'</span>
+    <div class='code'><pre><code>$score = <span class="number">76</span>
+$grade = <span class="keyword">switch</span>
+  <span class="keyword">when</span> $score &lt; <span class="number">60</span> <span class="keyword">then</span> <span class="string">'F'</span>
+  <span class="keyword">when</span> $score &lt; <span class="number">70</span> <span class="keyword">then</span> <span class="string">'D'</span>
+  <span class="keyword">when</span> $score &lt; <span class="number">80</span> <span class="keyword">then</span> <span class="string">'C'</span>
+  <span class="keyword">when</span> $score &lt; <span class="number">90</span> <span class="keyword">then</span> <span class="string">'B'</span>
   <span class="keyword">else</span> <span class="string">'A'</span>
-<span class="comment"># grade == 'C'</span>
-</code></pre><pre><code>score = <span class="number">76</span>;
+<span class="comment"># $grade == 'C'</span>
+</code></pre><pre><code>$score = <span class="number">76</span>;
 
-grade = call_user_func((<span class="function"><span class="keyword">function</span><span class="params">()</span>  {</span>
+$grade = call_user_func((<span class="function"><span class="keyword">function</span><span class="params">()</span> <span class="title">use</span> <span class="params">(&amp;$score)</span> {</span>
   <span class="keyword">switch</span> (<span class="literal">false</span>) {
-    <span class="keyword">case</span> !(score &lt; <span class="number">60</span>):
+    <span class="keyword">case</span> !($score &lt; <span class="number">60</span>):
       <span class="keyword">return</span> <span class="string">'F'</span>;
-    <span class="keyword">case</span> !(score &lt; <span class="number">70</span>):
+    <span class="keyword">case</span> !($score &lt; <span class="number">70</span>):
       <span class="keyword">return</span> <span class="string">'D'</span>;
-    <span class="keyword">case</span> !(score &lt; <span class="number">80</span>):
+    <span class="keyword">case</span> !($score &lt; <span class="number">80</span>):
       <span class="keyword">return</span> <span class="string">'C'</span>;
-    <span class="keyword">case</span> !(score &lt; <span class="number">90</span>):
+    <span class="keyword">case</span> !($score &lt; <span class="number">90</span>):
       <span class="keyword">return</span> <span class="string">'B'</span>;
     <span class="keyword">default</span>:
       <span class="keyword">return</span> <span class="string">'A'</span>;
   }
 }));
-</code></pre><script>window.example35 = "score = 76\ngrade = switch\n  when score < 60 then 'F'\n  when score < 70 then 'D'\n  when score < 80 then 'C'\n  when score < 90 then 'B'\n  else 'A'\n# grade == 'C'\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example35);'>load</div><br class='clear' /></div>
+</code></pre><script>window.example35 = "$score = 76\n$grade = switch\n  when $score < 60 then 'F'\n  when $score < 70 then 'D'\n  when $score < 80 then 'C'\n  when $score < 90 then 'B'\n  else 'A'\n# $grade == 'C'\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example35);'>load</div><br class='clear' /></div>
 
     <p>
       <span id="try" class="bookmark"></span>
@@ -1865,22 +1866,22 @@ grade = call_user_func((<span class="function"><span class="keyword">function</s
       they work as expressions).
     </p>
     <div class='code'><pre><code><span class="keyword">try</span>
-  allHellBreaksLoose()
-  catsAndDogsLivingTogether()
-<span class="keyword">catch</span> error
-  <span class="built_in">print</span> error
+  $allHellBreaksLoose()
+  $catsAndDogsLivingTogether()
+<span class="keyword">catch</span> Exception $error
+  echo $error
 <span class="keyword">finally</span>
-  cleanUp()
+  $cleanUp()
 
 </code></pre><pre><code><span class="keyword">try</span> {
-  allHellBreaksLoose();
-  catsAndDogsLivingTogether();
-} <span class="keyword">catch</span> (error) {
-  print(error);
+  $allHellBreaksLoose();
+  $catsAndDogsLivingTogether();
+} <span class="keyword">catch</span> (Exception $error) {
+  echo($error);
 } <span class="keyword">finally</span> {
-  cleanUp();
+  $cleanUp();
 }
-</code></pre><script>window.example36 = "try\n  allHellBreaksLoose()\n  catsAndDogsLivingTogether()\ncatch error\n  print error\nfinally\n  cleanUp()\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example36);'>load</div><br class='clear' /></div>
+</code></pre><script>window.example36 = "try\n  $allHellBreaksLoose()\n  $catsAndDogsLivingTogether()\ncatch Exception $error\n  echo $error\nfinally\n  $cleanUp()\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example36);'>load</div><br class='clear' /></div>
 
     <p>
       <span id="comparisons" class="bookmark"></span>
@@ -1890,17 +1891,17 @@ grade = call_user_func((<span class="function"><span class="keyword">function</s
       from Python &mdash; making it easy to test if a value falls within a
       certain range.
     </p>
-    <div class='code'><pre><code>cholesterol = <span class="number">127</span>
+    <div class='code'><pre><code>$cholesterol = <span class="number">127</span>
 
-healthy = <span class="number">200</span> &gt; cholesterol &gt; <span class="number">60</span>
+$healthy = <span class="number">200</span> &gt; $cholesterol &gt; <span class="number">60</span>
 
 
-</code></pre><pre><code>cholesterol = <span class="number">127</span>;
+</code></pre><pre><code>$cholesterol = <span class="number">127</span>;
 
-healthy = (<span class="number">200</span> &gt; cholesterol &amp;&amp; cholesterol &gt; <span class="number">60</span>);
-</code></pre><script>window.example37 = "cholesterol = 127\n\nhealthy = 200 > cholesterol > 60\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example37);'>load</div><div class='minibutton ok' onclick='javascript: cholesterol = 127;
+$healthy = (<span class="number">200</span> &gt; $cholesterol &amp;&amp; $cholesterol &gt; <span class="number">60</span>);
+</code></pre><script>window.example37 = "$cholesterol = 127\n\n$healthy = 200 > $cholesterol > 60\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example37);'>load</div><div class='minibutton ok' onclick='javascript: $cholesterol = 127;
 
-healthy = (200 > cholesterol && cholesterol > 60);
+$healthy = (200 > $cholesterol && $cholesterol > 60);
 ;alert(healthy);'>run: healthy</div><br class='clear' /></div>
 
     <p>
@@ -1910,37 +1911,37 @@ healthy = (200 > cholesterol && cholesterol > 60);
       strings allow for interpolated values, using <tt>#{ ... }</tt>,
       and single-quoted strings are literal.
     </p>
-    <div class='code'><pre><code>author = <span class="string">"Wittgenstein"</span>
-quote  = <span class="string">"A picture is a fact. -- <span class="subst">#{ author }</span>"</span>
+    <div class='code'><pre><code>$author = <span class="string">"Wittgenstein"</span>
+$quote  = <span class="string">"A picture is a fact. -- <span class="subst">#{ $author }</span>"</span>
 
-sentence = <span class="string">"<span class="subst">#{ <span class="number">22</span> / <span class="number">7</span> }</span> is a decent approximation of π"</span>
-
-
+$sentence = <span class="string">"<span class="subst">#{ <span class="number">22</span> / <span class="number">7</span> }</span> is a decent approximation of π"</span>
 
 
 
-</code></pre><pre><code>author = <span class="string">"Wittgenstein"</span>;
 
-quote = <span class="string">"A picture is a fact. -- "</span> . author;
 
-sentence = (<span class="number">22</span> / <span class="number">7</span>) . <span class="string">" is a decent approximation of π"</span>;
-</code></pre><script>window.example38 = "author = \"Wittgenstein\"\nquote  = \"A picture is a fact. -- #{ author }\"\n\nsentence = \"#{ 22 / 7 } is a decent approximation of π\"\n\n\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example38);'>load</div><div class='minibutton ok' onclick='javascript: author = "Wittgenstein";
+</code></pre><pre><code>$author = <span class="string">"Wittgenstein"</span>;
 
-quote = "A picture is a fact. -- " . author;
+$quote = <span class="string">"A picture is a fact. -- "</span> . $author;
 
-sentence = (22 / 7) . " is a decent approximation of π";
+$sentence = (<span class="number">22</span> / <span class="number">7</span>) . <span class="string">" is a decent approximation of π"</span>;
+</code></pre><script>window.example38 = "$author = \"Wittgenstein\"\n$quote  = \"A picture is a fact. -- #{ $author }\"\n\n$sentence = \"#{ 22 / 7 } is a decent approximation of π\"\n\n\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example38);'>load</div><div class='minibutton ok' onclick='javascript: $author = "Wittgenstein";
+
+$quote = "A picture is a fact. -- " . $author;
+
+$sentence = (22 / 7) . " is a decent approximation of π";
 ;alert(sentence);'>run: sentence</div><br class='clear' /></div>
     <p>
       Multiline strings are allowed in CoffeeScript. Lines are joined by a single space unless they end with a backslash. Indentation is ignored.
     </p>
-    <div class='code'><pre><code>mobyDick = <span class="string">"Call me Ishmael. Some years ago --
+    <div class='code'><pre><code>$mobyDick = <span class="string">"Call me Ishmael. Some years ago --
   never mind how long precisely -- having little
   or no money in my purse, and nothing particular
   to interest me on shore, I thought I would sail
   about a little and see the watery part of the
   world..."</span>
-</code></pre><pre><code>mobyDick = <span class="string">"Call me Ishmael. Some years ago -- never mind how long precisely -- having little or no money in my purse, and nothing particular to interest me on shore, I thought I would sail about a little and see the watery part of the world..."</span>;
-</code></pre><script>window.example39 = "mobyDick = \"Call me Ishmael. Some years ago --\n  never mind how long precisely -- having little\n  or no money in my purse, and nothing particular\n  to interest me on shore, I thought I would sail\n  about a little and see the watery part of the\n  world...\"\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example39);'>load</div><div class='minibutton ok' onclick='javascript: mobyDick = "Call me Ishmael. Some years ago -- never mind how long precisely -- having little or no money in my purse, and nothing particular to interest me on shore, I thought I would sail about a little and see the watery part of the world...";
+</code></pre><pre><code>$mobyDick = <span class="string">"Call me Ishmael. Some years ago -- never mind how long precisely -- having little or no money in my purse, and nothing particular to interest me on shore, I thought I would sail about a little and see the watery part of the world..."</span>;
+</code></pre><script>window.example39 = "$mobyDick = \"Call me Ishmael. Some years ago --\n  never mind how long precisely -- having little\n  or no money in my purse, and nothing particular\n  to interest me on shore, I thought I would sail\n  about a little and see the watery part of the\n  world...\"\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example39);'>load</div><div class='minibutton ok' onclick='javascript: $mobyDick = "Call me Ishmael. Some years ago -- never mind how long precisely -- having little or no money in my purse, and nothing particular to interest me on shore, I thought I would sail about a little and see the watery part of the world...";
 ;alert(mobyDick);'>run: mobyDick</div><br class='clear' /></div>
     <p>
       Block strings can be used to hold formatted or indentation-sensitive text
@@ -1948,16 +1949,16 @@ sentence = (22 / 7) . " is a decent approximation of π";
       indentation level that begins the block is maintained throughout, so
       you can keep it all aligned with the body of your code.
     </p>
-    <div class='code'><pre><code>html = <span class="string">"""
+    <div class='code'><pre><code>$html = <span class="string">"""
        &lt;strong&gt;
          cup of coffeescript
        &lt;/strong&gt;
        """</span>
        
-</code></pre><pre><code>html = "&lt;strong&gt;
+</code></pre><pre><code>$html = "&lt;strong&gt;
   cup of coffeescript
 &lt;/strong&gt;";
-</code></pre><script>window.example40 = "html = \"\"\"\n       <strong>\n         cup of coffeescript\n       </strong>\n       \"\"\"\n       \n"</script><div class='minibutton load' onclick='javascript: loadConsole(example40);'>load</div><div class='minibutton ok' onclick='javascript: html = "<strong>
+</code></pre><script>window.example40 = "$html = \"\"\"\n       <strong>\n         cup of coffeescript\n       </strong>\n       \"\"\"\n       \n"</script><div class='minibutton load' onclick='javascript: loadConsole(example40);'>load</div><div class='minibutton ok' onclick='javascript: $html = "<strong>
   cup of coffeescript
 </strong>";
 ;alert(html);'>run: html</div><br class='clear' /></div>
@@ -1971,18 +1972,18 @@ sentence = (22 / 7) . " is a decent approximation of π";
       are preserved in the generated code.
     </p>
     <div class='code'><pre><code><span class="comment">###
-SkinnyMochaHalfCaffScript Compiler v1.0
-Released under the MIT License
+# SkinnyMochaHalfCaffScript Compiler v1.0
+# Released under the MIT License
 ###</span>
 
 
 </code></pre><pre><code>
 <span class="comment">/**
-SkinnyMochaHalfCaffScript Compiler v1.0
-Released under the MIT License
+ *  SkinnyMochaHalfCaffScript Compiler v1.0
+ *  Released under the MIT License
  */</span>
 
-</code></pre><script>window.example41 = "###\nSkinnyMochaHalfCaffScript Compiler v1.0\nReleased under the MIT License\n###\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example41);'>load</div><br class='clear' /></div>
+</code></pre><script>window.example41 = "###\n# SkinnyMochaHalfCaffScript Compiler v1.0\n# Released under the MIT License\n###\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example41);'>load</div><br class='clear' /></div>
 
     <p>
       <span id="regexes" class="bookmark"></span>
@@ -1993,7 +1994,7 @@ Released under the MIT License
       block regexes are delimited by <tt>///</tt> and go a long way towards making complex
       regular expressions readable. To quote from the CoffeeScript source:
     </p>
-    <div class='code'><pre><code>OPERATOR = <span class="regexp">/// ^ (
+    <div class='code'><pre><code>$operator = <span class="regexp">/// ^ (
   ?: [-=]&gt;             <span class="comment"># function</span>
    | [-+*/%&lt;&gt;&amp;|^!?=]=  <span class="comment"># compound assign / compare</span>
    | &gt;&gt;&gt;=?             <span class="comment"># zero-fill right shift</span>
@@ -2004,8 +2005,8 @@ Released under the MIT License
 ) ///</span>
 
 
-</code></pre><pre><code>OPERATOR = <span class="string">'/^(?:[-=]&gt;|[-+*\/%&lt;&gt;&amp;|^!?=]=|&gt;&gt;&gt;=?|([-+:])\1|([&amp;|&lt;&gt;])\2=?|\?\.|\.{2,3})/'</span>;
-</code></pre><script>window.example42 = "OPERATOR = /// ^ (\n  ?: [-=]>             # function\n   | [-+*/%<>&|^!?=]=  # compound assign / compare\n   | >>>=?             # zero-fill right shift\n   | ([-+:])\\1         # doubles\n   | ([&|<>])\\2=?      # logic / shift\n   | \\?\\.              # soak access\n   | \\.{2,3}           # range or splat\n) ///\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example42);'>load</div><br class='clear' /></div>
+</code></pre><pre><code>$operator = <span class="string">'/^(?:[-=]&gt;|[-+*\/%&lt;&gt;&amp;|^!?=]=|&gt;&gt;&gt;=?|([-+:])\1|([&amp;|&lt;&gt;])\2=?|\?\.|\.{2,3})/'</span>;
+</code></pre><script>window.example42 = "$operator = /// ^ (\n  ?: [-=]>             # function\n   | [-+*/%<>&|^!?=]=  # compound assign / compare\n   | >>>=?             # zero-fill right shift\n   | ([-+:])\\1         # doubles\n   | ([&|<>])\\2=?      # logic / shift\n   | \\?\\.              # soak access\n   | \\.{2,3}           # range or splat\n) ///\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example42);'>load</div><br class='clear' /></div>
 
 
     <h2>

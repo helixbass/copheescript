@@ -1,5 +1,5 @@
-hi = `function() {
-  return [document.title, "Hello JavaScript"].join(": ");
+$hi = `function() {
+  return ( true ? "Hello" : "Goodbye" ) . " PHP";
 }`
 
 

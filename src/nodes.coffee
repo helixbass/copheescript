@@ -1903,6 +1903,7 @@ exports.While = class While extends Base
 exports.Op = class Op extends Base
   constructor: (op, first, second, flip ) ->
     return new In first, second if op is 'in'
+    return new Inn first, second if op is 'inn'
     if op is 'do'
       return @generateDo first
     if op is 'new'
@@ -1918,7 +1919,7 @@ exports.Op = class Op extends Base
   CONVERSIONS =
     # '==':        '==='
     # '!=':        '!=='
-    'of':        'in'
+    # 'of':        'in'
     'yieldfrom': 'yield*'
 
   # The map of invertible operators.
@@ -2008,9 +2009,10 @@ exports.Op = class Op extends Base
     return @compileChain     o if isChain
     switch @operator
       when '?'  then @compileExistence o
-      when '**' then @compilePower o
+      # when '**' then @compilePower o
       when '//' then @compileFloorDivision o
       when '%%' then @compileModulo o
+      when 'of' then @compileOf o
       else
         lhs = @first.compileToFragments o, LEVEL_OP
         rhs = @second.compileToFragments o, LEVEL_OP
@@ -2080,12 +2082,16 @@ exports.Op = class Op extends Base
     new Call(pow, [@first, @second]).compileToFragments o
 
   compileFloorDivision: (o) ->
-    floor = new Value new Literal('Math'), [new Access new Literal 'floor']
+    floor = new Value new Literal 'intval'
     div = new Op '/', @first, @second
     new Call(floor, [div]).compileToFragments o
 
   compileModulo: (o) ->
     mod = new Value new Literal utility 'modulo', o
+    new Call(mod, [@first, @second]).compileToFragments o
+
+  compileOf: (o) ->
+    mod = new Value new Literal 'array_key_exists', o
     new Call(mod, [@first, @second]).compileToFragments o
 
   toString: (idt) ->
@@ -2111,6 +2117,44 @@ exports.In = class In extends Base
   compileOrTest: (o) ->
     [sub, ref] = @object.cache o, LEVEL_OP
     [cmp, cnj] = if @negated then [' !== ', ' && '] else [' === ', ' || ']
+    tests = []
+    for item, i in @array.base.objects
+      if i then tests.push @makeCode cnj
+      tests = tests.concat (if i then ref else sub), @makeCode(cmp), item.compileToFragments(o, LEVEL_ACCESS)
+    if o.level < LEVEL_OP then tests else @wrapInBraces tests
+
+  compileLoopTest: (o) ->
+    # [sub, ref] = @object.cache o, LEVEL_LIST
+    fragments = [].concat @makeCode("in_array("),# ref,
+      @object.compileToFragments(o, LEVEL_LIST),
+      @makeCode(", "), @array.compileToFragments(o, LEVEL_LIST), @makeCode(", true)")
+    # return fragments if fragmentsToText(sub) is fragmentsToText(ref)
+    # fragments = sub.concat @makeCode(', '), fragments
+    # if o.level < LEVEL_LIST then fragments else @wrapInBraces fragments
+
+  toString: (idt) ->
+    super idt, @constructor.name + if @negated then '!' else ''
+
+#### Inn (weak In)
+exports.Inn = class Inn extends Base
+  constructor: (@object, @array) ->
+
+  children: ['object', 'array']
+
+  # invert: NEGATE
+
+  compileNode: (o) ->
+    if @array instanceof Value and @array.isArray() and @array.base.objects.length
+      for obj in @array.base.objects when obj instanceof Splat
+        hasSplat = yes
+        break
+      # `compileOrTest` only if we have an array literal with no splats
+      return @compileOrTest o unless hasSplat
+    @compileLoopTest o
+
+  compileOrTest: (o) ->
+    [sub, ref] = @object.cache o, LEVEL_OP
+    [cmp, cnj] = if @negated then [' != ', ' && '] else [' == ', ' || ']
     tests = []
     for item, i in @array.base.objects
       if i then tests.push @makeCode cnj
