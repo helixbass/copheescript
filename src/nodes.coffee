@@ -1316,6 +1316,13 @@ exports.Assign = class Assign extends Base
 
   children: ['variable', 'value']
 
+  makeReturn: ->
+   if @variable.isArray() or @variable.isObject()
+     @_make_return = yes
+     this
+   else
+     super
+
   isStatement: (o) ->
     o?.level is LEVEL_TOP and @context? and "?" in @context
 
@@ -1476,7 +1483,9 @@ exports.Assign = class Assign extends Base
       if name? and name in RESERVED
         obj.error "assignment to a reserved word: #{obj.compile o}"
       assigns.push new Assign(obj, val, null, param: @param, subpattern: yes).compileToFragments o, LEVEL_LIST unless name is '__IGNORED_ARG'
-    assigns.push vvar unless top or @subpattern
+    # console.log { vvar, make_return: @_make_return?, top, @subpattern }
+    vvar = [@makeCode('return '), vvar...] if @_make_return?
+    assigns.push vvar unless not @_make_return? and (top or @subpattern)
     fragments = @joinFragmentArrays assigns, '; '
     # if o.level < LEVEL_LIST then fragments else @wrapInBraces fragments
     fragments

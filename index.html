@@ -1658,27 +1658,27 @@ $ref = $text->split(" "); $first = $ref[0]; $last = $ref[count($ref) - 1];
       to assign properties to your instance from an options object passed to the constructor.
     </p>
     <div class='code'><pre><code><span class="class"><span class="keyword">class</span> <span class="title">Person</span></span>
-  <span class="attribute">constructor</span>: <span class="function"><span class="params">(options)</span> -&gt;</span> 
-    {<span class="property">@name</span>, <span class="property">@age</span>, <span class="property">@height</span>} = options
+  <span class="attribute">__construct</span>: <span class="function"><span class="params">($options)</span> -&gt;</span>
+    {<span class="property">@name</span>, <span class="property">@age</span>, <span class="property">@height</span>} = $options
 
-tim = <span class="keyword">new</span> Person <span class="attribute">age</span>: <span class="number">4</span>
+$tim = <span class="keyword">new</span> Person <span class="attribute">age</span>: <span class="number">4</span>
 
 </code></pre><pre><code><span class="keyword">class</span> Person  {
-(<span class="function"><span class="keyword">function</span><span class="params">( options)</span>  {</span>
-  <span class="keyword">return</span> $<span class="keyword">this</span>-&gt;name = options[<span class="string">'name'</span>]; $<span class="keyword">this</span>-&gt;age = options[<span class="string">'age'</span>]; $<span class="keyword">this</span>-&gt;height = options[<span class="string">'height'</span>]; options;
-});
+<span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">($options)</span>  {</span>
+  $<span class="keyword">this</span>-&gt;name = $options[<span class="string">'name'</span>]; $<span class="keyword">this</span>-&gt;age = $options[<span class="string">'age'</span>]; $<span class="keyword">this</span>-&gt;height = $options[<span class="string">'height'</span>]; <span class="keyword">return</span> $options;
+}
 }
 
-tim = <span class="keyword">new</span> Person([
+$tim = <span class="keyword">new</span> Person([
   <span class="string">'age'</span> =&gt; <span class="number">4</span>
 ]);
-</code></pre><script>window.example30 = "class Person\n  constructor: (options) -> \n    {@name, @age, @height} = options\n\ntim = new Person age: 4\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example30);'>load</div><div class='minibutton ok' onclick='javascript: class Person  {
-(function( options)  {
-  return $this->name = options['name']; $this->age = options['age']; $this->height = options['height']; options;
-});
+</code></pre><script>window.example30 = "class Person\n  __construct: ($options) ->\n    {@name, @age, @height} = $options\n\n$tim = new Person age: 4\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example30);'>load</div><div class='minibutton ok' onclick='javascript: class Person  {
+function __construct($options)  {
+  $this->name = $options['name']; $this->age = $options['age']; $this->height = $options['height']; return $options;
+}
 }
 
-tim = new Person([
+$tim = new Person([
   'age' => 4
 ]);
 ;alert(tim.age);'>run: tim.age</div><br class='clear' /></div>

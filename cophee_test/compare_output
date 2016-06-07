@@ -23,6 +23,28 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "return list assignment",
+  '''
+  ( $opts ) ->
+    [@a, @b, @c] = $opts
+  ''',
+  """
+  (function($opts)  {
+    $this->a = $opts[0]; $this->b = $opts[1]; $this->c = $opts[2]; return $opts;
+  });
+  """
+
+compare "return destructured assignment",
+  '''
+  ( $opts ) ->
+    { @a, @b, @c } = $opts
+  ''',
+  """
+  (function($opts)  {
+    $this->a = $opts['a']; $this->b = $opts['b']; $this->c = $opts['c']; return $opts;
+  });
+  """
+
 compare "expansion assignment multiple following",
   '''
   [first, ..., penultimate, last] = $text.split " "

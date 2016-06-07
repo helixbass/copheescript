@@ -1,6 +1,6 @@
 class Person
-  constructor: (options) -> 
-    {@name, @age, @height} = options
+  __construct: ($options) ->
+    {@name, @age, @height} = $options
 
-tim = new Person age: 4
+$tim = new Person age: 4
 
