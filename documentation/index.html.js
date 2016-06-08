@@ -426,8 +426,8 @@ Expressions
     <p>
       The "killer feature" of CopheeScript (especially when coding in a more
       functional style) is auto-generated <tt>use</tt> clauses on closures.
-      This means that variables from outer scopes are able to be referenced
-      (and they are in fact always passed by reference) freely inside closures.
+      This means that variables from outer scopes are able to be freely
+      referenced (and they are in fact always passed by reference) inside closures.
     </p>
     <%= codeFor('use') %>
 
@@ -444,6 +444,13 @@ Expressions
       Object properties and methods are accessed using the dot (<tt>.</tt>) operator.
     </p>
     <%= codeFor('objects_and_arrays', 'song.join(" ... ")') %>
+    <p>
+      There are a few shorthands for when keys in a hash/object literal correspond to the
+      variable/property name of the value. <small><i>The shorthands starting with <tt>.</tt> are
+      tailored for our ORM at Zeel, where we use <tt>.column_name: value</tt> hashes to
+      specify SQL <tt>WHERE</tt> clauses.</i></small>
+    </p>
+    <%= codeFor('object_shorthands') %>
     <!-- <p> -->
     <!--   In JavaScript, you can't use reserved words, like <tt>class</tt>, as properties -->
     <!--   of an object, without quoting them as strings. CoffeeScript notices reserved words -->

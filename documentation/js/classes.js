@@ -17,6 +17,12 @@ static function message()  {
 }
 }
 
+trait Animal_Trait  {
+function speak()  {
+  return echo("grrrr");
+}
+}
+
 class Snake extends Animal {
 function move()  {
   echo("Slithering...");

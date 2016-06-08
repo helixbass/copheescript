@@ -13,6 +13,10 @@ class Animal
   @message: ->
    "#{ self::$home } is where the heart is"
 
+trait Animal_Trait
+  speak: ->
+    echo "grrrr"
+
 class Snake extends Animal
   move: ->
     echo "Slithering..."
