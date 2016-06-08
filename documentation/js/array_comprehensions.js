@@ -5,7 +5,7 @@ foreach (['toast', 'cheese', 'wine'] as $food) {
 
 $courses = ['greens', 'caviar', 'truffles', 'roast', 'cake'];
 
-foreach (courses as $i => $dish) {
+foreach ($courses as $i => $dish) {
   $menu($i + 1, $dish);
 }
 

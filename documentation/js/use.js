@@ -7,4 +7,4 @@ $add_x_and_arg = function($y) use (&$x) {
   };
 };
 
-call_user_func($add_x_and_arg(4)5);
+call_user_func($add_x_and_arg(4), 5);

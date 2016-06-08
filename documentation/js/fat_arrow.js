@@ -6,5 +6,5 @@ Account = function( customer,  cart)  {
     return function( event)  {
       return _this->customer->purchase(_this->cart);
     };
-  })$this));
+  }), $this));
 };

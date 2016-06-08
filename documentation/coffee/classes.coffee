@@ -1,8 +1,17 @@
 class Animal
+  use Animal_Trait
+
   __construct: (@$name) ->
 
   move: ( $meters ) ->
     echo "#{ @name } moved #{ $meters }m."
+
+  @$home: "Meadowbrook Farm"
+
+  # TODO: support public/protected/private modifiers
+
+  @message: ->
+   "#{ self::$home } is where the heart is"
 
 class Snake extends Animal
   move: ->
@@ -20,6 +29,6 @@ $tom = new Horse "Tommy the Palomino"
 $sam.move()
 $tom.move()
 
-
+echo Animal::message()
 
 

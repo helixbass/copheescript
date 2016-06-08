@@ -1,3 +1,5 @@
+$regex = /^abc$/
+
 $operator = /// ^ (
   ?: [-=]>             # function
    | [-+*/%<>&|^!?=]=  # compound assign / compare

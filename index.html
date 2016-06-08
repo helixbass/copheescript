@@ -95,7 +95,7 @@
     <p>
       <b>CopheeScript is a little language that compiles into PHP.</b>
       It derives from <a href='http://coffeescript.org'>CoffeeScript</a>,
-      a popular (and beautiful) language that compiles into JavaScript.
+      a popular (and gorgeous) language that compiles into JavaScript.
       It adds a few PHP-specific features while aiming to support as much
       CoffeeScript syntax as possible and similarly beautify your
       server-side code.
@@ -504,7 +504,7 @@ $cube = <span class="function"><span class="keyword">function</span><span class=
 };
 </code></pre><script>window.example2 = "$square = ( $x ) -> $x * $x\n$cube   = ( $x ) -> $square( $x ) * $x\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example2);'>load</div><br class='clear' /></div>
     <p>
-      Functions may also have default values for arguments, which will be used
+      Functions may also have default values for arguments (like PHP), which will be used
       if the incoming argument is missing.
     </p>
     <div class='code'><pre><code><span class="function"><span class="title">$fill</span> = <span class="params">( $container, $liquid = <span class="string">"coffee"</span> )</span> -&gt;</span>
@@ -549,7 +549,7 @@ $first_one = <span class="function"><span class="keyword">function</span><span c
   <span class="function"><span class="params">( $z )</span> -&gt;</span>
     $x + $y + $z
 
-$add_x_and_arg( <span class="number">4</span> ) <span class="number">5</span> <span class="comment"># 15</span>
+$add_x_and_arg( <span class="number">4</span> )( <span class="number">5</span> ) <span class="comment"># 15</span>
 </code></pre><pre><code>$x = <span class="number">6</span>;
 
 $add_x_and_arg = <span class="function"><span class="keyword">function</span><span class="params">($y)</span> <span class="title">use</span> <span class="params">(&amp;$x)</span> {</span>
@@ -558,22 +558,27 @@ $add_x_and_arg = <span class="function"><span class="keyword">function</span><sp
   };
 };
 
-call_user_func($add_x_and_arg(<span class="number">4</span>)<span class="number">5</span>);
-</code></pre><script>window.example5 = "$x = 6\n\n$add_x_and_arg = ( $y ) ->\n  ( $z ) ->\n    $x + $y + $z\n\n$add_x_and_arg( 4 ) 5 # 15\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example5);'>load</div><br class='clear' /></div>
+call_user_func($add_x_and_arg(<span class="number">4</span>), <span class="number">5</span>);
+</code></pre><script>window.example5 = "$x = 6\n\n$add_x_and_arg = ( $y ) ->\n  ( $z ) ->\n    $x + $y + $z\n\n$add_x_and_arg( 4 )( 5 ) # 15\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example5);'>load</div><br class='clear' /></div>
 
     <p>
       <span id="objects_and_arrays" class="bookmark"></span>
       <b class="header">Objects and Arrays</b>
-      The CoffeeScript literals for objects and arrays look very similar to
-      their JavaScript cousins. When each property is listed on its own line,
-      the commas are optional. Objects may be created using indentation instead
+      For syntactic convenience,
+      CopheeScript has different literals for hashes (associative arrays) and
+      lists even though both compile to PHP arrays.
+      Object literals are similar to hash literals but use double curly braces (<tt>{{</tt>).
+      When each property is listed on its own line,
+      the commas are optional. Objects/hashes may be created using indentation instead
       of explicit braces, similar to <a href="http://yaml.org">YAML</a>.
+      Object properties and methods are accessed using the dot (<tt>.</tt>) operator.
     </p>
     <div class='code'><pre><code>$song = [<span class="string">"do"</span>, <span class="string">"re"</span>, <span class="string">"mi"</span>, <span class="string">"fa"</span>, <span class="string">"so"</span>]
 
 $singers = { <span class="attribute">Jagger</span>: <span class="string">"Rock"</span>, <span class="attribute">Elvis</span>: <span class="string">"Roll"</span> }
 
 $singers_obj = {{ <span class="attribute">Jagger</span>: <span class="string">"Rock"</span>, <span class="attribute">Elvis</span>: <span class="string">"Roll"</span> }}
+echo $singers_obj.Jagger
 
 $bitlist = [
   <span class="number">1</span>, <span class="number">0</span>, <span class="number">1</span>
@@ -602,6 +607,8 @@ $singers_obj = (object) [
   <span class="string">'Elvis'</span> =&gt; <span class="string">"Roll"</span>
 ];
 
+echo($singers_obj-&gt;Jagger);
+
 $bitlist = [<span class="number">1</span>, <span class="number">0</span>, <span class="number">1</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">1</span>, <span class="number">1</span>, <span class="number">1</span>, <span class="number">0</span>];
 
 $kids = [
@@ -614,14 +621,14 @@ $kids = [
     <span class="string">'age'</span> =&gt; <span class="number">9</span>
   ]
 ];
-</code></pre><script>window.example6 = "$song = [\"do\", \"re\", \"mi\", \"fa\", \"so\"]\n\n$singers = { Jagger: \"Rock\", Elvis: \"Roll\" }\n\n$singers_obj = {{ Jagger: \"Rock\", Elvis: \"Roll\" }}\n\n$bitlist = [\n  1, 0, 1\n  0, 0, 1\n  1, 1, 0\n]\n\n$kids =\n  brother:\n    name: \"Max\"\n    age:  11\n  sister:\n    name: \"Ida\"\n    age:  9\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example6);'>load</div><br class='clear' /></div>
-    <p>
-      In JavaScript, you can't use reserved words, like <tt>class</tt>, as properties
-      of an object, without quoting them as strings. CoffeeScript notices reserved words
-      used as keys in objects and quotes them for you, so you don't have to worry
-      about it (say, when using jQuery).
-    </p>
-    <div class='code'><pre><code>$('.account').attr class: 'active'
+</code></pre><script>window.example6 = "$song = [\"do\", \"re\", \"mi\", \"fa\", \"so\"]\n\n$singers = { Jagger: \"Rock\", Elvis: \"Roll\" }\n\n$singers_obj = {{ Jagger: \"Rock\", Elvis: \"Roll\" }}\necho $singers_obj.Jagger\n\n$bitlist = [\n  1, 0, 1\n  0, 0, 1\n  1, 1, 0\n]\n\n$kids =\n  brother:\n    name: \"Max\"\n    age:  11\n  sister:\n    name: \"Ida\"\n    age:  9\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example6);'>load</div><br class='clear' /></div>
+    <!-- <p> -->
+    <!--   In JavaScript, you can't use reserved words, like <tt>class</tt>, as properties -->
+    <!--   of an object, without quoting them as strings. CoffeeScript notices reserved words -->
+    <!--   used as keys in objects and quotes them for you, so you don't have to worry -->
+    <!--   about it (say, when using jQuery). -->
+    <!-- </p> -->
+    <!-- <div class='code'><pre><code>$('.account').attr class: 'active'
 
 echo $object.class
 
@@ -631,16 +638,16 @@ echo $object.class
 ]);
 
 echo($object-&gt;<span class="keyword">class</span>);
-</code></pre><script>window.example7 = "$('.account').attr class: 'active'\n\necho $object.class\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example7);'>load</div><br class='clear' /></div>
+</code></pre><script>window.example7 = "$('.account').attr class: 'active'\n\necho $object.class\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example7);'>load</div><br class='clear' /></div> -->
 
-    <p>
-      <span id="lexical-scope" class="bookmark"></span>
-      <b class="header">Lexical Scoping and Variable Safety</b>
-      The CoffeeScript compiler takes care to make sure that all of your variables
-      are properly declared within lexical scope &mdash; you never need to write
-      <tt>var</tt> yourself.
-    </p>
-    <div class='code'><pre><code>$outer = <span class="number">1</span>
+    <!-- <p> -->
+    <!--   <span id="lexical-scope" class="bookmark"></span> -->
+    <!--   <b class="header">Lexical Scoping and Variable Safety</b> -->
+    <!--   The CoffeeScript compiler takes care to make sure that all of your variables -->
+    <!--   are properly declared within lexical scope &mdash; you never need to write -->
+    <!--   <tt>var</tt> yourself. -->
+    <!-- </p> -->
+    <!-- <div class='code'><pre><code>$outer = <span class="number">1</span>
 <span class="function"><span class="title">$changeNumbers</span> = -&gt;</span>
   $inner = -<span class="number">1</span>
   $outer = <span class="number">10</span>
@@ -653,36 +660,36 @@ $changeNumbers = <span class="function"><span class="keyword">function</span><sp
 };
 
 $inner = $changeNumbers();
-</code></pre><script>window.example8 = "$outer = 1\n$changeNumbers = ->\n  $inner = -1\n  $outer = 10\n$inner = $changeNumbers()\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example8);'>load</div><br class='clear' /></div>
-    <p>
-      Notice how all of the variable declarations have been pushed up to
-      the top of the closest scope, the first time they appear.
-      <b>outer</b> is not redeclared within the inner function, because it's
-      already in scope; <b>inner</b> within the function, on the other hand,
-      should not be able to change the value of the external variable of the same name, and
-      therefore has a declaration of its own.
-    </p>
-    <p>
-      This behavior is effectively identical to Ruby's scope for local variables.
-      Because you don't have direct access to the <tt>var</tt> keyword,
-      it's impossible to shadow an outer variable on purpose, you may only refer
-      to it. So be careful that you're not reusing the name of an external
-      variable accidentally, if you're writing a deeply nested function.
-    </p>
-    <p>
-      Although suppressed within this documentation for clarity, all
-      CoffeeScript output is wrapped in an anonymous function:
-      <tt>(function(){ ... })();</tt> This safety wrapper, combined with the
-      automatic generation of the <tt>var</tt> keyword, make it exceedingly difficult
-      to pollute the global namespace by accident.
-    </p>
-    <p>
-      If you'd like to create top-level variables for other scripts to use,
-      attach them as properties on <b>window</b>, or on the <b>exports</b>
-      object in CommonJS. The <b>existential operator</b> (covered below), gives you a
-      reliable way to figure out where to add them; if you're targeting both
-      CommonJS and the browser: <tt>exports ? this</tt>
-    </p>
+</code></pre><script>window.example8 = "$outer = 1\n$changeNumbers = ->\n  $inner = -1\n  $outer = 10\n$inner = $changeNumbers()\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example8);'>load</div><br class='clear' /></div> -->
+    <!-- <p> -->
+    <!--   Notice how all of the variable declarations have been pushed up to -->
+    <!--   the top of the closest scope, the first time they appear. -->
+    <!--   <b>outer</b> is not redeclared within the inner function, because it's -->
+    <!--   already in scope; <b>inner</b> within the function, on the other hand, -->
+    <!--   should not be able to change the value of the external variable of the same name, and -->
+    <!--   therefore has a declaration of its own. -->
+    <!-- </p> -->
+    <!-- <p> -->
+    <!--   This behavior is effectively identical to Ruby's scope for local variables. -->
+    <!--   Because you don't have direct access to the <tt>var</tt> keyword, -->
+    <!--   it's impossible to shadow an outer variable on purpose, you may only refer -->
+    <!--   to it. So be careful that you're not reusing the name of an external -->
+    <!--   variable accidentally, if you're writing a deeply nested function. -->
+    <!-- </p> -->
+    <!-- <p> -->
+    <!--   Although suppressed within this documentation for clarity, all -->
+    <!--   CoffeeScript output is wrapped in an anonymous function: -->
+    <!--   <tt>(function(){ ... })();</tt> This safety wrapper, combined with the -->
+    <!--   automatic generation of the <tt>var</tt> keyword, make it exceedingly difficult -->
+    <!--   to pollute the global namespace by accident. -->
+    <!-- </p> -->
+    <!-- <p> -->
+    <!--   If you'd like to create top-level variables for other scripts to use, -->
+    <!--   attach them as properties on <b>window</b>, or on the <b>exports</b> -->
+    <!--   object in CommonJS. The <b>existential operator</b> (covered below), gives you a -->
+    <!--   reliable way to figure out where to add them; if you're targeting both -->
+    <!--   CommonJS and the browser: <tt>exports ? this</tt> -->
+    <!-- </p> -->
 
     <p>
       <span id="conditionals" class="bookmark"></span>
@@ -693,12 +700,15 @@ $inner = $changeNumbers();
       postfix form, with the <tt>if</tt> or <tt>unless</tt> at the end.
     </p>
     <p>
-      CoffeeScript can compile <b>if</b> statements into JavaScript expressions,
+      CopheeScript can compile <b>if</b> statements into PHP expressions,
       using the ternary operator when possible, and closure wrapping otherwise. There
-      is no explicit ternary statement in CoffeeScript &mdash; you simply use
+      is no explicit ternary statement in CopheeScript &mdash; you simply use
       a regular <b>if</b> statement on a single line.
     </p>
     <div class='code'><pre><code>$mood = $greatlyImproved <span class="keyword">if</span> $singing
+<span class="comment"># Notice the difference when compiled</span>
+$mood =
+  $greatlyImproved <span class="keyword">if</span> $singing
 
 <span class="keyword">if</span> $happy <span class="keyword">and</span> $knowsIt
   $clapsHands()
@@ -714,6 +724,8 @@ $date = <span class="keyword">if</span> $friday <span class="keyword">then</span
   $mood = $greatlyImproved;
 }
 
+$mood = $singing ? $greatlyImproved : <span class="literal">null</span>;
+
 <span class="keyword">if</span> ($happy &amp;&amp; $knowsIt) {
   $clapsHands();
   $chaChaCha();
@@ -722,13 +734,13 @@ $date = <span class="keyword">if</span> $friday <span class="keyword">then</span
 }
 
 $date = $friday ? $sue : ($jill);
-</code></pre><script>window.example9 = "$mood = $greatlyImproved if $singing\n\nif $happy and $knowsIt\n  $clapsHands()\n  $chaChaCha()\nelse\n  $showIt()\n\n$date = if $friday then $sue else $jill\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example9);'>load</div><br class='clear' /></div>
+</code></pre><script>window.example9 = "$mood = $greatlyImproved if $singing\n# Notice the difference when compiled\n$mood =\n  $greatlyImproved if $singing\n\nif $happy and $knowsIt\n  $clapsHands()\n  $chaChaCha()\nelse\n  $showIt()\n\n$date = if $friday then $sue else $jill\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example9);'>load</div><br class='clear' /></div>
 
     <p>
       <span id="splats" class="bookmark"></span>
       <b class="header">Splats...</b>
-      The JavaScript <b>arguments object</b> is a useful way to work with
-      functions that accept variable numbers of arguments. CoffeeScript provides
+      PHP's <b>func_get_args()</b> is a useful way to work with
+      functions that accept variable numbers of arguments. CopheeScript provides
       splats <tt>...</tt>, both for function definition as well as invocation,
       making variable numbers of arguments a little bit more palatable.
     </p>
@@ -783,10 +795,10 @@ echo(<span class="string">"The Field: "</span> + $rest);
     <p>
       <span id="loops" class="bookmark"></span>
       <b class="header">Loops and Comprehensions</b>
-      Most of the loops you'll write in CoffeeScript will be <b>comprehensions</b>
+      Most of the loops you'll write in CopheeScript will be <b>comprehensions</b>
       over arrays, objects, and ranges. Comprehensions replace (and compile into)
-      <b>for</b> loops, with optional guard clauses and the value of the current array index.
-      Unlike for loops, array comprehensions are expressions, and can be returned
+      <b>foreach</b> loops, with optional guard clauses and the value of the current array index.
+      Unlike foreach loops, array comprehensions are expressions, and can be returned
       and assigned.
     </p>
     <div class='code'><pre><code><span class="comment"># Eat lunch.</span>
@@ -794,7 +806,7 @@ $eat $food <span class="keyword">for</span> $food <span class="keyword">of</span
 
 <span class="comment"># Fine five course dining.</span>
 $courses = [<span class="string">'greens'</span>, <span class="string">'caviar'</span>, <span class="string">'truffles'</span>, <span class="string">'roast'</span>, <span class="string">'cake'</span>]
-$menu $i + <span class="number">1</span>, $dish <span class="keyword">for</span> $i, $dish <span class="keyword">of</span> courses
+$menu $i + <span class="number">1</span>, $dish <span class="keyword">for</span> $i, $dish <span class="keyword">of</span> $courses
 
 <span class="comment"># Health conscious meal.</span>
 $foods = [<span class="string">'broccoli'</span>, <span class="string">'spinach'</span>, <span class="string">'chocolate'</span>]
@@ -805,7 +817,7 @@ $eat $food <span class="keyword">for</span> $food <span class="keyword">of</span
 
 $courses = [<span class="string">'greens'</span>, <span class="string">'caviar'</span>, <span class="string">'truffles'</span>, <span class="string">'roast'</span>, <span class="string">'cake'</span>];
 
-foreach (courses as $i =&gt; $dish) {
+foreach ($courses as $i =&gt; $dish) {
   $menu($i + <span class="number">1</span>, $dish);
 }
 
@@ -816,11 +828,11 @@ foreach ($foods as $food) {
     $eat($food);
   }
 }
-</code></pre><script>window.example11 = "# Eat lunch.\n$eat $food for $food of ['toast', 'cheese', 'wine']\n\n# Fine five course dining.\n$courses = ['greens', 'caviar', 'truffles', 'roast', 'cake']\n$menu $i + 1, $dish for $i, $dish of courses\n\n# Health conscious meal.\n$foods = ['broccoli', 'spinach', 'chocolate']\n$eat $food for $food of $foods when $food isnt 'chocolate'\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example11);'>load</div><br class='clear' /></div>
+</code></pre><script>window.example11 = "# Eat lunch.\n$eat $food for $food of ['toast', 'cheese', 'wine']\n\n# Fine five course dining.\n$courses = ['greens', 'caviar', 'truffles', 'roast', 'cake']\n$menu $i + 1, $dish for $i, $dish of $courses\n\n# Health conscious meal.\n$foods = ['broccoli', 'spinach', 'chocolate']\n$eat $food for $food of $foods when $food isnt 'chocolate'\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example11);'>load</div><br class='clear' /></div>
     <p>
       Comprehensions should be able to handle most places where you otherwise
       would use a loop, <b>each</b>/<b>forEach</b>, <b>map</b>, or <b>select</b>/<b>filter</b>, for example:
-      <tt>shortNames = (name for name in list when name.length &lt; 5)</tt><br />
+      <tt>$shortNames = ($name for $name in $list when strlen( $name ) &lt; 5)</tt><br />
       If you know the start and end of your loop, or would like to step through
       in fixed-size increments, you can use a range to specify the start and
       end of your comprehension.
@@ -837,7 +849,7 @@ foreach ($foods as $food) {
 </code></pre><script>window.example12 = "$countdown = ( $num for $num in [10..1])\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example12);'>load</div><br class='clear' /></div>
     <p>
       Note how because we are assigning the value of the comprehensions to a
-      variable in the example above, CoffeeScript is collecting the result of
+      variable in the example above, CopheeScript is collecting the result of
       each iteration into an array. Sometimes functions end with loops that are
       intended to run only for their side-effects. Be careful that you're not
       accidentally returning the results of the comprehension in these cases,
@@ -847,12 +859,11 @@ foreach ($foods as $food) {
     <p>
       To step through a range comprehension in fixed-size chunks,
       use <tt>by</tt>, for example:<br />
-      <tt>evens = (x for x in [0..10] by 2)</tt>
+      <tt>$evens = ($x for $x in [0..10] by 2)</tt>
     </p>
     <p>
       Comprehensions can also be used to iterate over the keys and values in
-      an object. Use <tt>of</tt> to signal comprehension over the properties of
-      an object instead of the values in an array.
+      a hash.
     </p>
     <div class='code'><pre><code>$yearsOld = <span class="attribute">max</span>: <span class="number">10</span>, <span class="attribute">ida</span>: <span class="number">9</span>, <span class="attribute">tim</span>: <span class="number">11</span>
 
@@ -873,14 +884,8 @@ $ages = call_user_func((<span class="function"><span class="keyword">function</s
 }));
 </code></pre><script>window.example13 = "$yearsOld = max: 10, ida: 9, tim: 11\n\n$ages = for $child, $age of $yearsOld\n  \"#{ $child } is #{ $age }\"\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example13);'>load</div><br class='clear' /></div>
     <p>
-      If you would like to iterate over just the keys that are defined on the
-      object itself, by adding a <tt>hasOwnProperty</tt>
-      check to avoid properties that may be inherited from the prototype, use<br />
-      <tt>for own key, value of object</tt>
-    </p>
-    <p>
-      The only low-level loop that CoffeeScript provides is the <b>while</b> loop. The
-      main difference from JavaScript is that the <b>while</b> loop can be used
+      The only low-level loop that CopheeScript provides is the <b>while</b> loop. The
+      main difference from PHP is that the <b>while</b> loop can be used
       as an expression, returning an array containing the result of each iteration
       through the loop.
     </p>
@@ -918,9 +923,9 @@ $lyrics = call_user_func((<span class="function"><span class="keyword">function<
       and the <b>loop</b> keyword is equivalent to <tt>while true</tt>.
     </p>
     <p>
-      When using a JavaScript loop to generate functions, it's common to insert
+      When using a loop to generate functions, it's common to insert
       a closure wrapper in order to ensure that loop variables are closed over,
-      and all the generated functions don't just share the final values. CoffeeScript
+      and all the generated functions don't just share the final values. CopheeScript
       provides the <tt>do</tt> keyword, which immediately invokes a passed function,
       forwarding any arguments.
     </p>
@@ -956,6 +961,8 @@ $middle  = $numbers[<span class="number">3.</span>..-<span class="number">2</spa
 $end     = $numbers[-<span class="number">2.</span>.]
 
 $copy    = $numbers[..]
+
+
 </code></pre><pre><code>$numbers = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>, <span class="number">8</span>, <span class="number">9</span>];
 
 $start = array_slice( $numbers, <span class="number">0</span>, <span class="number">3</span> );
@@ -965,7 +972,7 @@ $middle = array_slice( $numbers, <span class="number">3</span>, -<span class="nu
 $end = array_slice( $numbers, -<span class="number">2</span> );
 
 $copy = array_slice( $numbers, <span class="number">0</span> );
-</code></pre><script>window.example16 = "$numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9]\n\n$start   = $numbers[0..2]\n\n$middle  = $numbers[3...-2]\n\n$end     = $numbers[-2..]\n\n$copy    = $numbers[..]\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example16);'>load</div><br class='clear' /></div>
+</code></pre><script>window.example16 = "$numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9]\n\n$start   = $numbers[0..2]\n\n$middle  = $numbers[3...-2]\n\n$end     = $numbers[-2..]\n\n$copy    = $numbers[..]\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example16);'>load</div><br class='clear' /></div>
     <p>
       The same syntax can be used with assignment to replace a segment of an array
       with new values, splicing it.
@@ -981,15 +988,15 @@ $numbers[<span class="number">3.</span><span class="number">.6</span>] = [-<span
 
 array_splice( $numbers, <span class="number">3</span>, <span class="number">4</span>, [-<span class="number">3</span>, -<span class="number">4</span>, -<span class="number">5</span>, -<span class="number">6</span>] );
 </code></pre><script>window.example17 = "$numbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]\n\n$numbers[3..6] = [-3, -4, -5, -6]\n\n\n\n \n"</script><div class='minibutton load' onclick='javascript: loadConsole(example17);'>load</div><br class='clear' /></div>
-    <p>
-      Note that JavaScript strings are immutable, and can't be spliced.
-    </p>
+    <!-- <p> -->
+    <!--   Note that JavaScript strings are immutable, and can't be spliced. -->
+    <!-- </p> -->
     <p>
       <span id="expressions" class="bookmark"></span>
       <b class="header">Everything is an Expression (at least, as much as possible)</b>
       You might have noticed how even though we don't add return statements
-      to CoffeeScript functions, they nonetheless return their final value.
-      The CoffeeScript compiler tries to make sure that all statements in the
+      to CopheeScript functions, they nonetheless return their final value.
+      The CopheeScript compiler tries to make sure that all statements in the
       language can be used as expressions. Watch how the <tt>return</tt> gets
       pushed down into each possible branch of execution in the function
       below.
@@ -1022,10 +1029,10 @@ $eldest = <span class="number">24</span> &gt; <span class="number">21</span> ? <
     <p>
       Even though functions will always return their final value, it's both possible
       and encouraged to return early from a function body writing out the explicit
-      return (<tt>return value</tt>), when you know that you're done.
+      return (<tt>return $value</tt>), when you know that you're done.
     </p>
     <p>
-      Because variable declarations occur at the top of scope, assignment can
+      Assignment can
       be used within expressions, even for variables that haven't been seen before:
     </p>
     <div class='code'><pre><code>$six = ($one = <span class="number">1</span>) + ($two = <span class="number">2</span>) + ($three = <span class="number">3</span>)
@@ -1034,8 +1041,8 @@ $eldest = <span class="number">24</span> &gt; <span class="number">21</span> ? <
 </code></pre><pre><code>$six = ($one = <span class="number">1</span>) + ($two = <span class="number">2</span>) + ($three = <span class="number">3</span>);
 </code></pre><script>window.example19 = "$six = ($one = 1) + ($two = 2) + ($three = 3)\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example19);'>load</div><br class='clear' /></div>
     <p>
-      Things that would otherwise be statements in JavaScript, when used
-      as part of an expression in CoffeeScript, are converted into expressions
+      Things that would otherwise be statements in PHP, when used
+      as part of an expression in CopheeScript, are converted into expressions
       by wrapping them in a closure. This lets you do useful things, like assign
       the result of a comprehension to a variable:
     </p>
@@ -1070,21 +1077,17 @@ $globals = ($name <span class="keyword">for</span> $name <span class="keyword">o
 })));
 </code></pre><script>window.example21 = "echo(\n  try\n    $nonexistent / $undefined\n  catch $error\n    \"And the error is ... #{ $error }\"\n)\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example21);'>load</div><br class='clear' /></div>
     <p>
-      There are a handful of statements in JavaScript that can't be meaningfully
+      There are a handful of statements in PHP that can't be meaningfully
       converted into expressions, namely <tt>break</tt>, <tt>continue</tt>,
       and <tt>return</tt>. If you make use of them within a block of code,
-      CoffeeScript won't try to perform the conversion.
+      CopheeScript won't try to perform the conversion.
     </p>
 
     <p>
       <span id="operators" class="bookmark"></span>
       <b class="header">Operators and Aliases</b>
-      Because the <tt>==</tt> operator frequently causes undesirable coercion,
-      is intransitive, and has a different meaning than in other languages,
-      CoffeeScript compiles <tt>==</tt> into <tt>===</tt>, and <tt>!=</tt> into
-      <tt>!==</tt>.
-      In addition, <tt>is</tt> compiles into <tt>===</tt>,
-      and <tt>isnt</tt> into <tt>!==</tt>.
+      CopheeScript supports both weak (<tt>==</tt>, <tt>!=</tt>) and strong
+      (<tt>is</tt>, <tt>isnt</tt>) comparison operators.
     </p>
     <p>
       You can use <tt>not</tt> as an alias for <tt>!</tt>.
@@ -1109,11 +1112,12 @@ $globals = ($name <span class="keyword">for</span> $name <span class="keyword">o
       As a shortcut for <tt>this.property</tt>, you can use <tt>@property</tt>.
     </p>
     <p>
-      You can use <tt>in</tt> to test for array presence, and <tt>of</tt> to
-      test for JavaScript object-key presence.
+      You can use <tt>in</tt> to test for array presence using strong comparison, <tt>inn</tt> to test for array presence using weak comparison, and <tt>of</tt> to
+      test for array key presence.
     </p>
     <p>
-      To simplify math expressions, <tt>**</tt> can be used for exponentiation, <tt>//</tt> performs integer division and <tt>%%</tt> provides true mathematical modulo.
+      <!-- To simplify math expressions, <tt>**</tt> can be used for exponentiation, <tt>//</tt> performs integer division and <tt>%%</tt> provides true mathematical modulo. -->
+      To simplify math expressions, <tt>//</tt> performs integer division.
     </p>
     <p>
       All together now:
@@ -1123,17 +1127,20 @@ $globals = ($name <span class="keyword">for</span> $name <span class="keyword">o
       <tr><th>CoffeeScript</th><th>JavaScript</th></tr>
       <tr><td><tt>is</tt></td><td><tt>===</tt></td></tr>
       <tr><td><tt>isnt</tt></td><td><tt>!==</tt></td></tr>
+      <tr><td><tt>==</tt></td><td><tt>==</tt></td></tr>
+      <tr><td><tt>!=</tt></td><td><tt>!=</tt></td></tr>
       <tr><td><tt>not</tt></td><td><tt>!</tt></td></tr>
       <tr><td><tt>and</tt></td><td><tt>&amp;&amp;</tt></td></tr>
       <tr><td><tt>or</tt></td><td><tt>||</tt></td></tr>
       <tr><td><tt>true</tt>, <tt>yes</tt>, <tt>on</tt></td><td><tt>true</tt></td></tr>
       <tr><td><tt>false</tt>, <tt>no</tt>, <tt>off</tt></td><td><tt>false</tt></td></tr>
       <tr><td><tt>@</tt>, <tt>this</tt></td><td><tt>this</tt></td></tr>
-      <tr><td><tt>of</tt></td><td><tt>in</tt></td></tr>
-      <tr><td><tt>in</tt></td><td><i><small>no JS equivalent</small></i></td></tr>
-      <tr><td><tt>a ** b</tt></td><td><tt>Math.pow(a, b)</tt></td></tr>
-      <tr><td><tt>a // b</tt></td><td><tt>Math.floor(a / b)</tt></td></tr>
-      <tr><td><tt>a %% b</tt></td><td><tt>(a % b + b) % b</tt></td></tr>
+      <tr><td><tt>of</tt></td><td><tt>array_key_exists()</tt></td></tr>
+      <tr><td><tt>in</tt></td><td><tt>in_array(..., $strict=true)</tt></td></tr>
+      <tr><td><tt>inn</tt></td><td><tt>in_array(..., $strict=false)</tt></td></tr>
+      <tr><td><tt>$a ** $b</tt></td><td><tt>$a ** $b</tt>(<small><i>PHP 5.6+</i></small>)</td></tr>
+      <tr><td><tt>$a // $b</tt></td><td><tt>intval($a / $b)</tt></td></tr>
+      <!-- <tr><td><tt>a %% b</tt></td><td><tt>(a % b + b) % b</tt></td></tr> -->
     </table>
 
     <div class='code'><pre><code>$launch() <span class="keyword">if</span> $ignition <span class="keyword">is</span> <span class="literal">on</span>
@@ -1172,11 +1179,8 @@ var_dump(<span class="string">"My name is "</span> . $<span class="keyword">this
 
     <p>
       <b class="header">The Existential Operator</b>
-      It's a little difficult to check for the existence of a variable in
-      JavaScript. <tt>if (variable) ...</tt> comes close, but fails for zero,
-      the empty string, and false. CoffeeScript's existential operator <tt>?</tt> returns true unless
-      a variable is <b>null</b> or <b>undefined</b>, which makes it analogous
-      to Ruby's <tt>nil?</tt>
+      CopheeScript's existential operator <tt>?</tt> corresponds to PHP's <tt>isset()</tt>
+      and returns true unless a variable is <b>null</b> or doesn't exist in the scope.
     </p>
     <p>
       It can also be used for safer conditional assignment than <tt>||=</tt>
@@ -1207,17 +1211,34 @@ $speed = <span class="number">0</span>;
 
 $footprints =  isset( $yeti ) ? $yeti : (<span class="string">"bear"</span>);
 </code></pre><script>window.example23 = "$solipsism = true if $mind? and not $world?\n\n$speed = 0\n$speed ?= 15\n\n$footprints = $yeti ? \"bear\"\n\n\n\n\n\n\n \n"</script><div class='minibutton load' onclick='javascript: loadConsole(example23);'>load</div><br class='clear' /></div>
+    <!-- <p> -->
+    <!--   The accessor variant of the existential operator <tt>?.</tt> can be used to soak -->
+    <!--   up null references in a chain of properties. Use it instead -->
+    <!--   of the dot accessor <tt>.</tt> in cases where the base value may be <b>null</b> -->
+    <!--   or <b>undefined</b>. If all of the properties exist then you'll get the expected -->
+    <!--   result, if the chain is broken, <b>undefined</b> is returned instead of -->
+    <!--   the <b>TypeError</b> that would be raised otherwise. -->
+    <!-- </p> -->
     <p>
       The accessor variant of the existential operator <tt>?.</tt> can be used to soak
       up null references in a chain of properties. Use it instead
-      of the dot accessor <tt>.</tt> in cases where the base value may be <b>null</b>
-      or <b>undefined</b>. If all of the properties exist then you'll get the expected
-      result, if the chain is broken, <b>undefined</b> is returned instead of
-      the <b>TypeError</b> that would be raised otherwise.
+      of the dot accessor <tt>.</tt> in cases where the base value may be <b>null</b>.
+      If all of the properties exist then you'll get the expected
+      result, if the chain is broken, <b>null</b> is returned instead of
+      the Notice/error that would be raised otherwise.
     </p>
-    <div class='code'><pre><code>$zip = $lottery.drawWinner?().address?.zipcode
-</code></pre><pre><code>$zip = isset( $lottery ) &amp;&amp; is_callable( [$lottery, <span class="string">"drawWinner"</span>] ) ?  isset( $lottery-&gt;drawWinner()-&gt;address-&gt;zipcode ) ? $lottery-&gt;drawWinner()-&gt;address-&gt;zipcode : <span class="literal">null</span> : <span class="literal">null</span>;
-</code></pre><script>window.example24 = "$zip = $lottery.drawWinner?().address?.zipcode\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example24);'>load</div><br class='clear' /></div>
+    <div class='code'><pre><code><span class="comment"># TODO: support multiple soaks in chain involving function call</span>
+<span class="comment"># $zip = $lottery.drawWinner?().address?.zipcode</span>
+
+$winner = $lottery.drawWinner?()
+
+$zip = $winner.address?.zipcode
+
+
+</code></pre><pre><code>$winner = isset( $lottery ) &amp;&amp; is_callable( [$lottery, <span class="string">"drawWinner"</span>] ) ? $lottery-&gt;drawWinner() : <span class="literal">null</span>;
+
+$zip =  isset( $winner-&gt;address-&gt;zipcode ) ? $winner-&gt;address-&gt;zipcode : <span class="literal">null</span>;
+</code></pre><script>window.example24 = "# TODO: support multiple soaks in chain involving function call\n# $zip = $lottery.drawWinner?().address?.zipcode\n\n$winner = $lottery.drawWinner?()\n\n$zip = $winner.address?.zipcode\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example24);'>load</div><br class='clear' /></div>
     <p>
       Soaking up nulls is similar to Ruby's
       <a href="https://rubygems.org/gems/andand">andand gem</a>, and to the
@@ -1228,33 +1249,26 @@ $footprints =  isset( $yeti ) ? $yeti : (<span class="string">"bear"</span>);
     <p>
       <span id="classes" class="bookmark"></span>
       <b class="header">Classes, Inheritance, and Super</b>
-      JavaScript's prototypal inheritance has always been a bit of a
-      brain-bender, with a whole family tree of libraries that provide a cleaner
-      syntax for classical inheritance on top of JavaScript's prototypes:
-      <a href="http://code.google.com/p/base2/">Base2</a>,
-      <a href="http://prototypejs.org/">Prototype.js</a>,
-      <a href="http://jsclass.jcoglan.com/">JS.Class</a>, etc.
-      The libraries provide syntactic sugar, but the built-in inheritance would
-      be completely usable if it weren't for a couple of small exceptions:
-      it's awkward to call <b>super</b> (the prototype object's
-      implementation of the current function), and it's awkward to correctly
-      set the prototype chain.
-    </p>
-    <p>
-      Instead of repetitively attaching functions to a prototype, CoffeeScript
-      provides a basic <tt>class</tt> structure that allows you to name your class,
-      set the superclass, assign prototypal properties, and define the constructor,
-      in a single assignable expression.
-    </p>
-    <p>
-      Constructor functions are named, to better support helpful stack traces.
-      In the first class in the example below, <tt>this.constructor.name is "Animal"</tt>.
+      CopheeScript provides a <tt>class</tt> structure that is
+      similar to PHP's while providing some nice syntactic shorthands,
+      eg <tt>super</tt> and direct assignment of constructor arguments
+      to properties.
+      To create static properties/methods, use the <tt>@$property:</tt>/<tt>@method:</tt> syntax.
     </p>
     <div class='code'><pre><code><span class="class"><span class="keyword">class</span> <span class="title">Animal</span></span>
+  use Animal_Trait
+
   <span class="attribute">__construct</span>: <span class="function"><span class="params">(<span class="property">@$name</span>)</span> -&gt;</span>
 
   <span class="attribute">move</span>: <span class="function"><span class="params">( $meters )</span> -&gt;</span>
     echo <span class="string">"<span class="subst">#{ <span class="property">@name</span> }</span> moved <span class="subst">#{ $meters }</span>m."</span>
+
+  <span class="property">@$home</span>: <span class="string">"Meadowbrook Farm"</span>
+
+  <span class="comment"># TODO: support public/protected/private modifiers</span>
+
+  <span class="property">@message</span>:<span class="function"> -&gt;</span>
+   <span class="string">"<span class="subst">#{ self::$home }</span> is where the heart is"</span>
 
 <span class="class"><span class="keyword">class</span> <span class="title">Snake</span> <span class="keyword">extends</span> <span class="title">Animal</span></span>
   <span class="attribute">move</span>:<span class="function"> -&gt;</span>
@@ -1272,16 +1286,24 @@ $tom = <span class="keyword">new</span> Horse <span class="string">"Tommy the Pa
 $sam.move()
 $tom.move()
 
-
+echo <span class="attribute">Animal</span>::message()
 
 
 </code></pre><pre><code><span class="keyword">class</span> Animal  {
+use Animal_Trait;
+
 <span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">($name)</span>  {</span>
   $<span class="keyword">this</span>-&gt;name = $name;
 }
 
 <span class="function"><span class="keyword">function</span> <span class="title">move</span><span class="params">($meters)</span>  {</span>
   <span class="keyword">return</span> echo($<span class="keyword">this</span>-&gt;name . <span class="string">" moved "</span> . $meters . <span class="string">"m."</span>);
+}
+
+public static $home = <span class="string">"Meadowbrook Farm"</span>;
+
+static <span class="function"><span class="keyword">function</span> <span class="title">message</span><span class="params">()</span>  {</span>
+  <span class="keyword">return</span> self::$home . <span class="string">" is where the heart is"</span>;
 }
 }
 
@@ -1306,37 +1328,32 @@ $tom = <span class="keyword">new</span> Horse(<span class="string">"Tommy the Pa
 $sam-&gt;move();
 
 $tom-&gt;move();
-</code></pre><script>window.example25 = "class Animal\n  __construct: (@$name) ->\n\n  move: ( $meters ) ->\n    echo \"#{ @name } moved #{ $meters }m.\"\n\nclass Snake extends Animal\n  move: ->\n    echo \"Slithering...\"\n    super 5\n\nclass Horse extends Animal\n  move: ->\n    echo \"Galloping...\"\n    super 45\n\n$sam = new Snake \"Sammy the Python\"\n$tom = new Horse \"Tommy the Palomino\"\n\n$sam.move()\n$tom.move()\n\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example25);'>load</div><br class='clear' /></div>
-    <p>
-      If structuring your prototypes classically isn't your cup of tea, CoffeeScript
-      provides a couple of lower-level conveniences. The <tt>extends</tt> operator
-      helps with proper prototype setup, and can be used to create an inheritance
-      chain between any pair of constructor functions; <tt>::</tt> gives you
-      quick access to an object's prototype; and <tt>super()</tt>
-      is converted into a call against the immediate ancestor's method of the same name.
-    </p>
-    <div class='code'><pre><code><span class="attribute">String</span>::<span class="function"><span class="title">dasherize</span> = -&gt;</span>
+
+echo(Animal::message());
+</code></pre><script>window.example25 = "class Animal\n  use Animal_Trait\n\n  __construct: (@$name) ->\n\n  move: ( $meters ) ->\n    echo \"#{ @name } moved #{ $meters }m.\"\n\n  @$home: \"Meadowbrook Farm\"\n\n  # TODO: support public/protected/private modifiers\n\n  @message: ->\n   \"#{ self::$home } is where the heart is\"\n\nclass Snake extends Animal\n  move: ->\n    echo \"Slithering...\"\n    super 5\n\nclass Horse extends Animal\n  move: ->\n    echo \"Galloping...\"\n    super 45\n\n$sam = new Snake \"Sammy the Python\"\n$tom = new Horse \"Tommy the Palomino\"\n\n$sam.move()\n$tom.move()\n\necho Animal::message()\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example25);'>load</div><br class='clear' /></div>
+    <!-- <p> -->
+    <!--   If structuring your prototypes classically isn't your cup of tea, CoffeeScript -->
+    <!--   provides a couple of lower-level conveniences. The <tt>extends</tt> operator -->
+    <!--   helps with proper prototype setup, and can be used to create an inheritance -->
+    <!--   chain between any pair of constructor functions; <tt>::</tt> gives you -->
+    <!--   quick access to an object's prototype; and <tt>super()</tt> -->
+    <!--   is converted into a call against the immediate ancestor's method of the same name. -->
+    <!-- </p> -->
+    <!-- <div class='code'><pre><code><span class="attribute">String</span>::<span class="function"><span class="title">dasherize</span> = -&gt;</span>
   <span class="keyword">this</span>.replace <span class="regexp">/_/g</span>, <span class="string">"-"</span>
 
 </code></pre><pre><code><span class="built_in">String</span>::dasherize = <span class="function"><span class="keyword">function</span> <span class="title">dasherize</span><span class="params">()</span>  {</span>
   <span class="keyword">return</span> $<span class="keyword">this</span>-&gt;replace(<span class="string">'/_/g'</span>, <span class="string">"-"</span>);
 };
-</code></pre><script>window.example26 = "String::dasherize = ->\n  this.replace /_/g, \"-\"\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example26);'>load</div><br class='clear' /></div>
-    <p>
-      Finally, class definitions are blocks of executable code, which make for interesting
-      metaprogramming possibilities. Because in the context of a class definition,
-      <tt>this</tt> is the class object itself (the constructor function), you
-      can assign static properties by using <br /><tt>@property: value</tt>, and call
-      functions defined in parent classes: <tt>@attr 'title', type: 'text'</tt>
-    </p>
+</code></pre><script>window.example26 = "String::dasherize = ->\n  this.replace /_/g, \"-\"\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example26);'>load</div><br class='clear' /></div> -->
 
     <p>
       <span id="destructuring" class="bookmark"></span>
       <b class="header">Destructuring Assignment</b>
       To make extracting values from complex arrays and objects more convenient,
-      CoffeeScript implements ECMAScript Harmony's proposed
+      CopheeScript implements ECMAScript Harmony's proposed
       <a href="http://wiki.ecmascript.org/doku.php?id=harmony:destructuring">destructuring assignment</a>
-      syntax. When you assign an array or object literal to a value, CoffeeScript
+      syntax. When you assign an array or object literal to a value, CopheeScript
       breaks up and matches both sides against each other, assigning the values
       on the right to the variables on the left. In the simplest case, it can be
       used for parallel assignment:
@@ -1436,13 +1453,13 @@ $ref = $text-&gt;split(<span class="string">" "</span>); $first = $ref[<span cla
 </code></pre><script>window.example31 = "$text = \"Every literary critic believes he will\n        outwit history and have the last word\"\n\n[first, ..., last] = $text.split \" \"\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example31);'>load</div><br class='clear' /></div>
     <p>
       Destructuring assignment is also useful when combined with class constructors
-      to assign properties to your instance from an options object passed to the constructor.
+      to assign properties to your instance from an options hash passed to the constructor.
     </p>
     <div class='code'><pre><code><span class="class"><span class="keyword">class</span> <span class="title">Person</span></span>
   <span class="attribute">__construct</span>: <span class="function"><span class="params">($options)</span> -&gt;</span>
     {<span class="property">@name</span>, <span class="property">@age</span>, <span class="property">@height</span>} = $options
 
-$tim = <span class="keyword">new</span> Person <span class="attribute">age</span>: <span class="number">4</span>
+$tim = <span class="keyword">new</span> Person <span class="attribute">age</span>: <span class="number">4</span>, <span class="attribute">name</span>: <span class="string">'Tim'</span>, <span class="attribute">height</span>: <span class="string">'71 in'</span>
 
 </code></pre><pre><code><span class="keyword">class</span> Person  {
 <span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">($options)</span>  {</span>
@@ -1451,29 +1468,31 @@ $tim = <span class="keyword">new</span> Person <span class="attribute">age</span
 }
 
 $tim = <span class="keyword">new</span> Person([
-  <span class="string">'age'</span> =&gt; <span class="number">4</span>
+  <span class="string">'age'</span> =&gt; <span class="number">4</span>,
+  <span class="string">'name'</span> =&gt; <span class="string">'Tim'</span>,
+  <span class="string">'height'</span> =&gt; <span class="string">'71 in'</span>
 ]);
-</code></pre><script>window.example32 = "class Person\n  __construct: ($options) ->\n    {@name, @age, @height} = $options\n\n$tim = new Person age: 4\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example32);'>load</div><br class='clear' /></div>
+</code></pre><script>window.example32 = "class Person\n  __construct: ($options) ->\n    {@name, @age, @height} = $options\n\n$tim = new Person age: 4, name: 'Tim', height: '71 in'\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example32);'>load</div><br class='clear' /></div>
 
-    <p>
-      <span id="fat-arrow" class="bookmark"></span>
-      <b class="header">Bound Functions, Generator Functions</b>
-      In JavaScript, the <tt>this</tt> keyword is dynamically scoped to mean the
-      object that the current function is attached to. If you pass a function as
-      a callback or attach it to a different object, the original value of <tt>this</tt>
-      will be lost. If you're not familiar with this behavior,
-      <a href="http://www.digital-web.com/articles/scope_in_javascript/">this Digital Web article</a>
-      gives a good overview of the quirks.
-    </p>
-    <p>
-      The fat arrow <tt>=&gt;</tt> can be used to both define a function, and to bind
-      it to the current value of <tt>this</tt>, right on the spot. This is helpful
-      when using callback-based libraries like Prototype or jQuery, for creating
-      iterator functions to pass to <tt>each</tt>, or event-handler functions
-      to use with <tt>on</tt>. Functions created with the fat arrow are able to access
-      properties of the <tt>this</tt> where they're defined.
-    </p>
-    <div class='code'><pre><code><span class="function"><span class="title">Account</span> = <span class="params">(customer, cart)</span> -&gt;</span>
+    <!-- <p> -->
+    <!--   <span id="fat-arrow" class="bookmark"></span> -->
+    <!--   <b class="header">Bound Functions, Generator Functions</b> -->
+    <!--   In JavaScript, the <tt>this</tt> keyword is dynamically scoped to mean the -->
+    <!--   object that the current function is attached to. If you pass a function as -->
+    <!--   a callback or attach it to a different object, the original value of <tt>this</tt> -->
+    <!--   will be lost. If you're not familiar with this behavior, -->
+    <!--   <a href="http://www.digital-web.com/articles/scope_in_javascript/">this Digital Web article</a> -->
+    <!--   gives a good overview of the quirks. -->
+    <!-- </p> -->
+    <!-- <p> -->
+    <!--   The fat arrow <tt>=&gt;</tt> can be used to both define a function, and to bind -->
+    <!--   it to the current value of <tt>this</tt>, right on the spot. This is helpful -->
+    <!--   when using callback-based libraries like Prototype or jQuery, for creating -->
+    <!--   iterator functions to pass to <tt>each</tt>, or event-handler functions -->
+    <!--   to use with <tt>on</tt>. Functions created with the fat arrow are able to access -->
+    <!--   properties of the <tt>this</tt> where they're defined. -->
+    <!-- </p> -->
+    <!-- <div class='code'><pre><code><span class="function"><span class="title">Account</span> = <span class="params">(customer, cart)</span> -&gt;</span>
   <span class="property">@customer</span> = customer
   <span class="property">@cart</span> = cart
 
@@ -1485,26 +1504,26 @@ $tim = <span class="keyword">new</span> Person([
     <span class="keyword">return</span> <span class="function"><span class="keyword">function</span><span class="params">( event)</span>  {</span>
       <span class="keyword">return</span> _this-&gt;customer-&gt;purchase(_this-&gt;cart);
     };
-  })$<span class="keyword">this</span>));
+  }), $<span class="keyword">this</span>));
 };
-</code></pre><script>window.example33 = "Account = (customer, cart) ->\n  @customer = customer\n  @cart = cart\n\n  $('.shopping_cart').on 'click', (event) =>\n    @customer.purchase @cart"</script><div class='minibutton load' onclick='javascript: loadConsole(example33);'>load</div><br class='clear' /></div>
-    <p>
-      If we had used <tt>-&gt;</tt> in the callback above, <tt>@customer</tt> would
-      have referred to the undefined "customer" property of the DOM element,
-      and trying to call <tt>purchase()</tt> on it would have raised an exception.
-    </p>
-    <p>
-      When used in a class definition, methods declared with the fat arrow will
-      be automatically bound to each instance of the class when the instance is
-      constructed.
-    </p>
-    <p>
-      CoffeeScript functions also support
-      <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/function*">ES6 generator functions</a>
-      through the <tt>yield</tt> keyword. There's no <tt>function*(){}</tt>
-      nonsense &mdash; a generator in CoffeeScript is simply a function that yields.
-    </p>
-    <div class='code'><pre><code><span class="function"><span class="title">perfectSquares</span> = -&gt;</span>
+</code></pre><script>window.example33 = "Account = (customer, cart) ->\n  @customer = customer\n  @cart = cart\n\n  $('.shopping_cart').on 'click', (event) =>\n    @customer.purchase @cart"</script><div class='minibutton load' onclick='javascript: loadConsole(example33);'>load</div><br class='clear' /></div> -->
+    <!-- <p> -->
+    <!--   If we had used <tt>-&gt;</tt> in the callback above, <tt>@customer</tt> would -->
+    <!--   have referred to the undefined "customer" property of the DOM element, -->
+    <!--   and trying to call <tt>purchase()</tt> on it would have raised an exception. -->
+    <!-- </p> -->
+    <!-- <p> -->
+    <!--   When used in a class definition, methods declared with the fat arrow will -->
+    <!--   be automatically bound to each instance of the class when the instance is -->
+    <!--   constructed. -->
+    <!-- </p> -->
+    <!-- <p> -->
+    <!--   CoffeeScript functions also support -->
+    <!--   <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/function*">ES6 generator functions</a> -->
+    <!--   through the <tt>yield</tt> keyword. There's no <tt>function*(){}</tt> -->
+    <!--   nonsense &mdash; a generator in CoffeeScript is simply a function that yields. -->
+    <!-- </p> -->
+    <!-- <div class='code'><pre><code><span class="function"><span class="title">perfectSquares</span> = -&gt;</span>
   num = <span class="number">0</span>
   <span class="keyword">loop</span>
     num += <span class="number">1</span>
@@ -1520,13 +1539,13 @@ $tim = <span class="keyword">new</span> Person([
 };
 
 window-&gt;ps || (window-&gt;ps = perfectSquares());
-</code></pre><script>window.example34 = "perfectSquares = ->\n  num = 0\n  loop\n    num += 1\n    yield num * num\n  return\n\nwindow.ps or= perfectSquares()"</script><div class='minibutton load' onclick='javascript: loadConsole(example34);'>load</div><br class='clear' /></div>
+</code></pre><script>window.example34 = "perfectSquares = ->\n  num = 0\n  loop\n    num += 1\n    yield num * num\n  return\n\nwindow.ps or= perfectSquares()"</script><div class='minibutton load' onclick='javascript: loadConsole(example34);'>load</div><br class='clear' /></div> -->
 
     <p>
       <span id="embedded" class="bookmark"></span>
-      <b class="header">Embedded JavaScript</b>
+      <b class="header">Embedded PHP</b>
       Hopefully, you'll never need to use it, but if you ever need to intersperse
-      snippets of JavaScript within your CoffeeScript, you can
+      snippets of PHP within your CopheeScript, you can
       use backticks to pass it straight through.
     </p>
     <div class='code'><pre><code>$hi = `<span class="javascript"><span class="function"><span class="keyword">function</span><span class="params">()</span> {</span>
@@ -1543,15 +1562,15 @@ window-&gt;ps || (window-&gt;ps = perfectSquares());
     <p>
       <span id="switch" class="bookmark"></span>
       <b class="header">Switch/When/Else</b>
-      <b>Switch</b> statements in JavaScript are a bit awkward. You need to
+      <b>Switch</b> statements in PHP are a bit awkward. You need to
       remember to <b>break</b> at the end of every <b>case</b> statement to
       avoid accidentally falling through to the default case.
-      CoffeeScript prevents accidental fall-through, and can convert the <tt>switch</tt>
+      CopheeScript prevents accidental fall-through, and can convert the <tt>switch</tt>
       into a returnable, assignable expression. The format is: <tt>switch</tt> condition,
       <tt>when</tt> clauses, <tt>else</tt> the default case.
     </p>
     <p>
-      As in Ruby, <b>switch</b> statements in CoffeeScript can take multiple
+      As in Ruby, <b>switch</b> statements in CopheeScript can take multiple
       values for each <b>when</b> clause. If any of the values match, the clause
       runs.
     </p>
@@ -1622,7 +1641,7 @@ $grade = call_user_func((<span class="function"><span class="keyword">function</
     <p>
       <span id="try" class="bookmark"></span>
       <b class="header">Try/Catch/Finally</b>
-      Try/catch statements are just about the same as JavaScript (although
+      Try/catch statements are just about the same as PHP (although
       they work as expressions).
     </p>
     <div class='code'><pre><code><span class="keyword">try</span>
@@ -1630,7 +1649,7 @@ $grade = call_user_func((<span class="function"><span class="keyword">function</
   $catsAndDogsLivingTogether()
 <span class="keyword">catch</span> Exception $error
   echo $error
-<span class="keyword">finally</span>
+<span class="keyword">finally</span> <span class="comment"># PHP 5.5+</span>
   $cleanUp()
 
 </code></pre><pre><code><span class="keyword">try</span> {
@@ -1641,12 +1660,12 @@ $grade = call_user_func((<span class="function"><span class="keyword">function</
 } <span class="keyword">finally</span> {
   $cleanUp();
 }
-</code></pre><script>window.example38 = "try\n  $allHellBreaksLoose()\n  $catsAndDogsLivingTogether()\ncatch Exception $error\n  echo $error\nfinally\n  $cleanUp()\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example38);'>load</div><br class='clear' /></div>
+</code></pre><script>window.example38 = "try\n  $allHellBreaksLoose()\n  $catsAndDogsLivingTogether()\ncatch Exception $error\n  echo $error\nfinally # PHP 5.5+\n  $cleanUp()\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example38);'>load</div><br class='clear' /></div>
 
     <p>
       <span id="comparisons" class="bookmark"></span>
       <b class="header">Chained Comparisons</b>
-      CoffeeScript borrows
+      CopheeScript borrows
       <a href="http://docs.python.org/reference/expressions.html#notin">chained comparisons</a>
       from Python &mdash; making it easy to test if a value falls within a
       certain range.
@@ -1664,16 +1683,19 @@ $healthy = (<span class="number">200</span> &gt; $cholesterol &amp;&amp; $choles
     <p>
       <span id="strings" class="bookmark"></span>
       <b class="header">String Interpolation, Block Strings, and Block Comments</b>
-      Ruby-style string interpolation is included in CoffeeScript. Double-quoted
+      Ruby-style string interpolation is included in CopheeScript. Double-quoted
       strings allow for interpolated values, using <tt>#{ ... }</tt>,
       and single-quoted strings are literal.
+      In fact, interpolation inside double-quoted strings is currently the only
+      way to mimic the PHP string concatenation (<tt>.</tt>) operator
+      (although you can use the <tt>.=</tt> operator as in PHP).
     </p>
     <div class='code'><pre><code>$author = <span class="string">"Wittgenstein"</span>
 $quote  = <span class="string">"A picture is a fact. -- <span class="subst">#{ $author }</span>"</span>
 
 $sentence = <span class="string">"<span class="subst">#{ <span class="number">22</span> / <span class="number">7</span> }</span> is a decent approximation of π"</span>
 
-
+$sentence .= <span class="string">", I think"</span>
 
 
 
@@ -1682,9 +1704,11 @@ $sentence = <span class="string">"<span class="subst">#{ <span class="number">22
 $quote = <span class="string">"A picture is a fact. -- "</span> . $author;
 
 $sentence = (<span class="number">22</span> / <span class="number">7</span>) . <span class="string">" is a decent approximation of π"</span>;
-</code></pre><script>window.example40 = "$author = \"Wittgenstein\"\n$quote  = \"A picture is a fact. -- #{ $author }\"\n\n$sentence = \"#{ 22 / 7 } is a decent approximation of π\"\n\n\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example40);'>load</div><br class='clear' /></div>
+
+$sentence .= <span class="string">", I think"</span>;
+</code></pre><script>window.example40 = "$author = \"Wittgenstein\"\n$quote  = \"A picture is a fact. -- #{ $author }\"\n\n$sentence = \"#{ 22 / 7 } is a decent approximation of π\"\n\n$sentence .= \", I think\"\n\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example40);'>load</div><br class='clear' /></div>
     <p>
-      Multiline strings are allowed in CoffeeScript. Lines are joined by a single space unless they end with a backslash. Indentation is ignored.
+      Multiline strings are allowed in CopheeScript. Lines are joined by a single space unless they end with a backslash. Indentation is ignored.
     </p>
     <div class='code'><pre><code>$mobyDick = <span class="string">"Call me Ishmael. Some years ago --
   never mind how long precisely -- having little
@@ -1692,8 +1716,10 @@ $sentence = (<span class="number">22</span> / <span class="number">7</span>) . <
   to interest me on shore, I thought I would sail
   about a little and see the watery part of the
   world..."</span>
+
+
 </code></pre><pre><code>$mobyDick = <span class="string">"Call me Ishmael. Some years ago -- never mind how long precisely -- having little or no money in my purse, and nothing particular to interest me on shore, I thought I would sail about a little and see the watery part of the world..."</span>;
-</code></pre><script>window.example41 = "$mobyDick = \"Call me Ishmael. Some years ago --\n  never mind how long precisely -- having little\n  or no money in my purse, and nothing particular\n  to interest me on shore, I thought I would sail\n  about a little and see the watery part of the\n  world...\"\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example41);'>load</div><br class='clear' /></div>
+</code></pre><script>window.example41 = "$mobyDick = \"Call me Ishmael. Some years ago --\n  never mind how long precisely -- having little\n  or no money in my purse, and nothing particular\n  to interest me on shore, I thought I would sail\n  about a little and see the watery part of the\n  world...\"\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example41);'>load</div><br class='clear' /></div>
     <p>
       Block strings can be used to hold formatted or indentation-sensitive text
       (or, if you just don't feel like escaping quotes and apostrophes). The
@@ -1735,14 +1761,17 @@ $sentence = (<span class="number">22</span> / <span class="number">7</span>) . <
 
     <p>
       <span id="regexes" class="bookmark"></span>
-      <b class="header">Block Regular Expressions</b>
-      Similar to block strings and comments, CoffeeScript supports block regexes &mdash;
+      <b class="header">Regular Expressions</b>
+      CopheeScript supports regular expression literals.
+      Similar to block strings and comments, CopheeScript supports block regexes &mdash;
       extended regular expressions that ignore internal whitespace and can contain
-      comments and interpolation. Modeled after Perl's <tt>/x</tt> modifier, CoffeeScript's
+      comments and interpolation. Modeled after Perl's <tt>/x</tt> modifier, CopheeScript's
       block regexes are delimited by <tt>///</tt> and go a long way towards making complex
-      regular expressions readable. To quote from the CoffeeScript source:
+      regular expressions readable.
     </p>
-    <div class='code'><pre><code>$operator = <span class="regexp">/// ^ (
+    <div class='code'><pre><code>$regex = <span class="regexp">/^abc$/</span>
+
+$operator = <span class="regexp">/// ^ (
   ?: [-=]&gt;             <span class="comment"># function</span>
    | [-+*/%&lt;&gt;&amp;|^!?=]=  <span class="comment"># compound assign / compare</span>
    | &gt;&gt;&gt;=?             <span class="comment"># zero-fill right shift</span>
@@ -1753,8 +1782,10 @@ $sentence = (<span class="number">22</span> / <span class="number">7</span>) . <
 ) ///</span>
 
 
-</code></pre><pre><code>$operator = <span class="string">'/^(?:[-=]&gt;|[-+*\/%&lt;&gt;&amp;|^!?=]=|&gt;&gt;&gt;=?|([-+:])\1|([&amp;|&lt;&gt;])\2=?|\?\.|\.{2,3})/'</span>;
-</code></pre><script>window.example44 = "$operator = /// ^ (\n  ?: [-=]>             # function\n   | [-+*/%<>&|^!?=]=  # compound assign / compare\n   | >>>=?             # zero-fill right shift\n   | ([-+:])\\1         # doubles\n   | ([&|<>])\\2=?      # logic / shift\n   | \\?\\.              # soak access\n   | \\.{2,3}           # range or splat\n) ///\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example44);'>load</div><br class='clear' /></div>
+</code></pre><pre><code>$regex = <span class="string">'/^abc$/'</span>;
+
+$operator = <span class="string">'/^(?:[-=]&gt;|[-+*\/%&lt;&gt;&amp;|^!?=]=|&gt;&gt;&gt;=?|([-+:])\1|([&amp;|&lt;&gt;])\2=?|\?\.|\.{2,3})/'</span>;
+</code></pre><script>window.example44 = "$regex = /^abc$/\n\n$operator = /// ^ (\n  ?: [-=]>             # function\n   | [-+*/%<>&|^!?=]=  # compound assign / compare\n   | >>>=?             # zero-fill right shift\n   | ([-+:])\\1         # doubles\n   | ([&|<>])\\2=?      # logic / shift\n   | \\?\\.              # soak access\n   | \\.{2,3}           # range or splat\n) ///\n\n\n"</script><div class='minibutton load' onclick='javascript: loadConsole(example44);'>load</div><br class='clear' /></div>
 
 
     <h2>

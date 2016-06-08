@@ -95,7 +95,7 @@
     <p>
       <b>CopheeScript is a little language that compiles into PHP.</b>
       It derives from <a href='http://coffeescript.org'>CoffeeScript</a>,
-      a popular (and beautiful) language that compiles into JavaScript.
+      a popular (and gorgeous) language that compiles into JavaScript.
       It adds a few PHP-specific features while aiming to support as much
       CoffeeScript syntax as possible and similarly beautify your
       server-side code.
@@ -413,7 +413,7 @@ Expressions
     </p>
     <%= codeFor('functions', 'cube(5)') %>
     <p>
-      Functions may also have default values for arguments, which will be used
+      Functions may also have default values for arguments (like PHP), which will be used
       if the incoming argument is missing.
     </p>
     <%= codeFor('default_args', 'fill("cup")') %>
@@ -434,57 +434,61 @@ Expressions
     <p>
       <span id="objects_and_arrays" class="bookmark"></span>
       <b class="header">Objects and Arrays</b>
-      The CoffeeScript literals for objects and arrays look very similar to
-      their JavaScript cousins. When each property is listed on its own line,
-      the commas are optional. Objects may be created using indentation instead
+      For syntactic convenience,
+      CopheeScript has different literals for hashes (associative arrays) and
+      lists even though both compile to PHP arrays.
+      Object literals are similar to hash literals but use double curly braces (<tt>{{</tt>).
+      When each property is listed on its own line,
+      the commas are optional. Objects/hashes may be created using indentation instead
       of explicit braces, similar to <a href="http://yaml.org">YAML</a>.
+      Object properties and methods are accessed using the dot (<tt>.</tt>) operator.
     </p>
     <%= codeFor('objects_and_arrays', 'song.join(" ... ")') %>
-    <p>
-      In JavaScript, you can't use reserved words, like <tt>class</tt>, as properties
-      of an object, without quoting them as strings. CoffeeScript notices reserved words
-      used as keys in objects and quotes them for you, so you don't have to worry
-      about it (say, when using jQuery).
-    </p>
-    <%= codeFor('objects_reserved') %>
+    <!-- <p> -->
+    <!--   In JavaScript, you can't use reserved words, like <tt>class</tt>, as properties -->
+    <!--   of an object, without quoting them as strings. CoffeeScript notices reserved words -->
+    <!--   used as keys in objects and quotes them for you, so you don't have to worry -->
+    <!--   about it (say, when using jQuery). -->
+    <!-- </p> -->
+    <!-- <%= codeFor('objects_reserved') %> -->
 
-    <p>
-      <span id="lexical-scope" class="bookmark"></span>
-      <b class="header">Lexical Scoping and Variable Safety</b>
-      The CoffeeScript compiler takes care to make sure that all of your variables
-      are properly declared within lexical scope &mdash; you never need to write
-      <tt>var</tt> yourself.
-    </p>
-    <%= codeFor('scope', 'inner') %>
-    <p>
-      Notice how all of the variable declarations have been pushed up to
-      the top of the closest scope, the first time they appear.
-      <b>outer</b> is not redeclared within the inner function, because it's
-      already in scope; <b>inner</b> within the function, on the other hand,
-      should not be able to change the value of the external variable of the same name, and
-      therefore has a declaration of its own.
-    </p>
-    <p>
-      This behavior is effectively identical to Ruby's scope for local variables.
-      Because you don't have direct access to the <tt>var</tt> keyword,
-      it's impossible to shadow an outer variable on purpose, you may only refer
-      to it. So be careful that you're not reusing the name of an external
-      variable accidentally, if you're writing a deeply nested function.
-    </p>
-    <p>
-      Although suppressed within this documentation for clarity, all
-      CoffeeScript output is wrapped in an anonymous function:
-      <tt>(function(){ ... })();</tt> This safety wrapper, combined with the
-      automatic generation of the <tt>var</tt> keyword, make it exceedingly difficult
-      to pollute the global namespace by accident.
-    </p>
-    <p>
-      If you'd like to create top-level variables for other scripts to use,
-      attach them as properties on <b>window</b>, or on the <b>exports</b>
-      object in CommonJS. The <b>existential operator</b> (covered below), gives you a
-      reliable way to figure out where to add them; if you're targeting both
-      CommonJS and the browser: <tt>exports ? this</tt>
-    </p>
+    <!-- <p> -->
+    <!--   <span id="lexical-scope" class="bookmark"></span> -->
+    <!--   <b class="header">Lexical Scoping and Variable Safety</b> -->
+    <!--   The CoffeeScript compiler takes care to make sure that all of your variables -->
+    <!--   are properly declared within lexical scope &mdash; you never need to write -->
+    <!--   <tt>var</tt> yourself. -->
+    <!-- </p> -->
+    <!-- <%= codeFor('scope', 'inner') %> -->
+    <!-- <p> -->
+    <!--   Notice how all of the variable declarations have been pushed up to -->
+    <!--   the top of the closest scope, the first time they appear. -->
+    <!--   <b>outer</b> is not redeclared within the inner function, because it's -->
+    <!--   already in scope; <b>inner</b> within the function, on the other hand, -->
+    <!--   should not be able to change the value of the external variable of the same name, and -->
+    <!--   therefore has a declaration of its own. -->
+    <!-- </p> -->
+    <!-- <p> -->
+    <!--   This behavior is effectively identical to Ruby's scope for local variables. -->
+    <!--   Because you don't have direct access to the <tt>var</tt> keyword, -->
+    <!--   it's impossible to shadow an outer variable on purpose, you may only refer -->
+    <!--   to it. So be careful that you're not reusing the name of an external -->
+    <!--   variable accidentally, if you're writing a deeply nested function. -->
+    <!-- </p> -->
+    <!-- <p> -->
+    <!--   Although suppressed within this documentation for clarity, all -->
+    <!--   CoffeeScript output is wrapped in an anonymous function: -->
+    <!--   <tt>(function(){ ... })();</tt> This safety wrapper, combined with the -->
+    <!--   automatic generation of the <tt>var</tt> keyword, make it exceedingly difficult -->
+    <!--   to pollute the global namespace by accident. -->
+    <!-- </p> -->
+    <!-- <p> -->
+    <!--   If you'd like to create top-level variables for other scripts to use, -->
+    <!--   attach them as properties on <b>window</b>, or on the <b>exports</b> -->
+    <!--   object in CommonJS. The <b>existential operator</b> (covered below), gives you a -->
+    <!--   reliable way to figure out where to add them; if you're targeting both -->
+    <!--   CommonJS and the browser: <tt>exports ? this</tt> -->
+    <!-- </p> -->
 
     <p>
       <span id="conditionals" class="bookmark"></span>
@@ -495,9 +499,9 @@ Expressions
       postfix form, with the <tt>if</tt> or <tt>unless</tt> at the end.
     </p>
     <p>
-      CoffeeScript can compile <b>if</b> statements into JavaScript expressions,
+      CopheeScript can compile <b>if</b> statements into PHP expressions,
       using the ternary operator when possible, and closure wrapping otherwise. There
-      is no explicit ternary statement in CoffeeScript &mdash; you simply use
+      is no explicit ternary statement in CopheeScript &mdash; you simply use
       a regular <b>if</b> statement on a single line.
     </p>
     <%= codeFor('conditionals') %>
@@ -505,8 +509,8 @@ Expressions
     <p>
       <span id="splats" class="bookmark"></span>
       <b class="header">Splats...</b>
-      The JavaScript <b>arguments object</b> is a useful way to work with
-      functions that accept variable numbers of arguments. CoffeeScript provides
+      PHP's <b>func_get_args()</b> is a useful way to work with
+      functions that accept variable numbers of arguments. CopheeScript provides
       splats <tt>...</tt>, both for function definition as well as invocation,
       making variable numbers of arguments a little bit more palatable.
     </p>
@@ -515,17 +519,17 @@ Expressions
     <p>
       <span id="loops" class="bookmark"></span>
       <b class="header">Loops and Comprehensions</b>
-      Most of the loops you'll write in CoffeeScript will be <b>comprehensions</b>
+      Most of the loops you'll write in CopheeScript will be <b>comprehensions</b>
       over arrays, objects, and ranges. Comprehensions replace (and compile into)
-      <b>for</b> loops, with optional guard clauses and the value of the current array index.
-      Unlike for loops, array comprehensions are expressions, and can be returned
+      <b>foreach</b> loops, with optional guard clauses and the value of the current array index.
+      Unlike foreach loops, array comprehensions are expressions, and can be returned
       and assigned.
     </p>
     <%= codeFor('array_comprehensions') %>
     <p>
       Comprehensions should be able to handle most places where you otherwise
       would use a loop, <b>each</b>/<b>forEach</b>, <b>map</b>, or <b>select</b>/<b>filter</b>, for example:
-      <tt>shortNames = (name for name in list when name.length &lt; 5)</tt><br />
+      <tt>$shortNames = ($name for $name in $list when strlen( $name ) &lt; 5)</tt><br />
       If you know the start and end of your loop, or would like to step through
       in fixed-size increments, you can use a range to specify the start and
       end of your comprehension.
@@ -533,7 +537,7 @@ Expressions
     <%= codeFor('range_comprehensions', 'countdown') %>
     <p>
       Note how because we are assigning the value of the comprehensions to a
-      variable in the example above, CoffeeScript is collecting the result of
+      variable in the example above, CopheeScript is collecting the result of
       each iteration into an array. Sometimes functions end with loops that are
       intended to run only for their side-effects. Be careful that you're not
       accidentally returning the results of the comprehension in these cases,
@@ -543,23 +547,16 @@ Expressions
     <p>
       To step through a range comprehension in fixed-size chunks,
       use <tt>by</tt>, for example:<br />
-      <tt>evens = (x for x in [0..10] by 2)</tt>
+      <tt>$evens = ($x for $x in [0..10] by 2)</tt>
     </p>
     <p>
       Comprehensions can also be used to iterate over the keys and values in
-      an object. Use <tt>of</tt> to signal comprehension over the properties of
-      an object instead of the values in an array.
+      a hash.
     </p>
     <%= codeFor('object_comprehensions', 'ages.join(", ")') %>
     <p>
-      If you would like to iterate over just the keys that are defined on the
-      object itself, by adding a <tt>hasOwnProperty</tt>
-      check to avoid properties that may be inherited from the prototype, use<br />
-      <tt>for own key, value of object</tt>
-    </p>
-    <p>
-      The only low-level loop that CoffeeScript provides is the <b>while</b> loop. The
-      main difference from JavaScript is that the <b>while</b> loop can be used
+      The only low-level loop that CopheeScript provides is the <b>while</b> loop. The
+      main difference from PHP is that the <b>while</b> loop can be used
       as an expression, returning an array containing the result of each iteration
       through the loop.
     </p>
@@ -569,9 +566,9 @@ Expressions
       and the <b>loop</b> keyword is equivalent to <tt>while true</tt>.
     </p>
     <p>
-      When using a JavaScript loop to generate functions, it's common to insert
+      When using a loop to generate functions, it's common to insert
       a closure wrapper in order to ensure that loop variables are closed over,
-      and all the generated functions don't just share the final values. CoffeeScript
+      and all the generated functions don't just share the final values. CopheeScript
       provides the <tt>do</tt> keyword, which immediately invokes a passed function,
       forwarding any arguments.
     </p>
@@ -592,15 +589,15 @@ Expressions
       with new values, splicing it.
     </p>
     <%= codeFor('splices', 'numbers') %>
-    <p>
-      Note that JavaScript strings are immutable, and can't be spliced.
-    </p>
+    <!-- <p> -->
+    <!--   Note that JavaScript strings are immutable, and can't be spliced. -->
+    <!-- </p> -->
     <p>
       <span id="expressions" class="bookmark"></span>
       <b class="header">Everything is an Expression (at least, as much as possible)</b>
       You might have noticed how even though we don't add return statements
-      to CoffeeScript functions, they nonetheless return their final value.
-      The CoffeeScript compiler tries to make sure that all statements in the
+      to CopheeScript functions, they nonetheless return their final value.
+      The CopheeScript compiler tries to make sure that all statements in the
       language can be used as expressions. Watch how the <tt>return</tt> gets
       pushed down into each possible branch of execution in the function
       below.
@@ -609,16 +606,16 @@ Expressions
     <p>
       Even though functions will always return their final value, it's both possible
       and encouraged to return early from a function body writing out the explicit
-      return (<tt>return value</tt>), when you know that you're done.
+      return (<tt>return $value</tt>), when you know that you're done.
     </p>
     <p>
-      Because variable declarations occur at the top of scope, assignment can
+      Assignment can
       be used within expressions, even for variables that haven't been seen before:
     </p>
     <%= codeFor('expressions_assignment', 'six') %>
     <p>
-      Things that would otherwise be statements in JavaScript, when used
-      as part of an expression in CoffeeScript, are converted into expressions
+      Things that would otherwise be statements in PHP, when used
+      as part of an expression in CopheeScript, are converted into expressions
       by wrapping them in a closure. This lets you do useful things, like assign
       the result of a comprehension to a variable:
     </p>
@@ -629,21 +626,17 @@ Expressions
     </p>
     <%= codeFor('expressions_try', true) %>
     <p>
-      There are a handful of statements in JavaScript that can't be meaningfully
+      There are a handful of statements in PHP that can't be meaningfully
       converted into expressions, namely <tt>break</tt>, <tt>continue</tt>,
       and <tt>return</tt>. If you make use of them within a block of code,
-      CoffeeScript won't try to perform the conversion.
+      CopheeScript won't try to perform the conversion.
     </p>
 
     <p>
       <span id="operators" class="bookmark"></span>
       <b class="header">Operators and Aliases</b>
-      Because the <tt>==</tt> operator frequently causes undesirable coercion,
-      is intransitive, and has a different meaning than in other languages,
-      CoffeeScript compiles <tt>==</tt> into <tt>===</tt>, and <tt>!=</tt> into
-      <tt>!==</tt>.
-      In addition, <tt>is</tt> compiles into <tt>===</tt>,
-      and <tt>isnt</tt> into <tt>!==</tt>.
+      CopheeScript supports both weak (<tt>==</tt>, <tt>!=</tt>) and strong
+      (<tt>is</tt>, <tt>isnt</tt>) comparison operators.
     </p>
     <p>
       You can use <tt>not</tt> as an alias for <tt>!</tt>.
@@ -668,11 +661,12 @@ Expressions
       As a shortcut for <tt>this.property</tt>, you can use <tt>@property</tt>.
     </p>
     <p>
-      You can use <tt>in</tt> to test for array presence, and <tt>of</tt> to
-      test for JavaScript object-key presence.
+      You can use <tt>in</tt> to test for array presence using strong comparison, <tt>inn</tt> to test for array presence using weak comparison, and <tt>of</tt> to
+      test for array key presence.
     </p>
     <p>
-      To simplify math expressions, <tt>**</tt> can be used for exponentiation, <tt>//</tt> performs integer division and <tt>%%</tt> provides true mathematical modulo.
+      <!-- To simplify math expressions, <tt>**</tt> can be used for exponentiation, <tt>//</tt> performs integer division and <tt>%%</tt> provides true mathematical modulo. -->
+      To simplify math expressions, <tt>//</tt> performs integer division.
     </p>
     <p>
       All together now:
@@ -682,41 +676,49 @@ Expressions
       <tr><th>CoffeeScript</th><th>JavaScript</th></tr>
       <tr><td><tt>is</tt></td><td><tt>===</tt></td></tr>
       <tr><td><tt>isnt</tt></td><td><tt>!==</tt></td></tr>
+      <tr><td><tt>==</tt></td><td><tt>==</tt></td></tr>
+      <tr><td><tt>!=</tt></td><td><tt>!=</tt></td></tr>
       <tr><td><tt>not</tt></td><td><tt>!</tt></td></tr>
       <tr><td><tt>and</tt></td><td><tt>&amp;&amp;</tt></td></tr>
       <tr><td><tt>or</tt></td><td><tt>||</tt></td></tr>
       <tr><td><tt>true</tt>, <tt>yes</tt>, <tt>on</tt></td><td><tt>true</tt></td></tr>
       <tr><td><tt>false</tt>, <tt>no</tt>, <tt>off</tt></td><td><tt>false</tt></td></tr>
       <tr><td><tt>@</tt>, <tt>this</tt></td><td><tt>this</tt></td></tr>
-      <tr><td><tt>of</tt></td><td><tt>in</tt></td></tr>
-      <tr><td><tt>in</tt></td><td><i><small>no JS equivalent</small></i></td></tr>
-      <tr><td><tt>a ** b</tt></td><td><tt>Math.pow(a, b)</tt></td></tr>
-      <tr><td><tt>a // b</tt></td><td><tt>Math.floor(a / b)</tt></td></tr>
-      <tr><td><tt>a %% b</tt></td><td><tt>(a % b + b) % b</tt></td></tr>
+      <tr><td><tt>of</tt></td><td><tt>array_key_exists()</tt></td></tr>
+      <tr><td><tt>in</tt></td><td><tt>in_array(..., $strict=true)</tt></td></tr>
+      <tr><td><tt>inn</tt></td><td><tt>in_array(..., $strict=false)</tt></td></tr>
+      <tr><td><tt>$a ** $b</tt></td><td><tt>$a ** $b</tt>(<small><i>PHP 5.6+</i></small>)</td></tr>
+      <tr><td><tt>$a // $b</tt></td><td><tt>intval($a / $b)</tt></td></tr>
+      <!-- <tr><td><tt>a %% b</tt></td><td><tt>(a % b + b) % b</tt></td></tr> -->
     </table>
 
     <%= codeFor('aliases') %>
 
     <p>
       <b class="header">The Existential Operator</b>
-      It's a little difficult to check for the existence of a variable in
-      JavaScript. <tt>if (variable) ...</tt> comes close, but fails for zero,
-      the empty string, and false. CoffeeScript's existential operator <tt>?</tt> returns true unless
-      a variable is <b>null</b> or <b>undefined</b>, which makes it analogous
-      to Ruby's <tt>nil?</tt>
+      CopheeScript's existential operator <tt>?</tt> corresponds to PHP's <tt>isset()</tt>
+      and returns true unless a variable is <b>null</b> or doesn't exist in the scope.
     </p>
     <p>
       It can also be used for safer conditional assignment than <tt>||=</tt>
       provides, for cases where you may be handling numbers or strings.
     </p>
     <%= codeFor('existence', 'footprints') %>
+    <!-- <p> -->
+    <!--   The accessor variant of the existential operator <tt>?.</tt> can be used to soak -->
+    <!--   up null references in a chain of properties. Use it instead -->
+    <!--   of the dot accessor <tt>.</tt> in cases where the base value may be <b>null</b> -->
+    <!--   or <b>undefined</b>. If all of the properties exist then you'll get the expected -->
+    <!--   result, if the chain is broken, <b>undefined</b> is returned instead of -->
+    <!--   the <b>TypeError</b> that would be raised otherwise. -->
+    <!-- </p> -->
     <p>
       The accessor variant of the existential operator <tt>?.</tt> can be used to soak
       up null references in a chain of properties. Use it instead
-      of the dot accessor <tt>.</tt> in cases where the base value may be <b>null</b>
-      or <b>undefined</b>. If all of the properties exist then you'll get the expected
-      result, if the chain is broken, <b>undefined</b> is returned instead of
-      the <b>TypeError</b> that would be raised otherwise.
+      of the dot accessor <tt>.</tt> in cases where the base value may be <b>null</b>.
+      If all of the properties exist then you'll get the expected
+      result, if the chain is broken, <b>null</b> is returned instead of
+      the Notice/error that would be raised otherwise.
     </p>
     <%= codeFor('soaks') %>
     <p>
@@ -729,53 +731,30 @@ Expressions
     <p>
       <span id="classes" class="bookmark"></span>
       <b class="header">Classes, Inheritance, and Super</b>
-      JavaScript's prototypal inheritance has always been a bit of a
-      brain-bender, with a whole family tree of libraries that provide a cleaner
-      syntax for classical inheritance on top of JavaScript's prototypes:
-      <a href="http://code.google.com/p/base2/">Base2</a>,
-      <a href="http://prototypejs.org/">Prototype.js</a>,
-      <a href="http://jsclass.jcoglan.com/">JS.Class</a>, etc.
-      The libraries provide syntactic sugar, but the built-in inheritance would
-      be completely usable if it weren't for a couple of small exceptions:
-      it's awkward to call <b>super</b> (the prototype object's
-      implementation of the current function), and it's awkward to correctly
-      set the prototype chain.
-    </p>
-    <p>
-      Instead of repetitively attaching functions to a prototype, CoffeeScript
-      provides a basic <tt>class</tt> structure that allows you to name your class,
-      set the superclass, assign prototypal properties, and define the constructor,
-      in a single assignable expression.
-    </p>
-    <p>
-      Constructor functions are named, to better support helpful stack traces.
-      In the first class in the example below, <tt>this.constructor.name is "Animal"</tt>.
+      CopheeScript provides a <tt>class</tt> structure that is
+      similar to PHP's while providing some nice syntactic shorthands,
+      eg <tt>super</tt> and direct assignment of constructor arguments
+      to properties.
+      To create static properties/methods, use the <tt>@$property:</tt>/<tt>@method:</tt> syntax.
     </p>
     <%= codeFor('classes', true) %>
-    <p>
-      If structuring your prototypes classically isn't your cup of tea, CoffeeScript
-      provides a couple of lower-level conveniences. The <tt>extends</tt> operator
-      helps with proper prototype setup, and can be used to create an inheritance
-      chain between any pair of constructor functions; <tt>::</tt> gives you
-      quick access to an object's prototype; and <tt>super()</tt>
-      is converted into a call against the immediate ancestor's method of the same name.
-    </p>
-    <%= codeFor('prototypes', '"one_two".dasherize()') %>
-    <p>
-      Finally, class definitions are blocks of executable code, which make for interesting
-      metaprogramming possibilities. Because in the context of a class definition,
-      <tt>this</tt> is the class object itself (the constructor function), you
-      can assign static properties by using <br /><tt>@property: value</tt>, and call
-      functions defined in parent classes: <tt>@attr 'title', type: 'text'</tt>
-    </p>
+    <!-- <p> -->
+    <!--   If structuring your prototypes classically isn't your cup of tea, CoffeeScript -->
+    <!--   provides a couple of lower-level conveniences. The <tt>extends</tt> operator -->
+    <!--   helps with proper prototype setup, and can be used to create an inheritance -->
+    <!--   chain between any pair of constructor functions; <tt>::</tt> gives you -->
+    <!--   quick access to an object's prototype; and <tt>super()</tt> -->
+    <!--   is converted into a call against the immediate ancestor's method of the same name. -->
+    <!-- </p> -->
+    <!-- <%= codeFor('prototypes', '"one_two".dasherize()') %> -->
 
     <p>
       <span id="destructuring" class="bookmark"></span>
       <b class="header">Destructuring Assignment</b>
       To make extracting values from complex arrays and objects more convenient,
-      CoffeeScript implements ECMAScript Harmony's proposed
+      CopheeScript implements ECMAScript Harmony's proposed
       <a href="http://wiki.ecmascript.org/doku.php?id=harmony:destructuring">destructuring assignment</a>
-      syntax. When you assign an array or object literal to a value, CoffeeScript
+      syntax. When you assign an array or object literal to a value, CopheeScript
       breaks up and matches both sides against each other, assigning the values
       on the right to the variables on the left. In the simplest case, it can be
       used for parallel assignment:
@@ -801,52 +780,52 @@ Expressions
     <%= codeFor('expansion', 'first + " " + last') %>
     <p>
       Destructuring assignment is also useful when combined with class constructors
-      to assign properties to your instance from an options object passed to the constructor.
+      to assign properties to your instance from an options hash passed to the constructor.
     </p>
     <%= codeFor('constructor_destructuring', 'tim.age') %>
 
-    <p>
-      <span id="fat-arrow" class="bookmark"></span>
-      <b class="header">Bound Functions, Generator Functions</b>
-      In JavaScript, the <tt>this</tt> keyword is dynamically scoped to mean the
-      object that the current function is attached to. If you pass a function as
-      a callback or attach it to a different object, the original value of <tt>this</tt>
-      will be lost. If you're not familiar with this behavior,
-      <a href="http://www.digital-web.com/articles/scope_in_javascript/">this Digital Web article</a>
-      gives a good overview of the quirks.
-    </p>
-    <p>
-      The fat arrow <tt>=&gt;</tt> can be used to both define a function, and to bind
-      it to the current value of <tt>this</tt>, right on the spot. This is helpful
-      when using callback-based libraries like Prototype or jQuery, for creating
-      iterator functions to pass to <tt>each</tt>, or event-handler functions
-      to use with <tt>on</tt>. Functions created with the fat arrow are able to access
-      properties of the <tt>this</tt> where they're defined.
-    </p>
-    <%= codeFor('fat_arrow') %>
-    <p>
-      If we had used <tt>-&gt;</tt> in the callback above, <tt>@customer</tt> would
-      have referred to the undefined "customer" property of the DOM element,
-      and trying to call <tt>purchase()</tt> on it would have raised an exception.
-    </p>
-    <p>
-      When used in a class definition, methods declared with the fat arrow will
-      be automatically bound to each instance of the class when the instance is
-      constructed.
-    </p>
-    <p>
-      CoffeeScript functions also support
-      <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/function*">ES6 generator functions</a>
-      through the <tt>yield</tt> keyword. There's no <tt>function*(){}</tt>
-      nonsense &mdash; a generator in CoffeeScript is simply a function that yields.
-    </p>
-    <%= codeFor('generators', 'ps.next().value') %>
+    <!-- <p> -->
+    <!--   <span id="fat-arrow" class="bookmark"></span> -->
+    <!--   <b class="header">Bound Functions, Generator Functions</b> -->
+    <!--   In JavaScript, the <tt>this</tt> keyword is dynamically scoped to mean the -->
+    <!--   object that the current function is attached to. If you pass a function as -->
+    <!--   a callback or attach it to a different object, the original value of <tt>this</tt> -->
+    <!--   will be lost. If you're not familiar with this behavior, -->
+    <!--   <a href="http://www.digital-web.com/articles/scope_in_javascript/">this Digital Web article</a> -->
+    <!--   gives a good overview of the quirks. -->
+    <!-- </p> -->
+    <!-- <p> -->
+    <!--   The fat arrow <tt>=&gt;</tt> can be used to both define a function, and to bind -->
+    <!--   it to the current value of <tt>this</tt>, right on the spot. This is helpful -->
+    <!--   when using callback-based libraries like Prototype or jQuery, for creating -->
+    <!--   iterator functions to pass to <tt>each</tt>, or event-handler functions -->
+    <!--   to use with <tt>on</tt>. Functions created with the fat arrow are able to access -->
+    <!--   properties of the <tt>this</tt> where they're defined. -->
+    <!-- </p> -->
+    <!-- <%= codeFor('fat_arrow') %> -->
+    <!-- <p> -->
+    <!--   If we had used <tt>-&gt;</tt> in the callback above, <tt>@customer</tt> would -->
+    <!--   have referred to the undefined "customer" property of the DOM element, -->
+    <!--   and trying to call <tt>purchase()</tt> on it would have raised an exception. -->
+    <!-- </p> -->
+    <!-- <p> -->
+    <!--   When used in a class definition, methods declared with the fat arrow will -->
+    <!--   be automatically bound to each instance of the class when the instance is -->
+    <!--   constructed. -->
+    <!-- </p> -->
+    <!-- <p> -->
+    <!--   CoffeeScript functions also support -->
+    <!--   <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/function*">ES6 generator functions</a> -->
+    <!--   through the <tt>yield</tt> keyword. There's no <tt>function*(){}</tt> -->
+    <!--   nonsense &mdash; a generator in CoffeeScript is simply a function that yields. -->
+    <!-- </p> -->
+    <!-- <%= codeFor('generators', 'ps.next().value') %> -->
 
     <p>
       <span id="embedded" class="bookmark"></span>
-      <b class="header">Embedded JavaScript</b>
+      <b class="header">Embedded PHP</b>
       Hopefully, you'll never need to use it, but if you ever need to intersperse
-      snippets of JavaScript within your CoffeeScript, you can
+      snippets of PHP within your CopheeScript, you can
       use backticks to pass it straight through.
     </p>
     <%= codeFor('embedded', 'hi()') %>
@@ -854,15 +833,15 @@ Expressions
     <p>
       <span id="switch" class="bookmark"></span>
       <b class="header">Switch/When/Else</b>
-      <b>Switch</b> statements in JavaScript are a bit awkward. You need to
+      <b>Switch</b> statements in PHP are a bit awkward. You need to
       remember to <b>break</b> at the end of every <b>case</b> statement to
       avoid accidentally falling through to the default case.
-      CoffeeScript prevents accidental fall-through, and can convert the <tt>switch</tt>
+      CopheeScript prevents accidental fall-through, and can convert the <tt>switch</tt>
       into a returnable, assignable expression. The format is: <tt>switch</tt> condition,
       <tt>when</tt> clauses, <tt>else</tt> the default case.
     </p>
     <p>
-      As in Ruby, <b>switch</b> statements in CoffeeScript can take multiple
+      As in Ruby, <b>switch</b> statements in CopheeScript can take multiple
       values for each <b>when</b> clause. If any of the values match, the clause
       runs.
     </p>
@@ -876,7 +855,7 @@ Expressions
     <p>
       <span id="try" class="bookmark"></span>
       <b class="header">Try/Catch/Finally</b>
-      Try/catch statements are just about the same as JavaScript (although
+      Try/catch statements are just about the same as PHP (although
       they work as expressions).
     </p>
     <%= codeFor('try') %>
@@ -884,7 +863,7 @@ Expressions
     <p>
       <span id="comparisons" class="bookmark"></span>
       <b class="header">Chained Comparisons</b>
-      CoffeeScript borrows
+      CopheeScript borrows
       <a href="http://docs.python.org/reference/expressions.html#notin">chained comparisons</a>
       from Python &mdash; making it easy to test if a value falls within a
       certain range.
@@ -894,13 +873,16 @@ Expressions
     <p>
       <span id="strings" class="bookmark"></span>
       <b class="header">String Interpolation, Block Strings, and Block Comments</b>
-      Ruby-style string interpolation is included in CoffeeScript. Double-quoted
+      Ruby-style string interpolation is included in CopheeScript. Double-quoted
       strings allow for interpolated values, using <tt>#{ ... }</tt>,
       and single-quoted strings are literal.
+      In fact, interpolation inside double-quoted strings is currently the only
+      way to mimic the PHP string concatenation (<tt>.</tt>) operator
+      (although you can use the <tt>.=</tt> operator as in PHP).
     </p>
     <%= codeFor('interpolation', 'sentence') %>
     <p>
-      Multiline strings are allowed in CoffeeScript. Lines are joined by a single space unless they end with a backslash. Indentation is ignored.
+      Multiline strings are allowed in CopheeScript. Lines are joined by a single space unless they end with a backslash. Indentation is ignored.
     </p>
     <%= codeFor('strings', 'mobyDick') %>
     <p>
@@ -923,12 +905,13 @@ Expressions
 
     <p>
       <span id="regexes" class="bookmark"></span>
-      <b class="header">Block Regular Expressions</b>
-      Similar to block strings and comments, CoffeeScript supports block regexes &mdash;
+      <b class="header">Regular Expressions</b>
+      CopheeScript supports regular expression literals.
+      Similar to block strings and comments, CopheeScript supports block regexes &mdash;
       extended regular expressions that ignore internal whitespace and can contain
-      comments and interpolation. Modeled after Perl's <tt>/x</tt> modifier, CoffeeScript's
+      comments and interpolation. Modeled after Perl's <tt>/x</tt> modifier, CopheeScript's
       block regexes are delimited by <tt>///</tt> and go a long way towards making complex
-      regular expressions readable. To quote from the CoffeeScript source:
+      regular expressions readable.
     </p>
     <%= codeFor('heregexes') %>
 

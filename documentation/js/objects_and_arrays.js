@@ -11,6 +11,8 @@ $singers_obj = (object) [
   'Elvis' => "Roll"
 ];
 
+echo($singers_obj->Jagger);
+
 $bitlist = [1, 0, 1, 0, 0, 1, 1, 1, 0];
 
 $kids = [

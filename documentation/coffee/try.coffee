@@ -3,6 +3,6 @@ try
   $catsAndDogsLivingTogether()
 catch Exception $error
   echo $error
-finally
+finally # PHP 5.5+
   $cleanUp()
 

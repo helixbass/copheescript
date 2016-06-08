@@ -3,6 +3,7 @@ $song = ["do", "re", "mi", "fa", "so"]
 $singers = { Jagger: "Rock", Elvis: "Roll" }
 
 $singers_obj = {{ Jagger: "Rock", Elvis: "Roll" }}
+echo $singers_obj.Jagger
 
 $bitlist = [
   1, 0, 1

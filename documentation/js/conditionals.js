@@ -3,6 +3,8 @@ if ($singing) {
   $mood = $greatlyImproved;
 }
 
+$mood = $singing ? $greatlyImproved : null;
+
 if ($happy && $knowsIt) {
   $clapsHands();
   $chaChaCha();
