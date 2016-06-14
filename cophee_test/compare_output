@@ -23,6 +23,20 @@ def compare msg, input, expected_output
   print '.'
 end
 
+compare "standalone super",
+  '''
+  class Snake extends Animal
+    move: ->
+      super
+  ''',
+  """
+  class Snake extends Animal {
+  function move()  {
+    return call_user_func_array( 'parent::move', func_get_args());
+  }
+  }
+  """
+
 compare "call call",
   """
   $a( 3 )( 4 )

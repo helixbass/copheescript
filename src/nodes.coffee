@@ -791,8 +791,16 @@ exports.Call = class Call extends Base
   # splatArgs is an array of CodeFragments to put into the 'apply'.
   compileSplat: (o, splatArgs) ->
     if @isSuper
-      return [].concat @makeCode("#{ @superReference o }.apply(#{@superThis(o)}, "),
-        splatArgs, @makeCode(")")
+      # return [].concat @makeCode("#{ @superReference o }.apply(#{@superThis(o)}, "),
+      #   splatArgs, @makeCode(")")
+      method_name = o.scope.namedMethod().name.name
+      fragments = []
+      fragments.push @makeCode "call_user_func_array( 'parent::"
+      fragments.push method_name.compileToFragments( o )...
+      fragments.push @makeCode "', "
+      fragments.push splatArgs...
+      fragments.push @makeCode ")"
+      return fragments
 
     if @isNew
       idt = @tab + TAB

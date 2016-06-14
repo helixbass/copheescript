@@ -665,6 +665,11 @@ Expressions
       <tt>unless</tt> can be used as the inverse of <tt>if</tt>.
     </p>
     <p>
+      The PHP <tt>?:</tt> "shorthand ternary" operator is supported
+      (though the full three-expression ternary operator isn't, you
+      must use expression <tt>if</tt>).
+    </p>
+    <p>
       As a shortcut for <tt>this.property</tt>, you can use <tt>@property</tt>.
     </p>
     <p>
@@ -690,6 +695,7 @@ Expressions
       <tr><td><tt>or</tt></td><td><tt>||</tt></td></tr>
       <tr><td><tt>true</tt>, <tt>yes</tt>, <tt>on</tt></td><td><tt>true</tt></td></tr>
       <tr><td><tt>false</tt>, <tt>no</tt>, <tt>off</tt></td><td><tt>false</tt></td></tr>
+      <tr><td><tt>?:</tt></td><td><tt>?:</tt></td></tr>
       <tr><td><tt>@</tt>, <tt>this</tt></td><td><tt>this</tt></td></tr>
       <tr><td><tt>of</tt></td><td><tt>array_key_exists()</tt></td></tr>
       <tr><td><tt>in</tt></td><td><tt>in_array(..., $strict=true)</tt></td></tr>

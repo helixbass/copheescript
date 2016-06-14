@@ -353,7 +353,7 @@ grammar =
   Invocation: [
     o 'Value OptFuncExist Arguments',           -> new Call $1, $3, $2
     o 'Invocation OptFuncExist Arguments',      -> new Call $1, $3, $2
-    o 'SUPER',                                  -> new Call 'super', [new Splat new Literal 'arguments']
+    o 'SUPER',                                  -> new Call 'super', [new Splat new Literal 'func_get_args()']
     o 'SUPER Arguments',                        -> new Call 'super', $2
   ]
 
