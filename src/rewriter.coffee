@@ -52,7 +52,7 @@ class exports.Rewriter
     levels = 0
     while token = tokens[i]
       return action.call this, token, i     if levels is 0 and condition.call this, token, i
-      return action.call this, token, i - 1 if not token or levels < 0
+      return action.call this, token, i - 1 if levels < 0
       if token[0] in EXPRESSION_START
         levels += 1
       else if token[0] in EXPRESSION_END
@@ -67,25 +67,23 @@ class exports.Rewriter
     @tokens.splice 0, i if i
 
   # The lexer has tagged the opening parenthesis of a method call. Match it with
-  # its paired close. We have the mis-nested outdent case included here for
-  # calls that close on the same line, just before their outdent.
+  # its paired close.
   closeOpenCalls: ->
     condition = (token, i) ->
-      token[0] in [')', 'CALL_END'] or
-      token[0] is 'OUTDENT' and @tag(i - 1) is ')'
+      token[0] in [')', 'CALL_END']
 
     action = (token, i) ->
-      @tokens[if token[0] is 'OUTDENT' then i - 1 else i][0] = 'CALL_END'
+      token[0] = 'CALL_END'
 
     @scanTokens (token, i) ->
       @detectEnd i + 1, condition, action if token[0] is 'CALL_START'
       1
 
-  # The lexer has tagged the opening parenthesis of an indexing operation call.
+  # The lexer has tagged the opening bracket of an indexing operation call.
   # Match it with its paired close.
   closeOpenIndexes: ->
     condition = (token, i) ->
-      token[0] in [']', 'INDEX_END']
+      token[0] is ']'
 
     action = (token, i) ->
       token[0] = 'INDEX_END'

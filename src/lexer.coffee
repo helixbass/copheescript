@@ -516,7 +516,8 @@ exports.Lexer = class Lexer
     stack = []
     {tokens} = this
     i = tokens.length
-    tokens[--i][0] = 'PARAM_END'
+    paramEndToken = tokens[--i]
+    paramEndToken[0] = 'PARAM_END'
     while tok = tokens[--i]
       switch tok[0]
         when ')'
@@ -526,7 +527,9 @@ exports.Lexer = class Lexer
           else if tok[0] is '('
             tok[0] = 'PARAM_START'
             return this
-          else return this
+          else
+            paramEndToken[0] = 'CALL_END'
+            return this
     this
 
   # Close up all remaining open blocks at the end of the file.
