@@ -179,6 +179,22 @@ exports.nodes = withPrettyErrors (source, options) ->
     parser.parse lexer.tokenize source, options
   else
     parser.parse source
+exports.babylon = withPrettyErrors (source, options) ->
+  parsed =
+    if typeof source is 'string'
+      parser.parse lexer.tokenize source, options
+    else
+      parser.parse source
+
+  parsed.compileToBabylon options
+exports.prettier = withPrettyErrors (source, options) ->
+  parsed =
+    if typeof source is 'string'
+      parser.parse lexer.tokenize source, options
+    else
+      parser.parse source
+
+  parsed.prettier options
 
 # This file used to export these methods; leave stubs that throw warnings
 # instead. These methods have been moved into `index.coffee` to provide

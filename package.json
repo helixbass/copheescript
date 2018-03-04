@@ -51,5 +51,7 @@
     "underscore": "~1.8.3",
     "webpack": "~3.11.0"
   },
-  "dependencies": {}
+  "dependencies": {
+    "prettier": "^1.11.1"
+  }
 }

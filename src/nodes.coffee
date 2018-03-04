@@ -7,6 +7,7 @@ Error.stackTraceLimit = Infinity
 
 {Scope} = require './scope'
 {isUnassignable, JS_FORBIDDEN} = require './lexer'
+prettier = require '../../../prettier'
 
 # Import the helpers we plan to use.
 {compact, flatten, extend, merge, del, starts, ends, some,
@@ -531,6 +532,28 @@ exports.Block = class Block extends Base
       answer = [@makeCode 'void 0']
     if compiledNodes.length > 1 and o.level >= LEVEL_LIST then @wrapInParentheses answer else answer
 
+  prettier: (o) ->
+    { opts } = prettier.__debug.parseAndAttachComments ''
+    ast = @compileToBabylon o
+    prettier.__debug.formatAST(ast, opts).formatted
+
+  compileToBabylon: (o) ->
+    # o.level   = LEVEL_TOP
+    # @spaced   = yes
+    # o.scope   = new Scope null, this, null, o.referencedVars ? []
+    # o.scope.parameter name for name in o.locals or []
+    # fragments = @compileNode o
+    type: 'File'
+    program:
+      type: 'Program'
+      sourceType: 'module'
+      body:
+        for node in @expressions
+          type: 'ExpressionStatement'
+          expression: node.compileToBabylon o
+      directives: []
+    comments: []
+
   # If we happen to be the top-level **Block**, wrap everything in a safety
   # closure, unless requested not to. It would be better not to generate them
   # in the first place, but for now, clean up obvious double-parentheses.
@@ -721,6 +744,13 @@ exports.Literal = class Literal extends Base
 
   compileNode: (o) ->
     [@makeCode @value]
+
+  compileToBabylon: (o) -> {
+    type: 'NumericLiteral'
+    @value
+    extra:
+      raw: @value
+  }
 
   toString: ->
     # This is only intended for debugging.
@@ -977,6 +1007,9 @@ exports.Value = class Value extends Base
       fragments.push (prop.compileToFragments o)...
 
     fragments
+
+  compileToBabylon: (o) ->
+    @base.compileToBabylon o
 
   # Unfold a soak into an `If`: `a?.b` -> `a.b if a?`
   unfoldSoak: (o) ->
@@ -3260,6 +3293,13 @@ exports.Op = class Op extends Base
         rhs = @second.compileToFragments o, LEVEL_OP
         answer = [].concat lhs, @makeCode(" #{@operator} "), rhs
         if o.level <= LEVEL_OP then answer else @wrapInParentheses answer
+
+  compileToBabylon: (o) -> {
+    type: 'BinaryExpression'
+    left: @first.compileToBabylon o#, LEVEL_OP
+    @operator
+    right: @second.compileToBabylon o
+  }
 
   # Mimic Python's chained comparisons when multiple comparison operators are
   # used sequentially. For example:

@@ -7,6 +7,7 @@
 # External dependencies.
 fs             = require 'fs'
 path           = require 'path'
+util           = require 'util'
 helpers        = require './helpers'
 optparse       = require './optparse'
 CoffeeScript   = require './'
@@ -52,6 +53,8 @@ SWITCHES = [
   [      '--tokens',            'print out the tokens that the lexer/rewriter produce']
   ['-v', '--version',           'display the version number']
   ['-w', '--watch',             'watch scripts for changes and rerun commands']
+  [      '--babylon',           'compile to Babylon AST']
+  [      '--prettier',          'compile using Prettier']
 ]
 
 # Top-level objects shared by all the functions.
@@ -207,6 +210,10 @@ compileScript = (file, input, base = null) ->
       printTokens CoffeeScript.tokens task.input, task.options
     else if opts.nodes
       printLine CoffeeScript.nodes(task.input, task.options).toString().trim()
+    else if opts.babylon
+      console.log util.inspect CoffeeScript.babylon(task.input, task.options), no, null
+    else if opts.prettier
+      printLine CoffeeScript.prettier(task.input, task.options)
     else if opts.run
       CoffeeScript.register()
       CoffeeScript.eval opts.prelude, task.options if opts.prelude
