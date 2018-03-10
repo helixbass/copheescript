@@ -118,3 +118,9 @@ of this scope.
 
       assignedVariables: ->
         "#{v.name} = #{v.type.value}" for v in @variables when v.type.assigned
+
+Return the list of assignments (as objects) that are supposed to be made at the top
+of this scope.
+
+      assignedVariableObjects: ->
+        {name, value} for {name, type: { assigned, value }} in @variables when assigned

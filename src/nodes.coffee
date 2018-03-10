@@ -8,11 +8,14 @@ Error.stackTraceLimit = Infinity
 {Scope} = require './scope'
 {isUnassignable, JS_FORBIDDEN} = require './lexer'
 prettier = require '../../../prettier'
+util = require 'util'
 
 # Import the helpers we plan to use.
 {compact, flatten, extend, merge, del, starts, ends, some,
 addDataToNode, attachCommentsToNode, locationDataToString,
 throwSyntaxError} = require './helpers'
+
+dump = (obj) -> console.log util.inspect obj, no, null
 
 # Functions required by parser.
 exports.extend = extend
@@ -538,21 +541,66 @@ exports.Block = class Block extends Base
     prettier.__debug.formatAST(ast, opts).formatted
 
   compileToBabylon: (o) ->
-    # o.level   = LEVEL_TOP
+    return @compileRootToBabylon(o) unless o.scope
+
+  compileRootToBabylon: (o) ->
     # @spaced   = yes
-    # o.scope   = new Scope null, this, null, o.referencedVars ? []
-    # o.scope.parameter name for name in o.locals or []
-    # fragments = @compileNode o
+    o.scope   = new Scope null, this, null, o.referencedVars ? []
+    o.scope.parameter name for name in o.locals or []
+
     type: 'File'
     program:
       type: 'Program'
       sourceType: 'module'
-      body:
-        for node in @expressions
-          type: 'ExpressionStatement'
-          expression: node.compileToBabylon o
+      body: @compileWithDeclarationsToBabylon o
       directives: []
     comments: []
+
+  compileWithDeclarationsToBabylon: (o) ->
+    o = merge(o, level: LEVEL_TOP)
+    compiledBody = @compileBodyToBabylon(o)
+    [...@compileDeclarationsToBabylon(o), ...compiledBody]
+
+  compileScopeDeclarationsToBabylon: (o) ->
+    {
+      type: 'VariableDeclarator'
+      id:
+        type: 'Identifier'
+        name: declaredVariable
+      init: null
+    } for declaredVariable in o.scope.declaredVariables()
+
+  compileScopeAssignedVariablesToBabylon: (o) ->
+    {
+      type: 'VariableDeclarator'
+      id: {
+        type: 'Identifier'
+        name
+      }
+      init: value # TODO: this is used to assign UTILITIES which are strings
+    } for {name, value} in o.scope.assignedVariables()
+
+  compileDeclarationsToBabylon: (o) ->
+    {scope} = o
+    return [] unless scope.expressions is this
+
+    declars = scope.hasDeclarations()
+    assigns = scope.hasAssignments
+    return [] unless declars or assigns
+
+    [
+      type: 'VariableDeclaration'
+      declarations: [
+        ...@compileScopeDeclarationsToBabylon(o)
+        ...@compileScopeAssignedVariablesToBabylon(o)
+      ]
+      kind: 'var'
+    ]
+
+  compileBodyToBabylon: (o) -> {
+    type: 'ExpressionStatement'
+    expression: node.compileToBabylon o
+  } for node in @expressions
 
   # If we happen to be the top-level **Block**, wrap everything in a safety
   # closure, unless requested not to. It would be better not to generate them
@@ -746,7 +794,7 @@ exports.Literal = class Literal extends Base
     [@makeCode @value]
 
   compileToBabylon: (o) -> {
-    type: 'NumericLiteral'
+    type: @babylonType
     @value
     extra:
       raw: @value
@@ -757,6 +805,7 @@ exports.Literal = class Literal extends Base
     " #{if @isStatement() then super() else @constructor.name}: #{@value}"
 
 exports.NumberLiteral = class NumberLiteral extends Literal
+  babylonType: 'NumericLiteral'
 
 exports.InfinityLiteral = class InfinityLiteral extends NumberLiteral
   compileNode: ->
@@ -771,6 +820,7 @@ exports.NaNLiteral = class NaNLiteral extends NumberLiteral
     if o.level >= LEVEL_OP then @wrapInParentheses code else code
 
 exports.StringLiteral = class StringLiteral extends Literal
+  babylonType: 'StringLiteral'
   compileNode: (o) ->
     res = if @csx then [@makeCode @unquote(yes, yes)] else super()
 
@@ -790,10 +840,18 @@ exports.IdentifierLiteral = class IdentifierLiteral extends Literal
   eachName: (iterator) ->
     iterator @
 
+  compileToBabylon: (o) ->
+    type: 'Identifier'
+    name: @value
+
 exports.CSXTag = class CSXTag extends IdentifierLiteral
 
 exports.PropertyName = class PropertyName extends Literal
   isAssignable: YES
+
+  compileToBabylon: (o) ->
+    type: 'Identifier'
+    name: @value
 
 exports.ComputedPropertyName = class ComputedPropertyName extends PropertyName
   compileNode: (o) ->
@@ -1522,6 +1580,47 @@ exports.Obj = class Obj extends Base
     return yes for prop in @properties when prop instanceof Splat
     no
 
+  compileToBabylon: (o) ->
+    type: 'ObjectExpression'
+    properties: {
+      type: 'ObjectProperty'
+      key: variable.base.compileToBabylon(o)
+      value: value.compileToBabylon(o)
+      shorthand
+    } for { variable, value, shorthand } in @expandProperties(o)
+
+  expandProperties: (o) ->
+    for prop in @properties then do ->
+      key = if prop instanceof Assign and prop.context is 'object'
+        prop.variable
+      else if prop instanceof Assign
+        prop.operatorToken.error "unexpected #{prop.operatorToken.value}" unless @lhs
+        prop.variable
+      else
+        prop
+      if key instanceof Value and key.hasProperties()
+        key.error 'invalid object key' unless prop.context isnt 'object' and key.this
+        key  = key.properties[0].name
+        prop = new Assign key, prop, 'object'
+      return prop unless key is prop
+      if prop.shouldCache()
+        [key, value] = prop.base.cache o
+        key  = new PropertyName key.value if key instanceof IdentifierLiteral
+        new Assign key, value, 'object'
+      else if key instanceof Value and key.base instanceof ComputedPropertyName
+        # `{ [foo()] }` output as `{ [ref = foo()]: ref }`.
+        if prop.base.value.shouldCache()
+          [key, value] = prop.base.value.cache o
+          key  = new ComputedPropertyName key.value if key instanceof IdentifierLiteral
+          new Assign key, value, 'object'
+        else
+          # `{ [expression] }` output as `{ [expression]: expression }`.
+          new Assign key, prop.base.value, 'object'
+      else if not prop.bareLiteral?(IdentifierLiteral)
+        new Assign prop, prop, 'object'
+      else
+        new Assign prop, prop, 'object', shorthand: yes
+
   compileNode: (o) ->
     props = @properties
     if @generated
@@ -1574,7 +1673,7 @@ exports.Obj = class Obj extends Base
       else
         prop
       if key instanceof Value and key.hasProperties()
-        key.error 'invalid object key' if prop.context is 'object' or not key.this
+        key.error 'invalid object key' unless prop.context isnt 'object' and key.this
         key  = key.properties[0].name
         prop = new Assign key, prop, 'object'
       if key is prop
@@ -1669,6 +1768,10 @@ exports.Arr = class Arr extends Base
 
   shouldCache: ->
     not @isAssignable()
+
+  compileToBabylon: (o) ->
+    type: 'ArrayExpression'
+    elements: obj.compileToBabylon(o) for obj in @objects
 
   compileNode: (o) ->
     return [@makeCode '[]'] unless @objects.length
@@ -2207,7 +2310,7 @@ exports.ExportSpecifier = class ExportSpecifier extends ModuleSpecifier
 exports.Assign = class Assign extends Base
   constructor: (@variable, @value, @context, options = {}) ->
     super()
-    {@param, @subpattern, @operatorToken, @moduleDeclaration} = options
+    {@param, @subpattern, @operatorToken, @moduleDeclaration, @shorthand} = options
 
   children: ['variable', 'value']
 
@@ -2226,6 +2329,52 @@ exports.Assign = class Assign extends Base
 
   unfoldSoak: (o) ->
     unfoldSoak o, this, 'variable'
+
+  compileToBabylon: (o) ->
+    @addScopeVariables o
+
+    type: 'AssignmentExpression'
+    operator: '='
+    left: @variable.compileToBabylon o
+    right: @value.compileToBabylon o
+
+  addScopeVariables: (o) ->
+    varBase = @variable.unwrapAll()
+    unless varBase.isAssignable()
+      @variable.error "'#{@variable.compile o}' can't be assigned"
+
+    varBase.eachName (name) =>
+      return if name.hasProperties?()
+
+      message = isUnassignable name.value
+      name.error message if message
+
+      # `moduleDeclaration` can be `'import'` or `'export'`.
+      @checkAssignability o, name
+      if @moduleDeclaration
+        o.scope.add name.value, @moduleDeclaration
+      else if @param
+        o.scope.add name.value,
+          if @param is 'alwaysDeclare'
+            'var'
+          else
+            'param'
+      else
+        o.scope.find name.value
+        # If this assignment identifier has one or more herecomments
+        # attached, output them as part of the declarations line (unless
+        # other herecomments are already staged there) for compatibility
+        # with Flow typing. Don’t do this if this assignment is for a
+        # class, e.g. `ClassName = class ClassName {`, as Flow requires
+        # the comment to be between the class name and the `{`.
+        if name.comments and not o.scope.comments[name.value] and
+           @value not instanceof Class and
+           name.comments.every((comment) -> comment.here and not comment.multiline)
+          commentsNode = new IdentifierLiteral name.value
+          commentsNode.comments = name.comments
+          commentFragments = []
+          @compileCommentFragments o, commentsNode, commentFragments
+          o.scope.comments[name.value] = commentFragments
 
   # Compile an assignment, delegating to `compileDestructuring` or
   # `compileSplice` if appropriate. Keep track of the name of the base object
@@ -2257,44 +2406,7 @@ exports.Assign = class Assign extends Base
       return @compileConditional  o if @context in ['||=', '&&=', '?=']
       return @compileSpecialMath  o if @context in ['**=', '//=', '%%=']
 
-    unless @context
-      varBase = @variable.unwrapAll()
-      unless varBase.isAssignable()
-        @variable.error "'#{@variable.compile o}' can't be assigned"
-
-      varBase.eachName (name) =>
-        return if name.hasProperties?()
-
-        message = isUnassignable name.value
-        name.error message if message
-
-        # `moduleDeclaration` can be `'import'` or `'export'`.
-        @checkAssignability o, name
-        if @moduleDeclaration
-          o.scope.add name.value, @moduleDeclaration
-        else if @param
-          o.scope.add name.value,
-            if @param is 'alwaysDeclare'
-              'var'
-            else
-              'param'
-        else
-          o.scope.find name.value
-          # If this assignment identifier has one or more herecomments
-          # attached, output them as part of the declarations line (unless
-          # other herecomments are already staged there) for compatibility
-          # with Flow typing. Don’t do this if this assignment is for a
-          # class, e.g. `ClassName = class ClassName {`, as Flow requires
-          # the comment to be between the class name and the `{`.
-          if name.comments and not o.scope.comments[name.value] and
-             @value not instanceof Class and
-             name.comments.every((comment) -> comment.here and not comment.multiline)
-            commentsNode = new IdentifierLiteral name.value
-            commentsNode.comments = name.comments
-            commentFragments = []
-            @compileCommentFragments o, commentsNode, commentFragments
-            o.scope.comments[name.value] = commentFragments
-
+    @addScopeVariables(o) unless @context
     if @value instanceof Code
       if @value.isStatic
         @value.name = @variable.properties[0]
