@@ -111,6 +111,11 @@ exports.Base = class Base
     @compileCommentFragments o, node, fragments
     fragments
 
+  compileToBabylon: (o, level) ->
+    o = extend {}, o
+    o.level = level if level
+    @_compileToBabylon o
+
   compileToFragmentsWithoutComments: (o, lvl) ->
     @compileWithoutComments o, lvl, 'compileToFragments'
 
@@ -540,26 +545,39 @@ exports.Block = class Block extends Base
     ast = @compileToBabylon o
     prettier.__debug.formatAST(ast, opts).formatted
 
-  compileToBabylon: (o) ->
+  _compileToBabylon: (o) ->
     return @compileRootToBabylon(o) unless o.scope
+    @compileNonrootToBabylon o
+
+  initializeScope: (o) ->
+    o.scope   = new Scope null, this, null, o.referencedVars ? []
+    # Mark given local variables in the root scope as parameters so they don’t
+    # end up being declared on this block.
+    o.scope.parameter name for name in o.locals or []
 
   compileRootToBabylon: (o) ->
     # @spaced   = yes
-    o.scope   = new Scope null, this, null, o.referencedVars ? []
-    o.scope.parameter name for name in o.locals or []
+    @initializeScope o
 
     type: 'File'
     program:
       type: 'Program'
       sourceType: 'module'
-      body: @compileWithDeclarationsToBabylon o
+      body: @compileWithDeclarationsToBabylon o, root: yes
       directives: []
     comments: []
 
-  compileWithDeclarationsToBabylon: (o) ->
-    o = merge(o, level: LEVEL_TOP)
-    compiledBody = @compileBodyToBabylon(o)
-    [...@compileDeclarationsToBabylon(o), ...compiledBody]
+  compileNonrootToBabylon: (o, { root, withDeclarations } = {}) ->
+    body = @compileBodyToBabylon(o)
+    body = [...@compileDeclarationsToBabylon(o), ...body] if withDeclarations
+    return body if root
+    {
+      type: 'BlockStatement'
+      body
+    }
+
+  compileWithDeclarationsToBabylon: (o, opts) ->
+    @compileNonrootToBabylon merge(o, level: LEVEL_TOP), {...opts, withDeclarations: yes}
 
   compileScopeDeclarationsToBabylon: (o) ->
     {
@@ -597,10 +615,13 @@ exports.Block = class Block extends Base
       kind: 'var'
     ]
 
-  compileBodyToBabylon: (o) -> {
-    type: 'ExpressionStatement'
-    expression: node.compileToBabylon o
-  } for node in @expressions
+  compileBodyToBabylon: (o) ->
+    for node in @expressions
+      if node.isStatement()
+        node.compileToBabylon o
+      else
+        type: 'ExpressionStatement'
+        expression: node.compileToBabylon o
 
   # If we happen to be the top-level **Block**, wrap everything in a safety
   # closure, unless requested not to. It would be better not to generate them
@@ -609,10 +630,7 @@ exports.Block = class Block extends Base
     o.indent  = if o.bare then '' else TAB
     o.level   = LEVEL_TOP
     @spaced   = yes
-    o.scope   = new Scope null, this, null, o.referencedVars ? []
-    # Mark given local variables in the root scope as parameters so they don’t
-    # end up being declared on this block.
-    o.scope.parameter name for name in o.locals or []
+    @initializeScope(o)
     fragments = @compileWithDeclarations o
     HoistTarget.expand fragments
     fragments = @compileComments fragments
@@ -793,7 +811,7 @@ exports.Literal = class Literal extends Base
   compileNode: (o) ->
     [@makeCode @value]
 
-  compileToBabylon: (o) -> {
+  _compileToBabylon: (o) -> {
     type: @babylonType
     @value
     extra:
@@ -840,7 +858,7 @@ exports.IdentifierLiteral = class IdentifierLiteral extends Literal
   eachName: (iterator) ->
     iterator @
 
-  compileToBabylon: (o) ->
+  _compileToBabylon: (o) ->
     type: 'Identifier'
     name: @value
 
@@ -849,7 +867,7 @@ exports.CSXTag = class CSXTag extends IdentifierLiteral
 exports.PropertyName = class PropertyName extends Literal
   isAssignable: YES
 
-  compileToBabylon: (o) ->
+  _compileToBabylon: (o) ->
     type: 'Identifier'
     name: @value
 
@@ -906,6 +924,10 @@ exports.Return = class Return extends Base
   compileToFragments: (o, level) ->
     expr = @expression?.makeReturn()
     if expr and expr not instanceof Return then expr.compileToFragments o, level else super o, level
+
+  _compileToBabylon: (o) ->
+    type: 'ReturnStatement'
+    argument: @expression.compileToBabylon o
 
   compileNode: (o) ->
     answer = []
@@ -1066,7 +1088,7 @@ exports.Value = class Value extends Base
 
     fragments
 
-  compileToBabylon: (o) ->
+  _compileToBabylon: (o) ->
     @base.compileToBabylon o
 
   # Unfold a soak into an `If`: `a?.b` -> `a.b if a?`
@@ -1580,7 +1602,7 @@ exports.Obj = class Obj extends Base
     return yes for prop in @properties when prop instanceof Splat
     no
 
-  compileToBabylon: (o) ->
+  _compileToBabylon: (o) ->
     type: 'ObjectExpression'
     properties: {
       type: 'ObjectProperty'
@@ -1769,7 +1791,7 @@ exports.Arr = class Arr extends Base
   shouldCache: ->
     not @isAssignable()
 
-  compileToBabylon: (o) ->
+  _compileToBabylon: (o) ->
     type: 'ArrayExpression'
     elements: obj.compileToBabylon(o) for obj in @objects
 
@@ -2330,13 +2352,13 @@ exports.Assign = class Assign extends Base
   unfoldSoak: (o) ->
     unfoldSoak o, this, 'variable'
 
-  compileToBabylon: (o) ->
+  _compileToBabylon: (o) ->
     @addScopeVariables o
 
     type: 'AssignmentExpression'
     operator: '='
-    left: @variable.compileToBabylon o
-    right: @value.compileToBabylon o
+    left: @variable.compileToBabylon o, LEVEL_LIST
+    right: @value.compileToBabylon o, LEVEL_LIST
 
   addScopeVariables: (o) ->
     varBase = @variable.unwrapAll()
@@ -2764,6 +2786,21 @@ exports.Code = class Code extends Base
   jumps: NO
 
   makeScope: (parentScope) -> new Scope parentScope, @body, this
+
+  compileParamsToBabylon: (o) ->
+    for param in @params
+      o.scope.parameter fragmentsToText param.compileToFragmentsWithoutComments o
+      param.name.compileToBabylon o
+
+  _compileToBabylon: (o) ->
+    wasEmpty = @body.isEmpty()
+    @body.makeReturn() unless wasEmpty or @noReturn
+
+    type: 'FunctionExpression'
+    generator: @isGenerator
+    async: @isAsync
+    params: @compileParamsToBabylon o
+    body: @body.compileWithDeclarationsToBabylon o
 
   # Compilation creates a new scope unless explicitly asked to share with the
   # outer scope. Handles splat parameters in the parameter list by setting
@@ -3406,7 +3443,7 @@ exports.Op = class Op extends Base
         answer = [].concat lhs, @makeCode(" #{@operator} "), rhs
         if o.level <= LEVEL_OP then answer else @wrapInParentheses answer
 
-  compileToBabylon: (o) -> {
+  _compileToBabylon: (o) -> {
     type: 'BinaryExpression'
     left: @first.compileToBabylon o#, LEVEL_OP
     @operator
@@ -3974,6 +4011,27 @@ exports.If = class If extends Base
 
   compileNode: (o) ->
     if @isStatement o then @compileStatement o else @compileExpression o
+
+  _compileToBabylon: (o) ->
+    if @isStatement o then @compileStatementToBabylon o else @compileExpressionToBabylon o
+
+  compileStatementToBabylon: (o) ->
+    type: 'IfStatement'
+    test: @condition.compileToBabylon o, LEVEL_PAREN
+    consequent: @ensureBlock(@body).compileToBabylon o
+    alternate: @elseBody.compileToBabylon(o, LEVEL_TOP) if @elseBody
+
+  compileExpressionToBabylon: (o) ->
+    type: 'ConditionalExpression'
+    test: @condition.compileToBabylon o, LEVEL_COND
+    consequent: @bodyNode().compileToBabylon o, LEVEL_LIST
+    alternate:
+      if @elseBodyNode()
+        @elseBodyNode().compileToBabylon o, LEVEL_LIST
+      else
+        # TODO: use void 0? abstract this? set location
+        type: 'Identifier'
+        name: 'undefined'
 
   makeReturn: (res) ->
     @elseBody  or= new Block [new Literal 'void 0'] if res
