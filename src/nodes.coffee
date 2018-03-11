@@ -3471,12 +3471,20 @@ exports.Op = class Op extends Base
         answer = [].concat lhs, @makeCode(" #{@operator} "), rhs
         if o.level <= LEVEL_OP then answer else @wrapInParentheses answer
 
-  _compileToBabylon: (o) -> {
-    type: 'BinaryExpression'
-    left: @first.compileToBabylon o#, LEVEL_OP
-    @operator
-    right: @second.compileToBabylon o
-  }
+  _compileToBabylon: (o) ->
+    return {
+      type: 'UpdateExpression'
+      @operator
+      prefix: @flip
+      argument: @first.compileToBabylon o
+    } if @isUnary()
+
+    {
+      type: 'BinaryExpression'
+      left: @first.compileToBabylon o#, LEVEL_OP
+      @operator
+      right: @second.compileToBabylon o
+    }
 
   # Mimic Python's chained comparisons when multiple comparison operators are
   # used sequentially. For example:
@@ -3874,12 +3882,9 @@ exports.For = class For extends While
   compileBodyToBabylon: (o) ->
     @body.compileToBabylon o, LEVEL_TOP
 
-  compileObjectToBabylon: ({o, name, sourceVar}) ->
-    index = @index
-    o.scope.find(index.value) if index and @index not instanceof Value
-
+  compileObjectToBabylon: ({o, name, sourceVar, keyVar}) ->
     type: 'ForInStatement'
-    left: index.compileToBabylon o
+    left: keyVar.compileToBabylon o
     right: sourceVar.compileToBabylon o
     body: @compileBodyToBabylon o
 
@@ -3888,22 +3893,30 @@ exports.For = class For extends While
     sourceVar = @source.base
     name = @name
     scope.find(name.value) if name and not @pattern
+    index = @index
+    o.scope.find(index.value) if index and @index not instanceof Value
+    indexVar = @object and index or new IdentifierLiteral(scope.freeVariable 'i', single: true)
+    keyVar = ((@range or @from) and name) or index or indexVar
+    @body.expressions.unshift new Assign name, new Value sourceVar, [new Index keyVar] if name
 
-    return @compileObjectToBabylon {o, name, sourceVar} if @object
+    return @compileObjectToBabylon {o, name, keyVar, sourceVar} if @object
 
-    indexVar = new IdentifierLiteral(
-      (@object and index) or scope.freeVariable 'i', single: true
-    )
     lengthVar = new IdentifierLiteral(scope.freeVariable 'len')# unless @step and stepNum? and down
 
-    @body.expressions.unshift new Assign name, new Value sourceVar, [new Index indexVar]
+    shouldWrapInAssignToKeyVar = keyVar isnt indexVar
+    wrapInAssignToKeyVar = do ->
+      return ((x) -> x) unless keyVar isnt indexVar
+
+      (x) -> new Assign(keyVar, x)
 
     type: 'ForStatement'
     init:
       # TODO: do we have an AST type for a sequence?
       type: 'SequenceExpression'
       expressions: [
-        new Assign(indexVar, new NumberLiteral '0').compileToBabylon o
+        wrapInAssignToKeyVar(
+          new Assign(indexVar, new NumberLiteral '0')
+        ).compileToBabylon o
         new Assign(
           lengthVar
           new Value(sourceVar, [new Access new PropertyName 'length'])
@@ -3911,10 +3924,9 @@ exports.For = class For extends While
       ]
     test: new Op('<', indexVar, lengthVar).compileToBabylon o
     update:
-      type: 'UpdateExpression'
-      operator: '++'
-      prefix: no
-      argument: indexVar.compileToBabylon o
+      wrapInAssignToKeyVar(
+        new Op '++', indexVar, null, shouldWrapInAssignToKeyVar
+      ).compileToBabylon o
     body: @compileBodyToBabylon o
 
   # Welcome to the hairiest method in all of CoffeeScript. Handles the inner
