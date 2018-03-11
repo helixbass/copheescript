@@ -233,3 +233,12 @@ exports.nameWhitespaceCharacter = (string) ->
     when '\r' then 'carriage return'
     when '\t' then 'tab'
     else string
+
+exports.getNumberValue = (number) ->
+  base = switch number.charAt 1
+    when 'b' then 2
+    when 'o' then 8
+    when 'x' then 16
+    else null
+
+  if base? then parseInt(number[2..], base) else parseFloat(number)

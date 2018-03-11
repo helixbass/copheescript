@@ -13,7 +13,7 @@ util = require 'util'
 # Import the helpers we plan to use.
 {compact, flatten, extend, merge, del, starts, ends, some,
 addDataToNode, attachCommentsToNode, locationDataToString,
-throwSyntaxError} = require './helpers'
+throwSyntaxError, getNumberValue} = require './helpers'
 
 dump = (obj) -> console.log util.inspect obj, no, null
 
@@ -823,7 +823,14 @@ exports.Literal = class Literal extends Base
     " #{if @isStatement() then super() else @constructor.name}: #{@value}"
 
 exports.NumberLiteral = class NumberLiteral extends Literal
-  babylonType: 'NumericLiteral'
+  _compileToBabylon: (o) ->
+    numberValue = getNumberValue @value
+
+    type: 'NumericLiteral'
+    value: numberValue
+    extra:
+      rawValue: numberValue
+      raw: @value
 
 exports.InfinityLiteral = class InfinityLiteral extends NumberLiteral
   compileNode: ->
@@ -1096,8 +1103,8 @@ exports.Value = class Value extends Base
 
     type: 'MemberExpression'
     object: @base.compileToBabylon o
-    property: @properties[0].name.compileToBabylon o
-    computed: no
+    property: @properties[0].compileToBabylon o
+    computed: @properties[0] instanceof Index
 
   # Unfold a soak into an `If`: `a?.b` -> `a.b if a?`
   unfoldSoak: (o) ->
@@ -1411,6 +1418,9 @@ exports.Access = class Access extends Base
 
   children: ['name']
 
+  _compileToBabylon: (o) ->
+    @name.compileToBabylon o
+
   compileToFragments: (o) ->
     name = @name.compileToFragments o
     node = @name.unwrap()
@@ -1429,6 +1439,9 @@ exports.Index = class Index extends Base
     super()
 
   children: ['index']
+
+  _compileToBabylon: (o) ->
+    @index.compileToBabylon o
 
   compileToFragments: (o) ->
     [].concat @makeCode("["), @index.compileToFragments(o, LEVEL_PAREN), @makeCode("]")
@@ -3280,11 +3293,10 @@ exports.Elision = class Elision extends Base
 # it, all other loops can be manufactured. Useful in cases where you need more
 # flexibility or more speed than a comprehension can provide.
 exports.While = class While extends Base
-  constructor: (condition, options) ->
+  constructor: (condition, {invert, @guard} = {}) ->
     super()
 
-    @condition = if options?.invert then condition.invert() else condition
-    @guard     = options?.guard
+    @condition = if invert then condition.invert() else condition
 
   children: ['condition', 'guard', 'body']
 
@@ -3839,9 +3851,13 @@ exports.For = class For extends While
     @index.error 'indexes do not apply to range loops' if @range and @index
     @name.error 'cannot pattern match over range loops' if @range and @pattern
     @returns = no
-    # Move up any comments in the “`for` line”, i.e. the line of code with `for`,
-    # from any child nodes of that line up to the `for` node itself so that these
-    # comments get output, and get output above the `for` loop.
+
+    @hoistComments()
+
+  # Move up any comments in the “`for` line”, i.e. the line of code with `for`,
+  # from any child nodes of that line up to the `for` node itself so that these
+  # comments get output, and get output above the `for` loop.
+  hoistComments: ->
     for attribute in ['source', 'guard', 'step', 'name', 'index'] when @[attribute]
       @[attribute].traverseChildren yes, (node) =>
         if node.comments
@@ -3854,6 +3870,37 @@ exports.For = class For extends While
       moveComments @[attribute], @
 
   children: ['body', 'source', 'guard', 'step']
+
+  _compileToBabylon: (o) ->
+    {scope} = o
+    indexVar = new IdentifierLiteral(
+      (@object and index) or scope.freeVariable 'i', single: true
+    )
+    lengthVar = new IdentifierLiteral(scope.freeVariable 'len')# unless @step and stepNum? and down
+    sourceVar = @source.base
+    name = @name
+    scope.find(name.value) if name and not @pattern
+
+    @body.expressions.unshift new Assign name, new Value sourceVar, [new Index indexVar]
+
+    type: 'ForStatement'
+    init:
+      # TODO: do we have an AST type for a sequence?
+      type: 'SequenceExpression'
+      expressions: [
+        new Assign(indexVar, new NumberLiteral '0').compileToBabylon o
+        new Assign(
+          lengthVar
+          new Value(sourceVar, [new Access new PropertyName 'length'])
+        ).compileToBabylon o
+      ]
+    test: new Op('<', indexVar, lengthVar).compileToBabylon o
+    update:
+      type: 'UpdateExpression'
+      operator: '++'
+      prefix: no
+      argument: indexVar.compileToBabylon o
+    body: @body.compileToBabylon o, LEVEL_TOP
 
   # Welcome to the hairiest method in all of CoffeeScript. Handles the inner
   # loop, filtering, stepping, and result saving for array, object, and range
