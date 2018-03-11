@@ -3871,15 +3871,30 @@ exports.For = class For extends While
 
   children: ['body', 'source', 'guard', 'step']
 
+  compileBodyToBabylon: (o) ->
+    @body.compileToBabylon o, LEVEL_TOP
+
+  compileObjectToBabylon: ({o, name, sourceVar}) ->
+    index = @index
+    o.scope.find(index.value) if index and @index not instanceof Value
+
+    type: 'ForInStatement'
+    left: index.compileToBabylon o
+    right: sourceVar.compileToBabylon o
+    body: @compileBodyToBabylon o
+
   _compileToBabylon: (o) ->
     {scope} = o
+    sourceVar = @source.base
+    name = @name
+    scope.find(name.value) if name and not @pattern
+
+    return @compileObjectToBabylon {o, name, sourceVar} if @object
+
     indexVar = new IdentifierLiteral(
       (@object and index) or scope.freeVariable 'i', single: true
     )
     lengthVar = new IdentifierLiteral(scope.freeVariable 'len')# unless @step and stepNum? and down
-    sourceVar = @source.base
-    name = @name
-    scope.find(name.value) if name and not @pattern
 
     @body.expressions.unshift new Assign name, new Value sourceVar, [new Index indexVar]
 
@@ -3900,7 +3915,7 @@ exports.For = class For extends While
       operator: '++'
       prefix: no
       argument: indexVar.compileToBabylon o
-    body: @body.compileToBabylon o, LEVEL_TOP
+    body: @compileBodyToBabylon o
 
   # Welcome to the hairiest method in all of CoffeeScript. Handles the inner
   # loop, filtering, stepping, and result saving for array, object, and range
