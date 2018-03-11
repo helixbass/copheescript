@@ -891,6 +891,9 @@ exports.ThisLiteral = class ThisLiteral extends Literal
   constructor: ->
     super 'this'
 
+  _compileToBabylon: (o) ->
+    type: 'ThisExpression'
+
   compileNode: (o) ->
     code = if o.scope.method?.bound then o.scope.method.context else @value
     [@makeCode code]
@@ -1089,7 +1092,12 @@ exports.Value = class Value extends Base
     fragments
 
   _compileToBabylon: (o) ->
-    @base.compileToBabylon o
+    return @base.compileToBabylon o unless @properties.length
+
+    type: 'MemberExpression'
+    object: @base.compileToBabylon o
+    property: @properties[0].name.compileToBabylon o
+    computed: no
 
   # Unfold a soak into an `If`: `a?.b` -> `a.b if a?`
   unfoldSoak: (o) ->
@@ -2794,6 +2802,8 @@ exports.Code = class Code extends Base
 
   _compileToBabylon: (o) ->
     wasEmpty = @body.isEmpty()
+    {thisAssignments} = @expandThisParams o
+    @body.expressions.unshift thisAssignments... unless @expandCtorSuper thisAssignments
     @body.makeReturn() unless wasEmpty or @noReturn
 
     type: 'FunctionExpression'
@@ -2801,6 +2811,33 @@ exports.Code = class Code extends Base
     async: @isAsync
     params: @compileParamsToBabylon o
     body: @body.compileWithDeclarationsToBabylon o
+
+  expandThisParams: (o) ->
+    thisAssignments  = @thisAssignments?.slice() ? []
+
+    # Check for duplicate parameters and separate `this` assignments.
+    paramNames = []
+    @eachParamName (name, node, param, obj) ->
+      node.error "multiple parameters named '#{name}'" if name in paramNames
+      paramNames.push name
+
+      if node.this
+        name   = node.properties[0].name.value
+        name   = "_#{name}" if name in JS_FORBIDDEN
+        target = new IdentifierLiteral o.scope.freeVariable name, reserve: no
+        # `Param` is object destructuring with a default value: ({@prop = 1}) ->
+        # In a case when the variable name is already reserved, we have to assign
+        # a new variable name to the destructured variable: ({prop:prop1 = 1}) ->
+        replacement =
+            if param.name instanceof Obj and obj instanceof Assign and
+                obj.operatorToken.value is '='
+              new Assign (new IdentifierLiteral name), target, 'object' #, operatorToken: new Literal ':'
+            else
+              target
+        param.renameParam node, replacement
+        thisAssignments.push new Assign node, target
+
+    {thisAssignments}
 
   # Compilation creates a new scope unless explicitly asked to share with the
   # outer scope. Handles splat parameters in the parameter list by setting
@@ -2824,32 +2861,11 @@ exports.Code = class Code extends Base
     delete o.isExistentialEquals
     params           = []
     exprs            = []
-    thisAssignments  = @thisAssignments?.slice() ? []
     paramsAfterSplat = []
     haveSplatParam   = no
     haveBodyParam    = no
 
-    # Check for duplicate parameters and separate `this` assignments.
-    paramNames = []
-    @eachParamName (name, node, param, obj) ->
-      node.error "multiple parameters named '#{name}'" if name in paramNames
-      paramNames.push name
-
-      if node.this
-        name   = node.properties[0].name.value
-        name   = "_#{name}" if name in JS_FORBIDDEN
-        target = new IdentifierLiteral o.scope.freeVariable name, reserve: no
-        # `Param` is object destructuring with a default value: ({@prop = 1}) ->
-        # In a case when the variable name is already reserved, we have to assign
-        # a new variable name to the destructured variable: ({prop:prop1 = 1}) ->
-        replacement =
-            if param.name instanceof Obj and obj instanceof Assign and
-                obj.operatorToken.value is '='
-              new Assign (new IdentifierLiteral name), target, 'object' #, operatorToken: new Literal ':'
-            else
-              target
-        param.renameParam node, replacement
-        thisAssignments.push new Assign node, target
+    {thisAssignments} = @expandThisParams o
 
     # Parse the parameters, adding them to the list of parameters to put in the
     # function definition; and dealing with splats or expansions, including
