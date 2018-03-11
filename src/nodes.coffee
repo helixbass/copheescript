@@ -114,7 +114,16 @@ exports.Base = class Base
   compileToBabylon: (o, level) ->
     o = extend {}, o
     o.level = level if level
+    node = this
+
+    return @compileClosureToBabylon o unless o.level is LEVEL_TOP or not node.isStatement o
     @_compileToBabylon o
+
+  compileClosureToBabylon: (o) ->
+    new Call(
+      new Code [], Block.wrap [this]
+      []
+    ).compileToBabylon o
 
   compileToFragmentsWithoutComments: (o, lvl) ->
     @compileWithoutComments o, lvl, 'compileToFragments'
@@ -246,7 +255,7 @@ exports.Base = class Base
   makeReturn: (res) ->
     me = @unwrapAll()
     if res
-      new Call new Literal("#{res}.push"), [me]
+      new Call new Value(new IdentifierLiteral(res), [new Access new PropertyName 'push']), [me]
     else
       new Return me
 
@@ -616,12 +625,14 @@ exports.Block = class Block extends Base
     ]
 
   compileBodyToBabylon: (o) ->
-    for node in @expressions
-      if node.isStatement()
-        node.compileToBabylon o
-      else
-        type: 'ExpressionStatement'
-        expression: node.compileToBabylon o
+    flatten(
+      for node in @expressions
+        if node.isStatement()
+          node.compileToBabylon o
+        else
+          type: 'ExpressionStatement'
+          expression: node.compileToBabylon o
+    )
 
   # If we happen to be the top-level **Block**, wrap everything in a safety
   # closure, unless requested not to. It would be better not to generate them
@@ -1257,6 +1268,11 @@ exports.Call = class Call extends Base
           call.variable.base = ifn
       ifn = unfoldSoak o, call, 'variable'
     ifn
+
+  _compileToBabylon: (o) ->
+    type: 'CallExpression'
+    callee: @variable.compileToBabylon o, LEVEL_ACCESS
+    arguments: arg.compileToBabylon(o, LEVEL_LIST) for arg in @args
 
   # Compile a vanilla function call.
   compileNode: (o) ->
@@ -2814,6 +2830,7 @@ exports.Code = class Code extends Base
       param.name.compileToBabylon o
 
   _compileToBabylon: (o) ->
+    @updateOptions o
     wasEmpty = @body.isEmpty()
     {thisAssignments} = @expandThisParams o
     @body.expressions.unshift thisAssignments... unless @expandCtorSuper thisAssignments
@@ -2852,6 +2869,13 @@ exports.Code = class Code extends Base
 
     {thisAssignments}
 
+  updateOptions: (o) ->
+    o.scope         = del(o, 'classScope') or @makeScope o.scope
+    o.scope.shared  = del(o, 'sharedScope')
+    o.indent        += TAB
+    delete o.bare
+    delete o.isExistentialEquals
+
   # Compilation creates a new scope unless explicitly asked to share with the
   # outer scope. Handles splat parameters in the parameter list by setting
   # such parameters to be the final parameter in the function definition, as
@@ -2867,11 +2891,7 @@ exports.Code = class Code extends Base
       @context = o.scope.method.context if o.scope.method?.bound
       @context = 'this' unless @context
 
-    o.scope         = del(o, 'classScope') or @makeScope o.scope
-    o.scope.shared  = del(o, 'sharedScope')
-    o.indent        += TAB
-    delete o.bare
-    delete o.isExistentialEquals
+    @updateOptions o
     params           = []
     exprs            = []
     paramsAfterSplat = []
@@ -3472,12 +3492,17 @@ exports.Op = class Op extends Base
         if o.level <= LEVEL_OP then answer else @wrapInParentheses answer
 
   _compileToBabylon: (o) ->
-    return {
-      type: 'UpdateExpression'
-      @operator
-      prefix: @flip
-      argument: @first.compileToBabylon o
-    } if @isUnary()
+    if @isUnary()
+      return {
+        type:
+          if @operator in ['++', '--']
+            'UpdateExpression'
+          else
+            'UnaryExpression'
+        @operator
+        prefix: @flip
+        argument: @first.compileToBabylon o
+      }
 
     {
       type: 'BinaryExpression'
@@ -3727,6 +3752,9 @@ exports.Parens = class Parens extends Base
 
   shouldCache: -> @body.shouldCache()
 
+  _compileToBabylon: (o) ->
+    @body.compileToBabylon o, LEVEL_PAREN
+
   compileNode: (o) ->
     expr = @body.unwrap()
     # If these parentheses are wrapping an `IdentifierLiteral` followed by a
@@ -3882,11 +3910,22 @@ exports.For = class For extends While
   compileBodyToBabylon: (o) ->
     @body.compileToBabylon o, LEVEL_TOP
 
-  compileObjectToBabylon: ({o, name, sourceVar, keyVar}) ->
-    type: 'ForInStatement'
-    left: keyVar.compileToBabylon o
-    right: sourceVar.compileToBabylon o
-    body: @compileBodyToBabylon o
+  compileObjectToBabylon: ({o, name, sourceVar, keyVar, resultsVar}) ->
+    @wrapInResultAccumulatingBlock({o, resultsVar})
+      type: 'ForInStatement'
+      left: keyVar.compileToBabylon o
+      right: sourceVar.compileToBabylon o
+      body: @compileBodyToBabylon o
+
+  wrapInResultAccumulatingBlock: ({o, resultsVar}) -> (compiledFor) =>
+    return compiledFor unless @returns
+
+    [
+      type: 'ExpressionStatement' # TODO: make this generated?
+      expression: new Assign(resultsVar, new Arr()).compileToBabylon o
+      compiledFor
+      new Return(resultsVar).compileToBabylon o
+    ]
 
   _compileToBabylon: (o) ->
     {scope} = o
@@ -3894,12 +3933,19 @@ exports.For = class For extends While
     name = @name
     scope.find(name.value) if name and not @pattern
     index = @index
-    o.scope.find(index.value) if index and @index not instanceof Value
+    scope.find(index.value) if index and @index not instanceof Value
     indexVar = @object and index or new IdentifierLiteral(scope.freeVariable 'i', single: true)
     keyVar = ((@range or @from) and name) or index or indexVar
+
+    @updateReturnsBasedOnLastBodyExpression()
+
+    if @returns
+      resultsVar = new IdentifierLiteral(scope.freeVariable 'results')
+      @body.makeReturn resultsVar.value
+
     @body.expressions.unshift new Assign name, new Value sourceVar, [new Index keyVar] if name
 
-    return @compileObjectToBabylon {o, name, keyVar, sourceVar} if @object
+    return @compileObjectToBabylon {o, name, keyVar, sourceVar, resultsVar} if @object
 
     lengthVar = new IdentifierLiteral(scope.freeVariable 'len')# unless @step and stepNum? and down
 
@@ -3909,34 +3955,38 @@ exports.For = class For extends While
 
       (x) -> new Assign(keyVar, x)
 
-    type: 'ForStatement'
-    init:
-      # TODO: do we have an AST type for a sequence?
-      type: 'SequenceExpression'
-      expressions: [
+    @wrapInResultAccumulatingBlock({o, resultsVar})
+      type: 'ForStatement'
+      init:
+        # TODO: do we have an AST type for a sequence?
+        type: 'SequenceExpression'
+        expressions: [
+          wrapInAssignToKeyVar(
+            new Assign(indexVar, new NumberLiteral '0')
+          ).compileToBabylon o
+          new Assign(
+            lengthVar
+            new Value(sourceVar, [new Access new PropertyName 'length'])
+          ).compileToBabylon o
+        ]
+      test: new Op('<', indexVar, lengthVar).compileToBabylon o
+      update:
         wrapInAssignToKeyVar(
-          new Assign(indexVar, new NumberLiteral '0')
+          new Op '++', indexVar, null, shouldWrapInAssignToKeyVar
         ).compileToBabylon o
-        new Assign(
-          lengthVar
-          new Value(sourceVar, [new Access new PropertyName 'length'])
-        ).compileToBabylon o
-      ]
-    test: new Op('<', indexVar, lengthVar).compileToBabylon o
-    update:
-      wrapInAssignToKeyVar(
-        new Op '++', indexVar, null, shouldWrapInAssignToKeyVar
-      ).compileToBabylon o
-    body: @compileBodyToBabylon o
+      body: @compileBodyToBabylon o
+
+  updateReturnsBasedOnLastBodyExpression: ->
+    [..., last] = @body.expressions
+    @returns    = no if last?.jumps() instanceof Return
 
   # Welcome to the hairiest method in all of CoffeeScript. Handles the inner
   # loop, filtering, stepping, and result saving for array, object, and range
   # comprehensions. Some of the generated code can be shared in common, and
   # some cannot.
   compileNode: (o) ->
-    body        = Block.wrap [@body]
-    [..., last] = body.expressions
-    @returns    = no if last?.jumps() instanceof Return
+    @updateReturnsBasedOnLastBodyExpression()
+    body        = @body
     source      = if @range then @source.base else @source
     scope       = o.scope
     name        = @name  and (@name.compile o, LEVEL_LIST) if not @pattern

@@ -1,0 +1,1 @@
+why is y declared outside IIFE function in compilation of x = (y * 2 for y in z)? is that correct/desirable?
