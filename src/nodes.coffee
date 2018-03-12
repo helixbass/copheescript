@@ -1110,12 +1110,15 @@ exports.Value = class Value extends Base
     fragments
 
   _compileToBabylon: (o) ->
-    return @base.compileToBabylon o unless @properties.length
-
-    type: 'MemberExpression'
-    object: @base.compileToBabylon o
-    property: @properties[0].compileToBabylon o
-    computed: @properties[0] instanceof Index
+    props = @properties
+    ret = @base.compileToBabylon o, if props.length then LEVEL_ACCESS else null
+    for prop in props
+      ret =
+        type: 'MemberExpression'
+        object: ret
+        property: prop.compileToBabylon o
+        computed: prop instanceof Index
+    ret
 
   # Unfold a soak into an `If`: `a?.b` -> `a.b if a?`
   unfoldSoak: (o) ->
@@ -1643,7 +1646,7 @@ exports.Obj = class Obj extends Base
     type: 'ObjectExpression'
     properties: {
       type: 'ObjectProperty'
-      key: variable.base.compileToBabylon(o)
+      key: variable.unwrap().compileToBabylon(o)
       value: value.compileToBabylon(o)
       shorthand
     } for { variable, value, shorthand } in @expandProperties(o)
