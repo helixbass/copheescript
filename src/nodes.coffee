@@ -1564,6 +1564,18 @@ exports.Range = class Range extends Base
     # The final loop body.
     [@makeCode "#{varPart}; #{condPart}; #{stepPart}"]
 
+  _compileToBabylon: (o) ->
+    @compileVariables o unless @fromVar
+    return @compileArrayToBabylon(o) unless o.index
+
+  compileArrayToBabylon: (o) ->
+    known = @fromNum? and @toNum?
+    if known and Math.abs(@fromNum - @toNum) <= 20
+      range = [@fromNum..@toNum]
+      range.pop() if @exclusive
+      return new Arr(
+        new NumberLiteral "#{num}" for num in range
+      ).compileToBabylon o
 
   # When used as a value, expand the range into the equivalent array.
   compileArray: (o) ->
@@ -3766,7 +3778,8 @@ exports.Parens = class Parens extends Base
   shouldCache: -> @body.shouldCache()
 
   _compileToBabylon: (o) ->
-    @body.compileToBabylon o, LEVEL_PAREN
+    expr = @body.unwrap()
+    expr.compileToBabylon o, LEVEL_PAREN
 
   compileNode: (o) ->
     expr = @body.unwrap()
@@ -3803,12 +3816,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
 
   shouldCache: -> @body.shouldCache()
 
-  compileNode: (o) ->
-    if @csxAttribute
-      wrapped = new Parens new StringWithInterpolations @body
-      wrapped.csxAttribute = yes
-      return wrapped.compileNode o
-
+  extractElementsAndComments: ->
     # Assumes that `expr` is `Value` » `StringLiteral` or `Op`
     expr = @body.unwrap()
 
@@ -3841,18 +3849,56 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
         delete node.comments
       return yes
 
+    {elements, salvagedComments}
+
+  _compileToBabylon: (o) ->
+    {elements, salvagedComments} = @extractElementsAndComments()
+    [first] = elements
+    elements.unshift new StringLiteral '' unless first instanceof StringLiteral
+    [..., last] = elements
+    elements.push (last = new StringLiteral '') unless last instanceof StringLiteral
+
+    quasis = []
+    expressions = []
+    for element, index in elements
+      if element instanceof StringLiteral
+        @prepareElementValue(element)
+        quasis.push
+          type: 'TemplateElement'
+          value:
+            raw: element.value
+            tail: element is last
+      else
+        expressions.push element.compileToBabylon o, LEVEL_PAREN
+
+    {
+      type: 'TemplateLiteral'
+      expressions, quasis
+    }
+
+  prepareElementValue: (element) ->
+    element.value = element.unquote yes, @csx
+    unless @csx
+      # Backticks and `${` inside template literals must be escaped.
+      element.value = element.value.replace /(\\*)(`|\$\{)/g, (match, backslashes, toBeEscaped) ->
+        if backslashes.length % 2 is 0
+          "#{backslashes}\\#{toBeEscaped}"
+        else
+          match
+
+  compileNode: (o) ->
+    if @csxAttribute
+      wrapped = new Parens new StringWithInterpolations @body
+      wrapped.csxAttribute = yes
+      return wrapped.compileNode o
+
+    {elements, salvagedComments} = @extractElementsAndComments()
+
     fragments = []
     fragments.push @makeCode '`' unless @csx
     for element in elements
       if element instanceof StringLiteral
-        element.value = element.unquote yes, @csx
-        unless @csx
-          # Backticks and `${` inside template literals must be escaped.
-          element.value = element.value.replace /(\\*)(`|\$\{)/g, (match, backslashes, toBeEscaped) ->
-            if backslashes.length % 2 is 0
-              "#{backslashes}\\#{toBeEscaped}"
-            else
-              match
+        @prepareElementValue(element)
         fragments.push element.compileToFragments(o)...
       else
         fragments.push @makeCode '$' unless @csx
