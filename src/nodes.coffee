@@ -893,6 +893,9 @@ exports.ComputedPropertyName = class ComputedPropertyName extends PropertyName
   compileNode: (o) ->
     [@makeCode('['), @value.compileToFragments(o, LEVEL_LIST)..., @makeCode(']')]
 
+  _compileToBabylon: (o) ->
+    @value.compileToBabylon o
+
 exports.StatementLiteral = class StatementLiteral extends Literal
   isStatement: YES
 
@@ -920,14 +923,22 @@ exports.UndefinedLiteral = class UndefinedLiteral extends Literal
   constructor: ->
     super 'undefined'
 
+  _compileToBabylon: (o) ->
+    new Op('void', new NumberLiteral('0')).compileToBabylon o # TODO: capture LEVEL_ACCESS condition
+
   compileNode: (o) ->
     [@makeCode if o.level >= LEVEL_ACCESS then '(void 0)' else 'void 0']
 
 exports.NullLiteral = class NullLiteral extends Literal
   constructor: ->
     super 'null'
+  _compileToBabylon: (o) ->
+    type: 'NullLiteral'
 
 exports.BooleanLiteral = class BooleanLiteral extends Literal
+  _compileToBabylon: (o) ->
+    type: 'BooleanLiteral'
+    value: if @value is 'true' then yes else no
 
 #### Return
 
@@ -1648,7 +1659,8 @@ exports.Obj = class Obj extends Base
       type: 'ObjectProperty'
       key: variable.unwrap().compileToBabylon(o)
       value: value.compileToBabylon(o)
-      shorthand
+      shorthand: !!shorthand
+      computed: variable instanceof Value and variable.base instanceof ComputedPropertyName
     } for { variable, value, shorthand } in @expandProperties(o)
 
   expandProperties: (o) ->
@@ -1669,19 +1681,17 @@ exports.Obj = class Obj extends Base
         [key, value] = prop.base.cache o
         key  = new PropertyName key.value if key instanceof IdentifierLiteral
         new Assign key, value, 'object'
-      else if key instanceof Value and key.base instanceof ComputedPropertyName
+      else if prop instanceof Value and prop.base instanceof ComputedPropertyName
         # `{ [foo()] }` output as `{ [ref = foo()]: ref }`.
         if prop.base.value.shouldCache()
           [key, value] = prop.base.value.cache o
-          key  = new ComputedPropertyName key.value if key instanceof IdentifierLiteral
+          key = new Value new ComputedPropertyName key.value if key instanceof IdentifierLiteral
           new Assign key, value, 'object'
         else
           # `{ [expression] }` output as `{ [expression]: expression }`.
-          new Assign key, prop.base.value, 'object'
-      else if not prop.bareLiteral?(IdentifierLiteral)
-        new Assign prop, prop, 'object'
+          new Assign prop, prop.base.value, 'object'
       else
-        new Assign prop, prop, 'object', shorthand: yes
+        new Assign prop, prop, 'object', shorthand: prop.bareLiteral? IdentifierLiteral
 
   compileNode: (o) ->
     props = @properties
@@ -1747,7 +1757,7 @@ exports.Obj = class Obj extends Base
           # `{ [foo()] }` output as `{ [ref = foo()]: ref }`.
           if prop.base.value.shouldCache()
             [key, value] = prop.base.value.cache o
-            key  = new ComputedPropertyName key.value if key instanceof IdentifierLiteral
+            key  = new Value new ComputedPropertyName key.value if key instanceof IdentifierLiteral
             prop = new Assign key, value, 'object'
           else
             # `{ [expression] }` output as `{ [expression]: expression }`.
@@ -4172,9 +4182,7 @@ exports.If = class If extends Base
       if @elseBodyNode()
         @elseBodyNode().compileToBabylon o, LEVEL_LIST
       else
-        # TODO: use void 0? abstract this? set location
-        type: 'Identifier'
-        name: 'undefined'
+        new UndefinedLiteral().compileToBabylon o
 
   makeReturn: (res) ->
     @elseBody  or= new Block [new Literal 'void 0'] if res
