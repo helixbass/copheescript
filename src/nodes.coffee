@@ -909,6 +909,11 @@ exports.StatementLiteral = class StatementLiteral extends Literal
     return this if @value is 'break' and not (o?.loop or o?.block)
     return this if @value is 'continue' and not o?.loop
 
+  _compileToBabylon: (o) ->
+    if @value is 'continue'
+      type: 'ContinueStatement'
+      label: null
+
   compileNode: (o) ->
     [@makeCode "#{@tab}#{@value};"]
 
@@ -3438,7 +3443,15 @@ exports.While = class While extends Base
     @wrapInResultAccumulatingBlock({o, resultsVar})
       type: 'WhileStatement'
       test: @condition.compileToBabylon o, LEVEL_PAREN
-      body: @body.compileToBabylon o, LEVEL_TOP
+      body: @bodyWithGuard().compileToBabylon o, LEVEL_TOP
+
+  bodyWithGuard: ->
+    return @body unless @guard
+
+    return Block.wrap [new If @guard, @body] unless @body.expressions.length > 1
+
+    @body.expressions.unshift new If (new Parens @guard).invert(), new StatementLiteral "continue"
+    @body
 
   # The main difference from a JavaScript *while* is that the CoffeeScript
   # *while* can be used as a part of a larger expression -- while loops may
@@ -3446,19 +3459,14 @@ exports.While = class While extends Base
   compileNode: (o) ->
     o.indent += TAB
     set      = ''
-    {body}   = this
-    if body.isEmpty()
-      body = @makeCode ''
-    else
-      if @returns
-        body.makeReturn rvar = o.scope.freeVariable 'results'
-        set  = "#{@tab}#{rvar} = [];\n"
-      if @guard
-        if body.expressions.length > 1
-          body.expressions.unshift new If (new Parens @guard).invert(), new StatementLiteral "continue"
-        else
-          body = Block.wrap [new If @guard, body] if @guard
-      body = [].concat @makeCode("\n"), (body.compileToFragments o, LEVEL_TOP), @makeCode("\n#{@tab}")
+    body =
+      if @body.isEmpty()
+        @makeCode ''
+      else
+        if @returns
+          @body.makeReturn rvar = o.scope.freeVariable 'results'
+          set = "#{@tab}#{rvar} = [];\n"
+        [].concat @makeCode("\n"), (@bodyWithGuard().compileToFragments o, LEVEL_TOP), @makeCode("\n#{@tab}")
     answer = [].concat @makeCode(set + @tab + "while ("), @condition.compileToFragments(o, LEVEL_PAREN),
       @makeCode(") {"), body, @makeCode("}")
     if @returns
@@ -4090,6 +4098,8 @@ exports.For = class For extends While
       resultsVar = new IdentifierLiteral(scope.freeVariable 'results')
       @body.makeReturn resultsVar.value
 
+    @body = @bodyWithGuard()
+
     @body.expressions.unshift new Assign name, new Value sourceVar, [new Index keyVar] if name
 
     return @compileObjectToBabylon {o, name, keyVar, sourceVar, resultsVar} if @object
@@ -4189,11 +4199,7 @@ exports.For = class For extends While
       resultPart   = "#{@tab}#{rvar} = [];\n"
       returnResult = "\n#{@tab}return #{rvar};"
       body.makeReturn rvar
-    if @guard
-      if body.expressions.length > 1
-        body.expressions.unshift new If (new Parens @guard).invert(), new StatementLiteral "continue"
-      else
-        body = Block.wrap [new If @guard, body] if @guard
+    body = @bodyWithGuard()
     if @pattern
       body.expressions.unshift new Assign @name, if @from then new IdentifierLiteral kvar else new Literal "#{svar}[#{kvar}]"
 
