@@ -3419,11 +3419,26 @@ exports.While = class While extends Base
       return jumpNode if jumpNode = node.jumps loop: yes
     no
 
-  _compileToBabylon: (o) -> {
-    type: 'WhileStatement'
-    test: @condition.compileToBabylon o, LEVEL_PAREN
-    body: @body.compileToBabylon o, LEVEL_TOP
-  }
+
+  wrapInResultAccumulatingBlock: ({o, resultsVar}) -> (compiled) =>
+    return compiled unless @returns
+
+    [
+      type: 'ExpressionStatement' # TODO: make this generated?
+      expression: new Assign(resultsVar, new Arr()).compileToBabylon o
+      compiled
+      new Return(resultsVar).compileToBabylon o
+    ]
+
+  _compileToBabylon: (o) ->
+    if @returns
+      resultsVar = new IdentifierLiteral o.scope.freeVariable 'results'
+      @body.makeReturn resultsVar.value
+
+    @wrapInResultAccumulatingBlock({o, resultsVar})
+      type: 'WhileStatement'
+      test: @condition.compileToBabylon o, LEVEL_PAREN
+      body: @body.compileToBabylon o, LEVEL_TOP
 
   # The main difference from a JavaScript *while* is that the CoffeeScript
   # *while* can be used as a part of a larger expression -- while loops may
@@ -4058,16 +4073,6 @@ exports.For = class For extends While
       left: keyVar.compileToBabylon o
       right: sourceVar.compileToBabylon o
       body: @compileBodyToBabylon o
-
-  wrapInResultAccumulatingBlock: ({o, resultsVar}) -> (compiledFor) =>
-    return compiledFor unless @returns
-
-    [
-      type: 'ExpressionStatement' # TODO: make this generated?
-      expression: new Assign(resultsVar, new Arr()).compileToBabylon o
-      compiledFor
-      new Return(resultsVar).compileToBabylon o
-    ]
 
   _compileToBabylon: (o) ->
     {scope} = o
