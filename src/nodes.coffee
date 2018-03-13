@@ -581,7 +581,11 @@ exports.Block = class Block extends Base
     body = [...@compileDeclarationsToBabylon(o), ...body] if withDeclarations
     return body if root
     {
-      type: 'BlockStatement'
+      type:
+        if @isClassBody
+          'ClassBody'
+        else
+          'BlockStatement'
       body
     }
 
@@ -1963,10 +1967,37 @@ exports.Class = class Class extends Base
     finally
       delete @compileNode
 
-  compileClassDeclaration: (o) ->
+  _compileToBabylon: (o) ->
+    @name = @determineName()
+    @walkBody()
+    @prepareConstructor()
+
+    @body.isClassBody = yes
+
+    node = @
+
+    if @variable
+      node = new Assign @variable, node, null, { @moduleDeclaration }
+
+    @_compileToBabylon = @compileClassDeclarationToBabylon
+
+    try
+      return node.compileToBabylon o
+    finally
+      delete @_compileToBabylon
+
+  compileClassDeclarationToBabylon: (o) ->
+    type: 'ClassExpression'
+    id: new IdentifierLiteral(@name).compileToBabylon o
+    superClass: null
+    body: @body.compileToBabylon o, LEVEL_TOP
+
+  prepareConstructor: ->
     @ctor ?= @makeDefaultConstructor() if @externalCtor or @boundMethods.length
     @ctor?.noReturn = true
 
+  compileClassDeclaration: (o) ->
+    @prepareConstructor()
     @proxyBoundMethods() if @boundMethods.length
 
     o.indent += TAB
@@ -2861,11 +2892,28 @@ exports.Code = class Code extends Base
     @body.expressions.unshift thisAssignments... unless @expandCtorSuper thisAssignments
     @body.makeReturn() unless wasEmpty or @noReturn
 
-    type: 'FunctionExpression'
-    generator: @isGenerator
-    async: @isAsync
-    params: @compileParamsToBabylon o
-    body: @body.compileWithDeclarationsToBabylon o
+    {
+      type:
+        if @isMethod
+          'ClassMethod'
+        else
+          'FunctionExpression'
+      generator: @isGenerator
+      async: @isAsync
+      params: @compileParamsToBabylon o
+      body: @body.compileWithDeclarationsToBabylon o
+      ...@addtlMethodBabylonFields o
+    }
+
+  addtlMethodBabylonFields: (o) ->
+    return {} unless @isMethod
+
+    kind:
+      if @ctor
+        'constructor'
+      else
+        'method'
+    key: @name.compileToBabylon o
 
   expandThisParams: (o) ->
     thisAssignments  = @thisAssignments?.slice() ? []
@@ -3289,6 +3337,10 @@ exports.Splat = class Splat extends Base
   assigns: (name) ->
     @name.assigns name
 
+  _compileToBabylon: (o) ->
+    type: 'SpreadElement'
+    argument: @name.compileToBabylon o, LEVEL_OP
+
   compileNode: (o) ->
     [@makeCode('...'), @name.compileToFragments(o, LEVEL_OP)...]
 
@@ -3318,6 +3370,9 @@ exports.Elision = class Elision extends Base
   isAssignable: YES
 
   shouldCache: NO
+
+  _compileToBabylon: (o) ->
+    null
 
   compileToFragments: (o, level) ->
     fragment = super o, level
