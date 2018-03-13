@@ -3795,6 +3795,28 @@ exports.Existence = class Existence extends Base
 
   invert: NEGATE
 
+  _compileToBabylon: (o) ->
+    comparison =
+      new Op(
+        '&&'
+        new Op(
+          '!=='
+          new Op 'typeof', @expression
+          new StringLiteral "'undefined'"
+        )
+        new Op(
+          '!=='
+          @expression
+          new NullLiteral
+        )
+      )
+
+    (if o.level <= LEVEL_COND
+      comparison
+    else
+      new Parens new Block [comparison]
+    ).compileToBabylon o
+
   compileNode: (o) ->
     @expression.front = @front
     code = @expression.compile o, LEVEL_OP
