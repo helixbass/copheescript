@@ -554,9 +554,9 @@ exports.Block = class Block extends Base
     ast = @compileToBabylon o
     prettier.__debug.formatAST(ast, opts).formatted
 
-  _compileToBabylon: (o) ->
+  compileToBabylon: (o, level) ->
     return @compileRootToBabylon(o) unless o.scope
-    @compileNonrootToBabylon o
+    super o, level
 
   initializeScope: (o) ->
     o.scope   = new Scope null, this, null, o.referencedVars ? []
@@ -576,7 +576,7 @@ exports.Block = class Block extends Base
       directives: []
     comments: []
 
-  compileNonrootToBabylon: (o, { root, withDeclarations } = {}) ->
+  _compileToBabylon: (o, { root, withDeclarations } = {}) ->
     body = @compileBodyToBabylon(o)
     body = [...@compileDeclarationsToBabylon(o), ...body] if withDeclarations
     return body if root
@@ -590,7 +590,7 @@ exports.Block = class Block extends Base
     }
 
   compileWithDeclarationsToBabylon: (o, opts) ->
-    @compileNonrootToBabylon merge(o, level: LEVEL_TOP), {...opts, withDeclarations: yes}
+    @_compileToBabylon merge(o, level: LEVEL_TOP), {...opts, withDeclarations: yes}
 
   compileScopeDeclarationsToBabylon: (o) ->
     {
@@ -3418,6 +3418,12 @@ exports.While = class While extends Base
     for node in expressions
       return jumpNode if jumpNode = node.jumps loop: yes
     no
+
+  _compileToBabylon: (o) -> {
+    type: 'WhileStatement'
+    test: @condition.compileToBabylon o, LEVEL_PAREN
+    body: @body.compileToBabylon o, LEVEL_TOP
+  }
 
   # The main difference from a JavaScript *while* is that the CoffeeScript
   # *while* can be used as a part of a larger expression -- while loops may
