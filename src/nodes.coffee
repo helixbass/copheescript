@@ -630,12 +630,12 @@ exports.Block = class Block extends Base
 
   compileBodyToBabylon: (o) ->
     flatten(
-      for node in @expressions
-        if node.isStatement()
-          node.compileToBabylon o
-        else
-          type: 'ExpressionStatement'
-          expression: node.compileToBabylon o
+      for node in @expressions then do ->
+        compiled = node.compileToBabylon o
+        return [] unless compiled
+        return compiled if node.isStatement()
+        type: 'ExpressionStatement'
+        expression: compiled
     )
 
   # If we happen to be the top-level **Block**, wrap everything in a safety
@@ -873,6 +873,7 @@ exports.StringLiteral = class StringLiteral extends Literal
 exports.RegexLiteral = class RegexLiteral extends Literal
 
 exports.PassthroughLiteral = class PassthroughLiteral extends Literal
+  _compileToBabylon: (o) -> null
 
 exports.IdentifierLiteral = class IdentifierLiteral extends Literal
   isAssignable: YES
@@ -1573,9 +1574,26 @@ exports.Range = class Range extends Base
     # The final loop body.
     [@makeCode "#{varPart}; #{condPart}; #{stepPart}"]
 
+  compileForToBabylon: (o) ->
+    indexVar = del o, 'indexVar'
+    keyVar = del o, 'keyVar'
+
+    init:
+      new Assign(
+        keyVar,
+        new Assign(indexVar, @from)
+      ).compileToBabylon o
+    test: new Op("<#{@equals}", indexVar, @to).compileToBabylon o
+    update:
+      new Assign(
+        keyVar,
+        new Op '++', indexVar, null, true
+      ).compileToBabylon o
+
   _compileToBabylon: (o) ->
     @compileVariables o unless @fromVar
-    return @compileArrayToBabylon(o) unless o.index
+    return @compileArrayToBabylon(o) unless o.indexVar
+    @compileForToBabylon o
 
   compileArrayToBabylon: (o) ->
     known = @fromNum? and @toNum?
@@ -3601,24 +3619,32 @@ exports.Op = class Op extends Base
         if o.level <= LEVEL_OP then answer else @wrapInParentheses answer
 
   _compileToBabylon: (o) ->
-    if @isUnary()
-      return {
-        type:
-          if @operator in ['++', '--']
-            'UpdateExpression'
-          else
-            'UnaryExpression'
-        @operator
-        prefix: @flip
-        argument: @first.compileToBabylon o
-      }
+    return @compileUnaryToBabylon o if @isUnary()
 
-    {
-      type: 'BinaryExpression'
-      left: @first.compileToBabylon o#, LEVEL_OP
-      @operator
-      right: @second.compileToBabylon o
-    }
+    switch @operator
+      when '?' then return @compileExistenceToBabylon o, @second.isDefaultValue
+
+    return new Parens(this).compileToBabylon o if o.level > LEVEL_OP
+
+    @compileBinaryToBabylon o
+
+  compileUnaryToBabylon: (o) -> {
+    type:
+      if @operator in ['++', '--']
+        'UpdateExpression'
+      else
+        'UnaryExpression'
+    @operator
+    prefix: @flip
+    argument: @first.compileToBabylon o
+  }
+
+  compileBinaryToBabylon: (o) -> {
+    type: 'BinaryExpression'
+    left: @first.compileToBabylon o, LEVEL_OP
+    @operator
+    right: @second.compileToBabylon o, LEVEL_OP
+  }
 
   # Mimic Python's chained comparisons when multiple comparison operators are
   # used sequentially. For example:
@@ -3631,6 +3657,15 @@ exports.Op = class Op extends Base
     fragments = fst.concat @makeCode(" #{if @invert then '&&' else '||'} "),
       (shared.compileToFragments o), @makeCode(" #{@operator} "), (@second.compileToFragments o, LEVEL_OP)
     @wrapInParentheses fragments
+
+  compileExistenceToBabylon: (o, checkOnlyUndefined) ->
+    new If(
+      new Existence @first, checkOnlyUndefined
+      @first
+      type: 'if'
+    )
+    .addElse(@second)
+    .compileToBabylon o
 
   # Keep reference to the left expression, unless this an existential assignment
   compileExistence: (o, checkOnlyUndefined) ->
@@ -3826,24 +3861,42 @@ exports.Existence = class Existence extends Base
 
   _compileToBabylon: (o) ->
     comparison =
-      new Op(
-        '&&'
-        new Op(
-          '!=='
-          new Op 'typeof', @expression
-          new StringLiteral "'undefined'"
-        )
-        new Op(
-          '!=='
+      if @expression.unwrap() instanceof IdentifierLiteral and not o.scope.check code
+        do =>
+          comparisonAgainstUndefined =
+            new Op(
+              '!=='
+              new Op 'typeof', @expression
+              new StringLiteral "'undefined'"
+            )
+          return comparisonAgainstUndefined if @comparisonTarget is 'undefined'
+
+          new Op(
+            '&&'
+            comparisonAgainstUndefined
+            new Op(
+              '!=='
+              @expression
+              new NullLiteral
+            )
+          )
+      else
+        op = new Op(
+          if @negated then '===' else '!=='
           @expression
-          new NullLiteral
+          if @comparisonTarget is 'null'
+            new NullLiteral
+          else
+            new UndefinedLiteral
         )
-      )
+        if @comparisonTarget is 'null'
+          op.operator = if @negated then '==' else '!='
+        op
 
     (if o.level <= LEVEL_COND
       comparison
     else
-      new Parens new Block [comparison]
+      new Parens comparison
     ).compileToBabylon o
 
   compileNode: (o) ->
@@ -4100,11 +4153,24 @@ exports.For = class For extends While
 
     @body = @bodyWithGuard()
 
-    @body.expressions.unshift new Assign name, new Value sourceVar, [new Index keyVar] if name
+    unless @range
+      @body.expressions.unshift new Assign name, new Value sourceVar, [new Index keyVar] if name
 
     return @compileObjectToBabylon {o, name, keyVar, sourceVar, resultsVar} if @object
 
-    lengthVar = new IdentifierLiteral(scope.freeVariable 'len')# unless @step and stepNum? and down
+    @wrapInResultAccumulatingBlock({o, resultsVar}) {
+      type: 'ForStatement'
+      ...(
+        if @range
+          @source.base.compileToBabylon merge o, {indexVar, keyVar}
+        else
+          @compileForPartsToBabylon {o, keyVar, indexVar, sourceVar}
+      )
+      body: @compileBodyToBabylon o
+    }
+
+  compileForPartsToBabylon: ({o, keyVar, indexVar, sourceVar}) ->
+    lengthVar = new IdentifierLiteral(o.scope.freeVariable 'len')# unless @step and stepNum? and down
 
     shouldWrapInAssignToKeyVar = keyVar isnt indexVar
     wrapInAssignToKeyVar = do ->
@@ -4112,26 +4178,23 @@ exports.For = class For extends While
 
       (x) -> new Assign(keyVar, x)
 
-    @wrapInResultAccumulatingBlock({o, resultsVar})
-      type: 'ForStatement'
-      init:
-        # TODO: do we have an AST type for a sequence?
-        type: 'SequenceExpression'
-        expressions: [
-          wrapInAssignToKeyVar(
-            new Assign(indexVar, new NumberLiteral '0')
-          ).compileToBabylon o
-          new Assign(
-            lengthVar
-            new Value(sourceVar, [new Access new PropertyName 'length'])
-          ).compileToBabylon o
-        ]
-      test: new Op('<', indexVar, lengthVar).compileToBabylon o
-      update:
+    init:
+      # TODO: do we have an AST type for a sequence?
+      type: 'SequenceExpression'
+      expressions: [
         wrapInAssignToKeyVar(
-          new Op '++', indexVar, null, shouldWrapInAssignToKeyVar
+          new Assign(indexVar, new NumberLiteral '0')
         ).compileToBabylon o
-      body: @compileBodyToBabylon o
+        new Assign(
+          lengthVar
+          new Value(sourceVar, [new Access new PropertyName 'length'])
+        ).compileToBabylon o
+      ]
+    test: new Op('<', indexVar, lengthVar).compileToBabylon o
+    update:
+      wrapInAssignToKeyVar(
+        new Op '++', indexVar, null, shouldWrapInAssignToKeyVar
+      ).compileToBabylon o
 
   updateReturnsBasedOnLastBodyExpression: ->
     [..., last] = @body.expressions
