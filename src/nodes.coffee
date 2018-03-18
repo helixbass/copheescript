@@ -572,11 +572,26 @@ exports.Block = class Block extends Base
     program:
       type: 'Program'
       sourceType: 'module'
-      body: @compileWithDeclarationsToBabylon o, root: yes
+      body: @compileWithDeclarationsToBabylon merge o, root: yes
       directives: []
     comments: []
 
-  _compileToBabylon: (o, { root, withDeclarations } = {}) ->
+  _compileToBabylon: (o) ->
+    root = del o, 'root'
+    withDeclarations = del o, 'withDeclarations'
+
+    if root and not o.bare
+      code = new Code [], this
+      code.noReturn = true
+      return @compileBodyToBabylon merge o, expressions: [
+        new Call(
+          new Value(
+            code
+            [new Access new PropertyName 'call']
+          )
+          [new ThisLiteral]
+        )
+      ]
     body = @compileBodyToBabylon(o)
     body = [...@compileDeclarationsToBabylon(o), ...body] if withDeclarations
     return body if root
@@ -589,8 +604,8 @@ exports.Block = class Block extends Base
       body
     }
 
-  compileWithDeclarationsToBabylon: (o, opts) ->
-    @_compileToBabylon merge(o, level: LEVEL_TOP), {...opts, withDeclarations: yes}
+  compileWithDeclarationsToBabylon: (o) ->
+    @_compileToBabylon merge o, level: LEVEL_TOP, withDeclarations: yes
 
   compileScopeDeclarationsToBabylon: (o) ->
     {
@@ -629,8 +644,10 @@ exports.Block = class Block extends Base
     ]
 
   compileBodyToBabylon: (o) ->
+    expressions = del o, 'expressions'
+    expressions ?= @expressions
     flatten(
-      for node in @expressions then do ->
+      for node in expressions then do ->
         compiled = node.compileToBabylon o
         return [] unless compiled
         return compiled.body if node instanceof Block
@@ -1295,7 +1312,11 @@ exports.Call = class Call extends Base
     ifn
 
   _compileToBabylon: (o) ->
-    type: 'CallExpression'
+    type:
+      if @isNew
+        'NewExpression'
+      else
+        'CallExpression'
     callee: @variable.compileToBabylon o, LEVEL_ACCESS
     arguments: arg.compileToBabylon(o, LEVEL_LIST) for arg in @args
 
@@ -3663,6 +3684,12 @@ exports.Op = class Op extends Base
     @compileBinaryToBabylon o
 
   compileUnaryToBabylon: (o) ->
+    if @operator is 'new'
+      return
+        type: 'NewExpression'
+        callee: @first.compileToBabylon o
+        arguments: []
+
     if @operator is '!' and @first instanceof Existence
       @first.negated = not @first.negated
       return @first.compileToBabylon o
@@ -4176,7 +4203,7 @@ exports.For = class For extends While
 
   _compileToBabylon: (o) ->
     {scope} = o
-    sourceVar = @source.base
+    sourceVar = if @range then @source.base else @source
     name = @name
     scope.find(name.value) if name and not @pattern
     index = @index

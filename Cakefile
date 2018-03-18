@@ -380,7 +380,7 @@ task 'bench', 'quick benchmark of compilation time', ->
 
 
 # Run the CoffeeScript test suite.
-runTests = (CoffeeScript) ->
+runTests = (CoffeeScript, {justTestFile, usePrettier} = {}) ->
   CoffeeScript.register() unless global.testingBrowser
 
   # These are attached to `global` so that they’re accessible from within
@@ -454,12 +454,12 @@ runTests = (CoffeeScript) ->
     files = files.filter (filename) -> filename isnt 'async.coffee'
 
   startTime = Date.now()
-  for file in files when helpers.isCoffee file
+  for file in files when helpers.isCoffee(file) and (not justTestFile or "#{justTestFile}.coffee" is file)
     literate = helpers.isLiterate file
     currentFile = filename = path.join 'test', file
     code = fs.readFileSync filename
     try
-      CoffeeScript.run code.toString(), {filename, literate}
+      CoffeeScript.run code.toString(), {filename, literate, usePrettier}
     catch error
       failures.push {filename, error}
 
@@ -469,6 +469,8 @@ runTests = (CoffeeScript) ->
 
 task 'test', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript).catch -> process.exit 1
+task 'test:objects', 'run the CoffeeScript language test suite', ->
+  runTests(CoffeeScript, justTestFile: 'objects', usePrettier: yes).catch -> process.exit 1
 
 
 task 'test:browser', 'run the test suite against the merged browser script', ->

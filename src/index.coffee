@@ -25,7 +25,7 @@ CoffeeScript.compile = (code, options) ->
   # require Babel.
   if options?.transpile
     options.transpile.transpile = CoffeeScript.transpile
-  universalCompile.call CoffeeScript, code, options
+  (if options?.usePrettier then CoffeeScript.prettier else universalCompile).call CoffeeScript, code, options
 
 # Compile and execute a string of CoffeeScript (on the server), correctly
 # setting `__filename`, `__dirname`, and relative `require()`.
