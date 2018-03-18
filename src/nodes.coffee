@@ -633,6 +633,7 @@ exports.Block = class Block extends Base
       for node in @expressions then do ->
         compiled = node.compileToBabylon o
         return [] unless compiled
+        return compiled.body if node instanceof Block
         return compiled if node.isStatement()
         type: 'ExpressionStatement'
         expression: compiled
@@ -1696,8 +1697,8 @@ exports.Obj = class Obj extends Base
     type: 'ObjectExpression'
     properties: {
       type: 'ObjectProperty'
-      key: variable.unwrap().compileToBabylon(o)
-      value: value.compileToBabylon(o)
+      key: variable.unwrap().compileToBabylon o, LEVEL_LIST
+      value: value.compileToBabylon o, LEVEL_LIST
       shorthand: !!shorthand
       computed: variable instanceof Value and variable.base instanceof ComputedPropertyName
     } for { variable, value, shorthand } in @expandProperties(o)
@@ -2469,6 +2470,9 @@ exports.Assign = class Assign extends Base
     unfoldSoak o, this, 'variable'
 
   _compileToBabylon: (o) ->
+    if @variable instanceof Value
+      return @compileConditionalToBabylon o if @context in ['||=', '&&=', '?=']
+
     @addScopeVariables o
 
     type: 'AssignmentExpression'
@@ -2829,6 +2833,23 @@ exports.Assign = class Assign extends Base
     else
       fragments = new Op(@context[...-1], left, new Assign(right, @value, '=')).compileToFragments o
       if o.level <= LEVEL_LIST then fragments else @wrapInParentheses fragments
+
+  wrapInParensIf: (shouldWrap) -> (node) ->
+    if shouldWrap then new Parens node else node
+
+  compileConditionalToBabylon: (o) ->
+    [left, right] = @variable.cacheReference o
+    # Disallow conditional assignment of undefined variables.
+    if not left.properties.length and left.base instanceof Literal and
+           left.base not instanceof ThisLiteral and not o.scope.check left.base.value
+      @variable.error "the variable \"#{left.base.value}\" can't be assigned with #{@context} because it has not been declared before"
+    if "?" in @context
+      o.isExistentialEquals = true
+      new If(new Existence(left), right, type: 'if').addElse(new Assign(right, @value, '=')).compileToBabylon o
+    else
+      @wrapInParensIf(o.level <= LEVEL_LIST)(
+        new Op(@context[...-1], left, new Assign(right, @value, '='))
+      ).compileToBabylon o
 
   # Convert special math assignment operators like `a **= b` to the equivalent
   # extended form `a = a ** b` and then compiles that.
@@ -3443,14 +3464,22 @@ exports.While = class While extends Base
     no
 
 
-  wrapInResultAccumulatingBlock: ({o, resultsVar}) -> (compiled) =>
-    return compiled unless @returns
+  wrapInResultAccumulatingBlock: ({o, resultsVar, cachedSourceVarAssign}) -> (compiled) =>
+    return compiled unless @returns or cachedSourceVarAssign
 
     [
-      type: 'ExpressionStatement' # TODO: make this generated?
-      expression: new Assign(resultsVar, new Arr()).compileToBabylon o
+      ...(if cachedSourceVarAssign then [
+        type: 'ExpressionStatement' # TODO: make this generated?
+        expression: cachedSourceVarAssign.compileToBabylon o
+      ] else [])
+      ...(if @returns then [
+        type: 'ExpressionStatement'
+        expression: new Assign(resultsVar, new Arr()).compileToBabylon o
+      ] else [])
       compiled
-      new Return(resultsVar).compileToBabylon o
+      ...(if @returns then [
+        new Return(resultsVar).compileToBabylon o
+      ] else [])
     ]
 
   _compileToBabylon: (o) ->
@@ -3861,7 +3890,7 @@ exports.Existence = class Existence extends Base
 
   _compileToBabylon: (o) ->
     comparison =
-      if @expression.unwrap() instanceof IdentifierLiteral and not o.scope.check code
+      if @expression.unwrap() instanceof IdentifierLiteral and not o.scope.check @expression.unwrap().value
         do =>
           comparisonAgainstUndefined =
             new Op(
@@ -4128,8 +4157,8 @@ exports.For = class For extends While
   compileBodyToBabylon: (o) ->
     @body.compileToBabylon o, LEVEL_TOP
 
-  compileObjectToBabylon: ({o, name, sourceVar, keyVar, resultsVar}) ->
-    @wrapInResultAccumulatingBlock({o, resultsVar})
+  compileObjectToBabylon: ({o, name, sourceVar, keyVar, resultsVar, cachedSourceVarAssign}) ->
+    @wrapInResultAccumulatingBlock({o, resultsVar, cachedSourceVarAssign})
       type: 'ForInStatement'
       left: keyVar.compileToBabylon o
       right: sourceVar.compileToBabylon o
@@ -4153,12 +4182,16 @@ exports.For = class For extends While
 
     @body = @bodyWithGuard()
 
+    [cachedSourceVarAssign, sourceVar] = sourceVar.cache o, null, (source) ->
+      (name or @own) and source.unwrap() not instanceof IdentifierLiteral
+    cachedSourceVarAssign = null unless cachedSourceVarAssign isnt sourceVar
+
     unless @range
       @body.expressions.unshift new Assign name, new Value sourceVar, [new Index keyVar] if name
 
-    return @compileObjectToBabylon {o, name, keyVar, sourceVar, resultsVar} if @object
+    return @compileObjectToBabylon {o, name, keyVar, sourceVar, resultsVar, cachedSourceVarAssign} if @object
 
-    @wrapInResultAccumulatingBlock({o, resultsVar}) {
+    @wrapInResultAccumulatingBlock({o, resultsVar, cachedSourceVarAssign}) {
       type: 'ForStatement'
       ...(
         if @range
@@ -4372,6 +4405,10 @@ exports.If = class If extends Base
     if @isStatement o then @compileStatementToBabylon o else @compileExpressionToBabylon o
 
   compileStatementToBabylon: (o) ->
+    exeq = del o, 'isExistentialEquals'
+    if exeq
+      return new If(@condition.invert(), @elseBodyNode(), type: 'if').compileToBabylon o
+
     type: 'IfStatement'
     test: @condition.compileToBabylon o, LEVEL_PAREN
     consequent: @ensureBlock(@body).compileToBabylon o
