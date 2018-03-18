@@ -2476,7 +2476,7 @@ exports.Assign = class Assign extends Base
     @addScopeVariables o
 
     type: 'AssignmentExpression'
-    operator: '='
+    operator: @context or '='
     left: @variable.compileToBabylon o, LEVEL_LIST
     right: @value.compileToBabylon o, LEVEL_LIST
 
@@ -2958,6 +2958,7 @@ exports.Code = class Code extends Base
       else
         'method'
     key: @name.compileToBabylon o
+    computed: @name instanceof Access and @name.name instanceof ComputedPropertyName
 
   expandThisParams: (o) ->
     thisAssignments  = @thisAssignments?.slice() ? []

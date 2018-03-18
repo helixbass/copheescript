@@ -712,15 +712,14 @@ test "computed property keys: empty array as key", ->
   eq o2[[]], 1
   o3 = [[]]: 1
   deepEqual o3, { [[]]: 1 }
-  deepEqual o3, { [[]]: 1 }
   eq o3[[]], 1
   o4 = a: 1, [[]]: 2
   deepEqual o4, { a: 1, [[]]: 2 }
-  eq o4.a, 1,
+  eq o4.a, 1
   eq o4[[]], 2
   o5 = { a: 1, [[]]: 2 }
   deepEqual o5, { a: 1, [[]]: 2 }
-  eq o5.a, 1,
+  eq o5.a, 1
   eq o5[[]], 2
 
 test "computed property keys: shorthand after computed property key", ->
