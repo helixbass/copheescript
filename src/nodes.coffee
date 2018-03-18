@@ -1700,7 +1700,7 @@ exports.Obj = class Obj extends Base
       key: variable.unwrap().compileToBabylon o, LEVEL_LIST
       value: value.compileToBabylon o, LEVEL_LIST
       shorthand: !!shorthand
-      computed: variable instanceof Value and variable.base instanceof ComputedPropertyName
+      computed: variable instanceof Value and variable.base instanceof ComputedPropertyName or variable.shouldCache()
     } for { variable, value, shorthand } in @expandProperties(o)
 
   expandProperties: (o) ->
@@ -3464,13 +3464,17 @@ exports.While = class While extends Base
     no
 
 
-  wrapInResultAccumulatingBlock: ({o, resultsVar, cachedSourceVarAssign}) -> (compiled) =>
-    return compiled unless @returns or cachedSourceVarAssign
+  wrapInResultAccumulatingBlock: ({o, resultsVar, cachedSourceVarAssign, cachedStepVarAssign}) -> (compiled) =>
+    return compiled unless @returns or cachedSourceVarAssign or cachedStepVarAssign
 
     [
       ...(if cachedSourceVarAssign then [
         type: 'ExpressionStatement' # TODO: make this generated?
         expression: cachedSourceVarAssign.compileToBabylon o
+      ] else [])
+      ...(if cachedStepVarAssign then [
+        type: 'ExpressionStatement'
+        expression: cachedStepVarAssign.compileToBabylon o
       ] else [])
       ...(if @returns then [
         type: 'ExpressionStatement'
@@ -3664,7 +3668,7 @@ exports.Op = class Op extends Base
       else
         'UnaryExpression'
     @operator
-    prefix: @flip
+    prefix: !@flip
     argument: @first.compileToBabylon o
   }
 
@@ -4191,18 +4195,22 @@ exports.For = class For extends While
 
     return @compileObjectToBabylon {o, name, keyVar, sourceVar, resultsVar, cachedSourceVarAssign} if @object
 
-    @wrapInResultAccumulatingBlock({o, resultsVar, cachedSourceVarAssign}) {
+    if @step and not @range
+      [cachedStepVarAssign, stepVar] = @step.cache o, null, shouldCacheOrIsAssignable
+      cachedStepVarAssign = null unless cachedStepVarAssign isnt stepVar
+
+    @wrapInResultAccumulatingBlock({o, resultsVar, cachedSourceVarAssign, cachedStepVarAssign}) {
       type: 'ForStatement'
       ...(
         if @range
           @source.base.compileToBabylon merge o, {indexVar, keyVar}
         else
-          @compileForPartsToBabylon {o, keyVar, indexVar, sourceVar}
+          @compileForPartsToBabylon {o, keyVar, indexVar, sourceVar, stepVar}
       )
       body: @compileBodyToBabylon o
     }
 
-  compileForPartsToBabylon: ({o, keyVar, indexVar, sourceVar}) ->
+  compileForPartsToBabylon: ({o, keyVar, indexVar, sourceVar, stepVar}) ->
     lengthVar = new IdentifierLiteral(o.scope.freeVariable 'len')# unless @step and stepNum? and down
 
     shouldWrapInAssignToKeyVar = keyVar isnt indexVar
@@ -4226,7 +4234,10 @@ exports.For = class For extends While
     test: new Op('<', indexVar, lengthVar).compileToBabylon o
     update:
       wrapInAssignToKeyVar(
-        new Op '++', indexVar, null, shouldWrapInAssignToKeyVar
+        if @step
+          new Op '+=', indexVar, stepVar
+        else
+          new Op '++', indexVar, null, !shouldWrapInAssignToKeyVar
       ).compileToBabylon o
 
   updateReturnsBasedOnLastBodyExpression: ->
