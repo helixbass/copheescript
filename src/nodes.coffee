@@ -3662,16 +3662,21 @@ exports.Op = class Op extends Base
 
     @compileBinaryToBabylon o
 
-  compileUnaryToBabylon: (o) -> {
-    type:
-      if @operator in ['++', '--']
-        'UpdateExpression'
-      else
-        'UnaryExpression'
-    @operator
-    prefix: !@flip
-    argument: @first.compileToBabylon o
-  }
+  compileUnaryToBabylon: (o) ->
+    if @operator is '!' and @first instanceof Existence
+      @first.negated = not @first.negated
+      return @first.compileToBabylon o
+
+    {
+      type:
+        if @operator in ['++', '--']
+          'UpdateExpression'
+        else
+          'UnaryExpression'
+      @operator
+      prefix: !@flip
+      argument: @first.compileToBabylon o
+    }
 
   compileBinaryToBabylon: (o) -> {
     type: 'BinaryExpression'
@@ -4187,7 +4192,7 @@ exports.For = class For extends While
 
     @body = @bodyWithGuard()
 
-    [cachedSourceVarAssign, sourceVar] = sourceVar.cache o, null, (source) ->
+    [cachedSourceVarAssign, sourceVar] = sourceVar.cache o, null, (source) =>
       (name or @own) and source.unwrap() not instanceof IdentifierLiteral
     cachedSourceVarAssign = null unless cachedSourceVarAssign isnt sourceVar
 
