@@ -1,3 +1,5 @@
+util = require 'util'
+
 # This file contains the common helper functions that we'd like to share among
 # the **Lexer**, **Rewriter**, and the **Nodes**. Merge objects, flatten
 # arrays, count characters, that sort of thing.
@@ -107,6 +109,10 @@ buildLocationData = (first, last) ->
     first_column: first.first_column
     last_line: last.last_line
     last_column: last.last_column
+    range: [
+      first.range[0]
+      last.range[1]
+    ]
 
 buildLocationHash = (loc) ->
   "#{loc.first_line}x#{loc.first_column}-#{loc.last_line}x#{loc.last_column}"
@@ -242,3 +248,5 @@ exports.getNumberValue = (number) ->
     else null
 
   if base? then parseInt(number[2..], base) else parseFloat(number)
+
+exports.dump = (obj) -> console.log util.inspect obj, no, null

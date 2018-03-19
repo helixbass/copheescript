@@ -8,14 +8,11 @@ Error.stackTraceLimit = Infinity
 {Scope} = require './scope'
 {isUnassignable, JS_FORBIDDEN} = require './lexer'
 prettier = require '../../../prettier'
-util = require 'util'
 
 # Import the helpers we plan to use.
 {compact, flatten, extend, merge, del, starts, ends, some,
 addDataToNode, attachCommentsToNode, locationDataToString,
-throwSyntaxError, getNumberValue} = require './helpers'
-
-dump = (obj) -> console.log util.inspect obj, no, null
+throwSyntaxError, getNumberValue, dump} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -117,12 +114,42 @@ exports.Base = class Base
     node = this
 
     return @compileClosureToBabylon o unless o.level is LEVEL_TOP or not node.isStatement o
-    @_compileToBabylon o
+    @withBabylonLocationData @_compileToBabylon o
+
+  withEmptyBabylonLocationData: (compiled) ->
+    @withBabylonLocationData compiled,
+      locationData:
+        first_line: 0
+        first_column: 0
+        last_line: 0
+        last_column: 0
+        range: [0, 0]
+
+  withBabylonLocationData: (compiled, node) ->
+    {locationData} = node or @
+    return compiled unless locationData and not Array.isArray compiled
+    {first_line, first_column, last_line, last_column, range} = locationData
+
+    merge compiled, {
+      loc:
+        start:
+          line: first_line + 1
+          column: first_column
+        end:
+          line: last_line + 1
+          column: last_column
+      range
+    }
+
+  withLocationData: (node) ->
+    node.updateLocationDataIfMissing @locationData
 
   compileClosureToBabylon: (o) ->
-    new Call(
-      new Code [], Block.wrap [this]
-      []
+    @withLocationData(
+      new Call(
+        new Code [], Block.wrap [this]
+        []
+      )
     ).compileToBabylon o
 
   compileToFragmentsWithoutComments: (o, lvl) ->
@@ -254,10 +281,12 @@ exports.Base = class Base
   # many statement nodes (e.g. If, For)...
   makeReturn: (res) ->
     me = @unwrapAll()
-    if res
-      new Call new Value(new IdentifierLiteral(res), [new Access new PropertyName 'push']), [me]
-    else
-      new Return me
+    @withLocationData(
+      if res
+        new Call new Value(new IdentifierLiteral(res), [new Access new PropertyName 'push']), [me]
+      else
+        new Return me
+    )
 
   # Does this node, or any of its children, contain a node of a certain kind?
   # Recursively traverses down the *children* nodes and returns the first one
@@ -568,13 +597,14 @@ exports.Block = class Block extends Base
     # @spaced   = yes
     @initializeScope o
 
-    type: 'File'
-    program:
-      type: 'Program'
-      sourceType: 'module'
-      body: @compileWithDeclarationsToBabylon merge o, root: yes
-      directives: []
-    comments: []
+    @withBabylonLocationData
+      type: 'File'
+      program:
+        type: 'Program'
+        sourceType: 'module'
+        body: @compileWithDeclarationsToBabylon merge o, root: yes
+        directives: []
+      comments: []
 
   _compileToBabylon: (o) ->
     root = del o, 'root'
@@ -608,18 +638,19 @@ exports.Block = class Block extends Base
     @_compileToBabylon merge o, level: LEVEL_TOP, withDeclarations: yes
 
   compileScopeDeclarationsToBabylon: (o) ->
-    {
+    @withEmptyBabylonLocationData {
       type: 'VariableDeclarator'
       id:
-        type: 'Identifier'
-        name: declaredVariable
+        @withEmptyBabylonLocationData
+          type: 'Identifier'
+          name: declaredVariable
       init: null
     } for declaredVariable in o.scope.declaredVariables()
 
   compileScopeAssignedVariablesToBabylon: (o) ->
-    {
+    @withEmptyBabylonLocationData {
       type: 'VariableDeclarator'
-      id: {
+      id: @withEmptyBabylonLocationData {
         type: 'Identifier'
         name
       }
@@ -635,12 +666,13 @@ exports.Block = class Block extends Base
     return [] unless declars or assigns
 
     [
-      type: 'VariableDeclaration'
-      declarations: [
-        ...@compileScopeDeclarationsToBabylon(o)
-        ...@compileScopeAssignedVariablesToBabylon(o)
-      ]
-      kind: 'var'
+      @withEmptyBabylonLocationData
+        type: 'VariableDeclaration'
+        declarations: [
+          ...@compileScopeDeclarationsToBabylon(o)
+          ...@compileScopeAssignedVariablesToBabylon(o)
+        ]
+        kind: 'var'
     ]
 
   compileBodyToBabylon: (o) ->
@@ -654,6 +686,8 @@ exports.Block = class Block extends Base
         return compiled if node.isStatement()
         type: 'ExpressionStatement'
         expression: compiled
+        loc: compiled.loc
+        range: compiled.range
     )
 
   # If we happen to be the top-level **Block**, wrap everything in a safety
@@ -1260,10 +1294,12 @@ exports.Call = class Call extends Base
     if @locationData and @needsUpdatedStartLocation
       @locationData.first_line = locationData.first_line
       @locationData.first_column = locationData.first_column
+      @locationData.range[0] = locationData.range[0]
       base = @variable?.base or @variable
       if base.needsUpdatedStartLocation
         @variable.locationData.first_line = locationData.first_line
         @variable.locationData.first_column = locationData.first_column
+        @variable.locationData.range[0] = locationData.range[0]
         base.updateLocationDataIfMissing locationData
       delete @needsUpdatedStartLocation
     super locationData
@@ -3500,11 +3536,11 @@ exports.While = class While extends Base
       ] else [])
       ...(if @returns then [
         type: 'ExpressionStatement'
-        expression: new Assign(resultsVar, new Arr()).compileToBabylon o
+        expression: @withLocationData(new Assign(resultsVar, new Arr())).compileToBabylon o
       ] else [])
       compiled
       ...(if @returns then [
-        new Return(resultsVar).compileToBabylon o
+        @withLocationData(new Return(resultsVar)).compileToBabylon o
       ] else [])
     ]
 
@@ -4208,13 +4244,13 @@ exports.For = class For extends While
     scope.find(name.value) if name and not @pattern
     index = @index
     scope.find(index.value) if index and @index not instanceof Value
-    indexVar = @object and index or new IdentifierLiteral(scope.freeVariable 'i', single: true)
+    indexVar = @object and index or @withLocationData new IdentifierLiteral scope.freeVariable 'i', single: true
     keyVar = ((@range or @from) and name) or index or indexVar
 
     @updateReturnsBasedOnLastBodyExpression()
 
     if @returns
-      resultsVar = new IdentifierLiteral(scope.freeVariable 'results')
+      resultsVar = @withLocationData new IdentifierLiteral(scope.freeVariable 'results')
       @body.makeReturn resultsVar.value
 
     @body = @bodyWithGuard()
@@ -4224,7 +4260,7 @@ exports.For = class For extends While
     cachedSourceVarAssign = null unless cachedSourceVarAssign isnt sourceVar
 
     unless @range
-      @body.expressions.unshift new Assign name, new Value sourceVar, [new Index keyVar] if name
+      @body.expressions.unshift @withLocationData new Assign name, new Value sourceVar, [new Index keyVar] if name
 
     return @compileObjectToBabylon {o, name, keyVar, sourceVar, resultsVar, cachedSourceVarAssign} if @object
 
@@ -4244,7 +4280,7 @@ exports.For = class For extends While
     }
 
   compileForPartsToBabylon: ({o, keyVar, indexVar, sourceVar, stepVar}) ->
-    lengthVar = new IdentifierLiteral(o.scope.freeVariable 'len')# unless @step and stepNum? and down
+    lengthVar = @withLocationData new IdentifierLiteral(o.scope.freeVariable 'len')# unless @step and stepNum? and down
 
     shouldWrapInAssignToKeyVar = keyVar isnt indexVar
     wrapInAssignToKeyVar = do ->
@@ -4253,24 +4289,24 @@ exports.For = class For extends While
       (x) -> new Assign(keyVar, x)
 
     init:
-      # TODO: do we have an AST type for a sequence?
-      type: 'SequenceExpression'
-      expressions: [
+      @withLocationData(new Sequence [
         wrapInAssignToKeyVar(
           new Assign(indexVar, new NumberLiteral '0')
-        ).compileToBabylon o
+        )
         new Assign(
           lengthVar
           new Value(sourceVar, [new Access new PropertyName 'length'])
-        ).compileToBabylon o
-      ]
-    test: new Op('<', indexVar, lengthVar).compileToBabylon o
+        )
+      ]).compileToBabylon o
+    test: @withLocationData(new Op('<', indexVar, lengthVar)).compileToBabylon o
     update:
-      wrapInAssignToKeyVar(
-        if @step
-          new Op '+=', indexVar, stepVar
-        else
-          new Op '++', indexVar, null, !shouldWrapInAssignToKeyVar
+      @withLocationData(
+        wrapInAssignToKeyVar(
+          if @step
+            new Op '+=', indexVar, stepVar
+          else
+            new Op '++', indexVar, null, !shouldWrapInAssignToKeyVar
+        )
       ).compileToBabylon o
 
   updateReturnsBasedOnLastBodyExpression: ->
@@ -4360,6 +4396,18 @@ exports.For = class For extends While
       @makeCode(@tab), @makeCode('}')
     fragments.push @makeCode(returnResult) if returnResult
     fragments
+
+exports.Sequence = class Sequence extends Base
+  children: ['expressions']
+
+  constructor: (@expressions) ->
+    super()
+
+  _compileToBabylon: (o) ->
+    type: 'SequenceExpression'
+    expressions:
+      for expression in @expressions
+        expression.compileToBabylon o
 
 #### Switch
 

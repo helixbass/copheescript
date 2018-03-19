@@ -1,12 +1,7 @@
 {
   "name": "coffeescript",
   "description": "Unfancy JavaScript",
-  "keywords": [
-    "javascript",
-    "language",
-    "coffeescript",
-    "compiler"
-  ],
+  "keywords": ["javascript", "language", "coffeescript", "compiler"],
   "author": "Jeremy Ashkenas",
   "version": "2.2.2",
   "license": "MIT",
@@ -22,12 +17,7 @@
     "coffee": "./bin/coffee",
     "cake": "./bin/cake"
   },
-  "files": [
-    "bin",
-    "lib",
-    "register.js",
-    "repl.js"
-  ],
+  "files": ["bin", "lib", "register.js", "repl.js"],
   "scripts": {
     "test": "node ./bin/cake test",
     "test-harmony": "node --harmony ./bin/cake test"
@@ -52,6 +42,14 @@
     "webpack": "~3.11.0"
   },
   "dependencies": {
+    "babel-eslint": "^8.2.2",
+    "eslint": "^4.19.0",
+    "eslint-config-prettier": "^2.9.0",
+    "eslint-config-standard": "^11.0.0",
+    "eslint-plugin-import": "^2.9.0",
+    "eslint-plugin-node": "^6.0.1",
+    "eslint-plugin-promise": "^3.7.0",
+    "eslint-plugin-standard": "^3.0.1",
     "prettier": "^1.11.1"
   }
 }

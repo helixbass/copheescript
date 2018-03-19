@@ -11,6 +11,10 @@ SourceMap     = require './sourcemap'
 # evaluated from `lib/coffeescript`.
 packageJson   = require '../../package.json'
 
+babylonToEspree = require '../../node_modules/babel-eslint/lib/babylon-to-espree'
+babelTraverse = require('@babel/traverse').default
+babylonTokenTypes = require('babylon').tokTypes
+
 # The current CoffeeScript version number.
 exports.VERSION = packageJson.version
 
@@ -80,6 +84,7 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
   map = new SourceMap if generateSourceMap
 
   tokens = lexer.tokenize code, options
+  # dump {tokens}
 
   # Pass a list of referenced variables, so that generated variables won’t get
   # the same name.
@@ -95,6 +100,9 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
         break
 
   fragments = parser.parse(tokens).compileToFragments options
+  # parsed = parser.parse(tokens)
+  # dump {parsed}
+  # fragments = parsed.compileToFragments options
 
   currentLine = 0
   currentLine += 1 if options.header
@@ -179,7 +187,7 @@ exports.nodes = withPrettyErrors (source, options) ->
     parser.parse lexer.tokenize source, options
   else
     parser.parse source
-exports.babylon = withPrettyErrors (source, options) ->
+exports.babylon = compileToBabylon = withPrettyErrors (source, options) ->
   parsed =
     if typeof source is 'string'
       parser.parse lexer.tokenize source, options
@@ -187,6 +195,7 @@ exports.babylon = withPrettyErrors (source, options) ->
       parser.parse source
 
   parsed.compileToBabylon options
+
 exports.prettier = withPrettyErrors (source, options) ->
   parsed =
     if typeof source is 'string'
@@ -195,6 +204,14 @@ exports.prettier = withPrettyErrors (source, options) ->
       parser.parse source
 
   parsed.prettier options
+
+{dump} = helpers
+exports.parseForESLint = (code, opts) ->
+  opts.bare = yes
+  ast = compileToBabylon code, opts
+  ast.tokens = []
+  babylonToEspree ast, babelTraverse, babylonTokenTypes, code
+  {ast}
 
 # This file used to export these methods; leave stubs that throw warnings
 # instead. These methods have been moved into `index.coffee` to provide
@@ -211,6 +228,10 @@ lexer = new Lexer
 # thin wrapper around it, compatible with the Jison API. We can then pass it
 # directly as a "Jison lexer".
 parser.lexer =
+  yylloc:
+    range: []
+  options:
+    ranges: yes
   lex: ->
     token = parser.tokens[@pos++]
     if token
