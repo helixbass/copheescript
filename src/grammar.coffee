@@ -167,7 +167,7 @@ grammar =
 
   String: [
     o 'STRING',                                 -> new StringLiteral $1
-    o 'STRING_START Body STRING_END',           -> new StringWithInterpolations $2
+    o 'STRING_START Body STRING_END',           -> new StringWithInterpolations $2, startQuote: LOC(1)(new Literal $1), endQuote: LOC(3)(new Literal $3)
   ]
 
   Regex: [

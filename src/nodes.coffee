@@ -233,7 +233,7 @@ exports.Base = class Base
     complex = if shouldCache? then shouldCache this else @shouldCache()
     if complex
       ref = new IdentifierLiteral o.scope.freeVariable 'ref'
-      sub = new Assign ref, this
+      sub = @withLocationData new Assign ref, this
       if level then [sub.compileToFragments(o, level), [@makeCode(ref.value)]] else [sub, ref]
     else
       ref = if level then @compileToFragments o, level else this
@@ -1626,15 +1626,22 @@ exports.Range = class Range extends Base
     keyVar = del o, 'keyVar'
 
     init:
-      new Assign(
-        keyVar,
-        new Assign(indexVar, @from)
+      @from.withLocationData(
+        new Assign(
+          keyVar,
+          new Assign(indexVar, @from)
+        )
       ).compileToBabylon o
-    test: new Op("<#{@equals}", indexVar, @to).compileToBabylon o
+    test:
+      @to.withLocationData(
+        new Op("<#{@equals}", indexVar, @to)
+      ).compileToBabylon o
     update:
-      new Assign(
-        keyVar,
-        new Op '++', indexVar, null, true
+      @withLocationData(
+        new Assign(
+          keyVar,
+          new Op '++', indexVar, null
+        )
       ).compileToBabylon o
 
   _compileToBabylon: (o) ->
@@ -3549,9 +3556,9 @@ exports.While = class While extends Base
   bodyWithGuard: ->
     return @body unless @guard
 
-    return Block.wrap [new If @guard, @body] unless @body.expressions.length > 1
+    return @guard.withLocationData Block.wrap [new If @guard, @body] unless @body.expressions.length > 1
 
-    @body.expressions.unshift new If (new Parens @guard).invert(), new StatementLiteral "continue"
+    @body.expressions.unshift @guard.withLocationData new If (new Parens @guard).invert(), new StatementLiteral "continue"
     @body
 
   # The main difference from a JavaScript *while* is that the CoffeeScript
@@ -3753,13 +3760,14 @@ exports.Op = class Op extends Base
     @wrapInParentheses fragments
 
   compileExistenceToBabylon: (o, checkOnlyUndefined) ->
-    new If(
-      new Existence @first, checkOnlyUndefined
-      @first
-      type: 'if'
-    )
-    .addElse(@second)
-    .compileToBabylon o
+    @withLocationData(
+      new If(
+        new Existence @first, checkOnlyUndefined
+        @first
+        type: 'if'
+      )
+      .addElse(@second)
+    ).compileToBabylon o
 
   # Keep reference to the left expression, unless this an existential assignment
   compileExistence: (o, checkOnlyUndefined) ->
@@ -3958,14 +3966,14 @@ exports.Existence = class Existence extends Base
       if @expression.unwrap() instanceof IdentifierLiteral and not o.scope.check @expression.unwrap().value
         do =>
           comparisonAgainstUndefined =
-            new Op(
+            @withLocationData new Op(
               '!=='
               new Op 'typeof', @expression
               new StringLiteral "'undefined'"
             )
           return comparisonAgainstUndefined if @comparisonTarget is 'undefined'
 
-          new Op(
+          @withLocationData new Op(
             '&&'
             comparisonAgainstUndefined
             new Op(
@@ -3987,10 +3995,11 @@ exports.Existence = class Existence extends Base
           op.operator = if @negated then '==' else '!='
         op
 
-    (if o.level <= LEVEL_COND
-      comparison
-    else
-      new Parens comparison
+    @withLocationData(
+      if o.level <= LEVEL_COND
+        comparison
+      else
+        new Parens comparison
     ).compileToBabylon o
 
   compileNode: (o) ->
@@ -4057,7 +4066,7 @@ exports.Parens = class Parens extends Base
 #### StringWithInterpolations
 
 exports.StringWithInterpolations = class StringWithInterpolations extends Base
-  constructor: (@body) ->
+  constructor: (@body, {@startQuote, @endQuote} = {}) ->
     super()
 
   children: ['body']
@@ -4107,16 +4116,16 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
   _compileToBabylon: (o) ->
     {elements, salvagedComments} = @extractElementsAndComments()
     [first] = elements
-    elements.unshift new StringLiteral '' unless first instanceof StringLiteral
+    elements.unshift (@startQuote ? @).withLocationData new StringLiteral '' unless first instanceof StringLiteral
     [..., last] = elements
-    elements.push (last = new StringLiteral '') unless last instanceof StringLiteral
+    elements.push (last = (@endQuote ? @).withLocationData new StringLiteral '') unless last instanceof StringLiteral
 
     quasis = []
     expressions = []
     for element, index in elements
       if element instanceof StringLiteral
         @prepareElementValue(element)
-        quasis.push
+        quasis.push element.withBabylonLocationData
           type: 'TemplateElement'
           value:
             raw: element.value
@@ -4247,11 +4256,11 @@ exports.For = class For extends While
 
     @body = @bodyWithGuard()
 
-    [cachedSourceVarAssign, sourceVar] = sourceVar.cache o, null, (source) =>
-      (name or @own) and source.unwrap() not instanceof IdentifierLiteral
-    cachedSourceVarAssign = null unless cachedSourceVarAssign isnt sourceVar
-
     unless @range
+      [cachedSourceVarAssign, sourceVar] = sourceVar.cache o, null, (source) =>
+        (name or @own) and source.unwrap() not instanceof IdentifierLiteral
+      cachedSourceVarAssign = null unless cachedSourceVarAssign isnt sourceVar
+
       @body.expressions.unshift @withLocationData new Assign name, new Value sourceVar, [new Index keyVar] if name
 
     return @compileObjectToBabylon {o, name, keyVar, sourceVar, resultsVar, cachedSourceVarAssign} if @object

@@ -210,12 +210,21 @@ exports.prettier = withPrettyErrors (source, options) ->
   parsed.prettier options
 
 {dump} = helpers
+espreeTokenTypes =
+  '{': 'Punctuator'
+  '}': 'Punctuator'
+getEspreeTokenType = (type) ->
+  espreeTokenTypes[type] ? type
 exports.parseForESLint = (code, opts) ->
   opts.bare = yes
   {ast, tokens} = compileToBabylon code, {...opts, withTokens: yes}
   ast.tokens =
     for [type, value, locationData] in tokens
-      {type, value, ...helpers.locationDataToBabylon(locationData)}
+      {
+        type: getEspreeTokenType type
+        value
+        ...helpers.locationDataToBabylon(locationData)
+      }
   babylonToEspree ast, babelTraverse, babylonTokenTypes, code
   # dump espreeAst: ast
   {ast}
