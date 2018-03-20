@@ -1773,21 +1773,29 @@ exports.Obj = class Obj extends Base
         key  = key.properties[0].name
         prop = new Assign key, prop, 'object'
       return prop unless key is prop
-      if prop.shouldCache()
-        [key, value] = prop.base.cache o
-        key  = new PropertyName key.value if key instanceof IdentifierLiteral
-        new Assign key, value, 'object'
-      else if prop instanceof Value and prop.base instanceof ComputedPropertyName
-        # `{ [foo()] }` output as `{ [ref = foo()]: ref }`.
-        if prop.base.value.shouldCache()
-          [key, value] = prop.base.value.cache o
-          key = new Value new ComputedPropertyName key.value if key instanceof IdentifierLiteral
+      prop.withLocationData(
+        if prop.shouldCache()
+          [key, value] = prop.base.cache o
+          key  = key.withLocationData new PropertyName key.value if key instanceof IdentifierLiteral
           new Assign key, value, 'object'
+        else if prop instanceof Value and prop.base instanceof ComputedPropertyName
+          # `{ [foo()] }` output as `{ [ref = foo()]: ref }`.
+          if prop.base.value.shouldCache()
+            [key, value] = prop.base.value.cache o
+            key = key.withLocationData new Value new ComputedPropertyName key.value if key instanceof IdentifierLiteral
+            new Assign key, value, 'object'
+          else
+            # `{ [expression] }` output as `{ [expression]: expression }`.
+            new Assign(
+              if prop.base.value.isNumber() or prop.base.value.isString()
+                prop.base.value
+              else
+                prop
+              prop.base.value, 'object'
+            )
         else
-          # `{ [expression] }` output as `{ [expression]: expression }`.
-          new Assign prop, prop.base.value, 'object'
-      else
-        new Assign prop, prop, 'object', shorthand: prop.bareLiteral? IdentifierLiteral
+          new Assign prop, prop, 'object', shorthand: prop.bareLiteral? IdentifierLiteral
+      )
 
   compileNode: (o) ->
     props = @properties

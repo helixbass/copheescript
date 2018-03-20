@@ -213,6 +213,8 @@ exports.prettier = withPrettyErrors (source, options) ->
 espreeTokenTypes =
   '{': 'Punctuator'
   '}': 'Punctuator'
+  '[': 'Punctuator'
+  ']': 'Punctuator'
 getEspreeTokenType = (type) ->
   espreeTokenTypes[type] ? type
 exports.parseForESLint = (code, opts) ->
