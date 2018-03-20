@@ -614,7 +614,7 @@ exports.Block = class Block extends Base
     body = @compileBodyToBabylon(o)
     body = [...@compileDeclarationsToBabylon(o), ...body] if withDeclarations
     return body if root
-    {
+    @withBabylonLocationData {
       type:
         if @isClassBody
           'ClassBody'
@@ -1751,13 +1751,19 @@ exports.Obj = class Obj extends Base
     properties:
       for prop in @expandProperties(o)
         { variable, value, shorthand } = prop
+        isComputedPropertyName = variable instanceof Value and variable.base instanceof ComputedPropertyName
 
         prop.withBabylonLocationData
           type: 'ObjectProperty'
-          key: variable.unwrap().compileToBabylon o, LEVEL_LIST
+          key: (
+            if isComputedPropertyName
+              variable.base.value
+            else
+              variable.unwrap()
+          ).compileToBabylon o, LEVEL_LIST
           value: value.compileToBabylon o, LEVEL_LIST
           shorthand: !!shorthand
-          computed: variable instanceof Value and variable.base instanceof ComputedPropertyName or variable.shouldCache()
+          computed: isComputedPropertyName or variable.shouldCache()
 
   expandProperties: (o) ->
     for prop in @properties then do ->
@@ -3047,7 +3053,7 @@ exports.Code = class Code extends Base
             else
               target
         param.renameParam node, replacement
-        thisAssignments.push new Assign node, target
+        thisAssignments.push param.withLocationData new Assign node, target
 
     {thisAssignments}
 

@@ -9,3 +9,5 @@ globals:
   test: no
   throws: no
   CoffeeScript: no
+  arrayEq: no
+  deepEqual: no
