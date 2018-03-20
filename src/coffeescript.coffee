@@ -11,8 +11,10 @@ SourceMap     = require './sourcemap'
 # evaluated from `lib/coffeescript`.
 packageJson   = require '../../package.json'
 
-babylonToEspree = require '../../node_modules/babel-eslint/lib/babylon-to-espree'
-babelTraverse = require('@babel/traverse').default
+# babylonToEspree = require '../../node_modules/babel-eslint/lib/babylon-to-espree'
+# babelTraverse = require('@babel/traverse').default
+babylonToEspree = require '../../node_modules/babel-eslint/babylon-to-espree'
+babelTraverse = require('babel-traverse').default
 babylonTokenTypes = require('babylon').tokTypes
 
 # The current CoffeeScript version number.
@@ -188,13 +190,15 @@ exports.nodes = withPrettyErrors (source, options) ->
   else
     parser.parse source
 exports.babylon = compileToBabylon = withPrettyErrors (source, options) ->
-  parsed =
+  tokens =
     if typeof source is 'string'
-      parser.parse lexer.tokenize source, options
+      lexer.tokenize source, options
     else
-      parser.parse source
-
-  parsed.compileToBabylon options
+      source
+  parsed = parser.parse tokens
+  ast = parsed.compileToBabylon options
+  return ast unless options.withTokens
+  {ast, tokens}
 
 exports.prettier = withPrettyErrors (source, options) ->
   parsed =
@@ -208,9 +212,12 @@ exports.prettier = withPrettyErrors (source, options) ->
 {dump} = helpers
 exports.parseForESLint = (code, opts) ->
   opts.bare = yes
-  ast = compileToBabylon code, opts
-  ast.tokens = []
+  {ast, tokens} = compileToBabylon code, {...opts, withTokens: yes}
+  ast.tokens =
+    for [type, value, locationData] in tokens
+      {type, value, ...helpers.locationDataToBabylon(locationData)}
   babylonToEspree ast, babelTraverse, babylonTokenTypes, code
+  # dump espreeAst: ast
   {ast}
 
 # This file used to export these methods; leave stubs that throw warnings

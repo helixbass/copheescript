@@ -12,7 +12,7 @@ prettier = require '../../../prettier'
 # Import the helpers we plan to use.
 {compact, flatten, extend, merge, del, starts, ends, some,
 addDataToNode, attachCommentsToNode, locationDataToString,
-throwSyntaxError, getNumberValue, dump} = require './helpers'
+throwSyntaxError, getNumberValue, dump, locationDataToBabylon} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -127,19 +127,8 @@ exports.Base = class Base
 
   withBabylonLocationData: (compiled, node) ->
     {locationData} = node or @
-    return compiled unless locationData and not Array.isArray compiled
-    {first_line, first_column, last_line, last_column, range} = locationData
-
-    merge compiled, {
-      loc:
-        start:
-          line: first_line + 1
-          column: first_column
-        end:
-          line: last_line + 1
-          column: last_column
-      range
-    }
+    return compiled unless locationData and compiled and not Array.isArray compiled
+    merge compiled, locationDataToBabylon locationData
 
   withLocationData: (node) ->
     node.updateLocationDataIfMissing @locationData
@@ -1752,13 +1741,16 @@ exports.Obj = class Obj extends Base
 
   _compileToBabylon: (o) ->
     type: 'ObjectExpression'
-    properties: {
-      type: 'ObjectProperty'
-      key: variable.unwrap().compileToBabylon o, LEVEL_LIST
-      value: value.compileToBabylon o, LEVEL_LIST
-      shorthand: !!shorthand
-      computed: variable instanceof Value and variable.base instanceof ComputedPropertyName or variable.shouldCache()
-    } for { variable, value, shorthand } in @expandProperties(o)
+    properties:
+      for prop in @expandProperties(o)
+        { variable, value, shorthand } = prop
+
+        prop.withBabylonLocationData
+          type: 'ObjectProperty'
+          key: variable.unwrap().compileToBabylon o, LEVEL_LIST
+          value: value.compileToBabylon o, LEVEL_LIST
+          shorthand: !!shorthand
+          computed: variable instanceof Value and variable.base instanceof ComputedPropertyName or variable.shouldCache()
 
   expandProperties: (o) ->
     for prop in @properties then do ->
@@ -3536,7 +3528,7 @@ exports.While = class While extends Base
       ] else [])
       ...(if @returns then [
         type: 'ExpressionStatement'
-        expression: @withLocationData(new Assign(resultsVar, new Arr())).compileToBabylon o
+        expression: (@source ? @).withLocationData(new Assign(resultsVar, new Arr())).compileToBabylon o
       ] else [])
       compiled
       ...(if @returns then [

@@ -250,3 +250,16 @@ exports.getNumberValue = (number) ->
   if base? then parseInt(number[2..], base) else parseFloat(number)
 
 exports.dump = (obj) -> console.log util.inspect obj, no, null
+
+exports.locationDataToBabylon = ({first_line, first_column, last_line, last_column, range}) -> {
+  loc:
+    start:
+      line: first_line + 1
+      column: first_column
+    end:
+      line: last_line + 1
+      column: last_column
+  range
+  start: range[0]
+  end: range[1] + 1
+}
