@@ -123,7 +123,7 @@ exports.Base = class Base
         first_column: 0
         last_line: 0
         last_column: 0
-        range: [0, 0]
+        range: [-1, -1]
 
   withBabylonLocationData: (compiled, node) ->
     return (@withBabylonLocationData(item, node) for item in compiled) if Array.isArray compiled
@@ -4304,7 +4304,13 @@ exports.For = class For extends While
         (name or @own) and source.unwrap() not instanceof IdentifierLiteral
       cachedSourceVarAssign = null unless cachedSourceVarAssign isnt sourceVar
 
-      @body.expressions.unshift @withLocationData new Assign name, new Value sourceVar, [new Index keyVar] if name
+      @body.expressions.unshift @withLocationData new Assign(
+        name
+        new Value(
+          name.withLocationData new IdentifierLiteral sourceVar.unwrap().value
+          [new Index keyVar]
+        )
+      ) if name
 
     return @compileObjectToBabylon {o, name, keyVar, sourceVar, resultsVar, cachedSourceVarAssign} if @object
 
@@ -4340,7 +4346,7 @@ exports.For = class For extends While
         new Assign(
           lengthVar
           new Value(
-            @withLocationData(sourceVar, force: yes),
+            @withLocationData new IdentifierLiteral sourceVar.unwrap().value
             [new Access new PropertyName 'length']
           )
         )
