@@ -209,7 +209,7 @@ exports.prettier = withPrettyErrors (source, options) ->
 
   parsed.prettier options
 
-{dump} = helpers
+{dump, flatten, isPlainObject} = helpers
 espreeTokenTypes =
   '{': 'Punctuator'
   '}': 'Punctuator'
@@ -217,16 +217,56 @@ espreeTokenTypes =
   ']': 'Punctuator'
 getEspreeTokenType = (type) ->
   espreeTokenTypes[type] ? type
+
+traverseBabylonAst = (node, func) ->
+  if Array.isArray node
+    return (traverseBabylonAst(item, func) for item in node)
+  func node
+  if isPlainObject node
+    traverseBabylonAst(child, func) for own _, child of node
+
+extraTokensForESLint = (ast) ->
+  extraTokens = []
+  traverseBabylonAst ast, (node) ->
+    return unless node
+    {extra: {parenthesized} = {}, start, end} = node
+    return unless parenthesized
+    extraTokens.push
+      type: '('
+      value: '('
+      start: start - 1
+      end: start
+    ,
+      type: ')'
+      value: ')'
+      start: end
+      end: end + 1
+  extraTokens.sort ({start: firstStart}, {start: secondStart}) ->
+    if firstStart < secondStart then -1 else 1
+tokensForESLint = ({tokens, ast}) ->
+  extraTokens = extraTokensForESLint ast
+  popExtraTokens = ({nextStart}) ->
+    popped = []
+    while (nextExtra = extraTokens[0]) and (nextStart is 'END' or nextExtra.start < nextStart)
+      popped.push extraTokens.shift()
+    popped
+  flatten [
+    ...(for [type, value, locationData] in tokens
+      [
+        ...(popExtraTokens {nextStart: locationData.range[0]})
+        {
+          type: getEspreeTokenType type
+          value
+          ...helpers.locationDataToBabylon(locationData)
+        }
+      ])
+    ...popExtraTokens({nextStart: 'END'})
+    {}
+  ]
 exports.parseForESLint = (code, opts) ->
   opts.bare = yes
   {ast, tokens} = compileToBabylon code, {...opts, withTokens: yes}
-  ast.tokens =
-    for [type, value, locationData] in tokens
-      {
-        type: getEspreeTokenType type
-        value
-        ...helpers.locationDataToBabylon(locationData)
-      }
+  ast.tokens = tokensForESLint {tokens, ast}
   babylonToEspree ast, babelTraverse, babylonTokenTypes, code
   # dump espreeAst: ast
   {ast}

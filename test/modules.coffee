@@ -655,7 +655,7 @@ test "`*` and `from` can be used in an export default expression", ->
       bar: function() {
         var from;
         from = 5;
-        return from = from * 3;
+        return (from = from * 3);
       }
     });"""
 

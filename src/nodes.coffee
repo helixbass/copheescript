@@ -126,11 +126,13 @@ exports.Base = class Base
         range: [0, 0]
 
   withBabylonLocationData: (compiled, node) ->
+    return (@withBabylonLocationData(item, node) for item in compiled) if Array.isArray compiled
     {locationData} = node or @
-    return compiled unless locationData and compiled and not Array.isArray compiled
+    return compiled unless locationData and compiled
     merge compiled, locationDataToBabylon locationData
 
-  withLocationData: (node) ->
+  withLocationData: (node, {force} = {}) ->
+    node.forceUpdateLocation = yes if force
     node.updateLocationDataIfMissing @locationData
 
   compileClosureToBabylon: (o) ->
@@ -672,11 +674,13 @@ exports.Block = class Block extends Base
         compiled = node.compileToBabylon o
         return [] unless compiled
         return compiled.body if node instanceof Block
-        return compiled if node.isStatement()
+        return compiled if node.isStatement o
         type: 'ExpressionStatement'
         expression: compiled
         loc: compiled.loc
         range: compiled.range
+        start: compiled.start
+        end: compiled.end
     )
 
   # If we happen to be the top-level **Block**, wrap everything in a safety
@@ -2956,6 +2960,10 @@ exports.Assign = class Assign extends Base
   eachName: (iterator) ->
     @variable.unwrapAll().eachName iterator
 
+  makeReturn: (res) ->
+    return super res if res
+    @withLocationData new Return new Parens @
+
 #### FuncGlyph
 
 exports.FuncGlyph = class FuncGlyph extends Base
@@ -3035,7 +3043,7 @@ exports.Code = class Code extends Base
 
     # Check for duplicate parameters and separate `this` assignments.
     paramNames = []
-    @eachParamName (name, node, param, obj) ->
+    @eachParamName (name, node, param, obj) =>
       node.error "multiple parameters named '#{name}'" if name in paramNames
       paramNames.push name
 
@@ -3046,14 +3054,18 @@ exports.Code = class Code extends Base
         # `Param` is object destructuring with a default value: ({@prop = 1}) ->
         # In a case when the variable name is already reserved, we have to assign
         # a new variable name to the destructured variable: ({prop:prop1 = 1}) ->
-        replacement =
-            if param.name instanceof Obj and obj instanceof Assign and
-                obj.operatorToken.value is '='
-              new Assign (new IdentifierLiteral name), target, 'object' #, operatorToken: new Literal ':'
-            else
-              target
+        replacement = param.withLocationData(
+          if param.name instanceof Obj and obj instanceof Assign and
+              obj.operatorToken.value is '='
+            new Assign (new IdentifierLiteral name), target, 'object' #, operatorToken: new Literal ':'
+          else
+            target
+        )
         param.renameParam node, replacement
-        thisAssignments.push param.withLocationData new Assign node, target
+        thisAssignments.push @funcGlyph.withLocationData new Assign(
+          node
+          new IdentifierLiteral target.value
+        )
 
     {thisAssignments}
 
@@ -3745,17 +3757,23 @@ exports.Op = class Op extends Base
 
     {
       type:
-        if @operator in ['++', '--']
-          'UpdateExpression'
-        else
-          'UnaryExpression'
+        switch @operator
+          when '++', '--'
+            'UpdateExpression'
+          when 'yield'
+            'YieldExpression'
+          else
+            'UnaryExpression'
       @operator
       prefix: !@flip
       argument: @first.compileToBabylon o
     }
 
   compileBinaryToBabylon: (o) -> {
-    type: 'BinaryExpression'
+    type:
+      switch @operator
+        when '||' or '&&' then 'LogicalExpression'
+        else 'BinaryExpression'
     left: @first.compileToBabylon o, LEVEL_OP
     @operator
     right: @second.compileToBabylon o, LEVEL_OP
@@ -4055,7 +4073,18 @@ exports.Parens = class Parens extends Base
 
   _compileToBabylon: (o) ->
     expr = @body.unwrap()
-    expr.compileToBabylon o, LEVEL_PAREN
+    compiled = expr.compileToBabylon o, LEVEL_PAREN
+    shouldntWrap =
+      expr instanceof Op or expr.unwrap() instanceof Call or
+      (expr instanceof For and expr.returns)
+    return compiled if shouldntWrap or not compiled or Array.isArray compiled
+    {
+      ...compiled
+      extra: {
+        ...(compiled.extra ? {})
+        parenthesized: yes
+      }
+    }
 
   compileNode: (o) ->
     expr = @body.unwrap()
@@ -4259,7 +4288,7 @@ exports.For = class For extends While
     scope.find(name.value) if name and not @pattern
     index = @index
     scope.find(index.value) if index and @index not instanceof Value
-    indexVar = @object and index or @withLocationData new IdentifierLiteral scope.freeVariable 'i', single: true
+    indexVar = @object and index or (name or @).withLocationData new IdentifierLiteral scope.freeVariable 'i', single: true
     keyVar = ((@range or @from) and name) or index or indexVar
 
     @updateReturnsBasedOnLastBodyExpression()
@@ -4295,7 +4324,7 @@ exports.For = class For extends While
     }
 
   compileForPartsToBabylon: ({o, keyVar, indexVar, sourceVar, stepVar}) ->
-    lengthVar = @withLocationData new IdentifierLiteral(o.scope.freeVariable 'len')# unless @step and stepNum? and down
+    lengthVar = sourceVar.withLocationData new IdentifierLiteral(o.scope.freeVariable 'len')# unless @step and stepNum? and down
 
     shouldWrapInAssignToKeyVar = keyVar isnt indexVar
     wrapInAssignToKeyVar = do ->
@@ -4304,13 +4333,16 @@ exports.For = class For extends While
       (x) -> new Assign(keyVar, x)
 
     init:
-      @withLocationData(new Sequence [
+      indexVar.withLocationData(new Sequence [
         wrapInAssignToKeyVar(
           new Assign(indexVar, new NumberLiteral '0')
         )
         new Assign(
           lengthVar
-          new Value(sourceVar, [new Access new PropertyName 'length'])
+          new Value(
+            @withLocationData(sourceVar, force: yes),
+            [new Access new PropertyName 'length']
+          )
         )
       ]).compileToBabylon o
     test: @withLocationData(new Op('<', indexVar, lengthVar)).compileToBabylon o

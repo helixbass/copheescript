@@ -11,3 +11,4 @@ globals:
   CoffeeScript: no
   arrayEq: no
   deepEqual: no
+  doesNotThrow: no

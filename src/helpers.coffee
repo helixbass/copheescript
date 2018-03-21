@@ -263,3 +263,8 @@ exports.locationDataToBabylon = ({first_line, first_column, last_line, last_colu
   start: range[0]
   end: range[1] + 1
 }
+
+exports.isArray = isArray = (obj) -> Array.isArray obj
+exports.isNumber = isNumber = (obj) -> Object::toString.call(obj) is '[object Number]'
+exports.isString = isString = (obj) -> Object::toString.call(obj) is '[object String]'
+exports.isPlainObject = (obj) -> typeof obj is 'object' and !!obj and not isArray(obj) and not isNumber(obj) and not isString(obj)
