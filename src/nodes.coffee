@@ -112,10 +112,10 @@ exports.Base = class Base
   compileToBabylon: (o, level) ->
     o = extend {}, o
     o.level = level if level
-    node = this
+    node = @unfoldSoak(o) or this
 
-    return @compileClosureToBabylon o unless o.level is LEVEL_TOP or not node.isStatement o
-    @withBabylonLocationData @_compileToBabylon o
+    return node.compileClosureToBabylon o unless o.level is LEVEL_TOP or not node.isStatement o
+    @withBabylonLocationData node._compileToBabylon o
 
   withEmptyBabylonLocationData: (compiled) ->
     @withBabylonLocationData compiled,
@@ -613,7 +613,7 @@ exports.Block = class Block extends Base
           )
           [new ThisLiteral]
         )
-      ]
+      ], classScope: o.scope
     body = @compileBodyToBabylon(o)
     body = [...@compileDeclarationsToBabylon(o), ...body] if withDeclarations
     return body if root
@@ -922,6 +922,18 @@ exports.StringLiteral = class StringLiteral extends Literal
     unquoted
 
 exports.RegexLiteral = class RegexLiteral extends Literal
+  REGEX_REGEX: /^\/(.*)\/(\w*)$/
+  _compileToBabylon: (o) ->
+    [, pattern, flags] = @REGEX_REGEX.exec @value
+    {
+      type: 'RegExpLiteral'
+      value: undefined
+      pattern
+      flags
+      extra:
+        raw: @value
+        rawValue: undefined
+    }
 
 exports.PassthroughLiteral = class PassthroughLiteral extends Literal
   _compileToBabylon: (o) -> null
@@ -2758,12 +2770,19 @@ exports.Assign = class Assign extends Base
     {objects} = @variable.base
     assigns   = []
 
+    return @wrapInParensIf(o.level >= LEVEL_OP)(value).compileToBabylon o unless objects.length
+
     # if value.unwrap() not instanceof IdentifierLiteral
     #   [cachedValueAssign, value] = value.cache o, null, YES
     #   assigns.push cachedValueAssign
     # vvar     = value.compileToFragments o, LEVEL_LIST
 
+    splats = (i for obj, i in objects when obj instanceof Splat)
     expans = (i for obj, i in objects when obj instanceof Expansion)
+    splatsAndExpans = [splats..., expans...]
+    # if splatsAndExpans.length > 1
+    #   objects[splatsAndExpans.sort()[1]].error "multiple splats/expansions are disallowed in an assignment"
+    isSplat = splats.length > 0
     isExpans = expans.length > 0
 
     slicer = (type) -> (slicee, ...args) ->
@@ -2771,6 +2790,7 @@ exports.Assign = class Assign extends Base
       new Value new Call slice, [slicee, ...(new NumberLiteral arg for arg in args)]
 
     getSlice = slicer 'slice'
+    getSplice = slicer 'splice'
 
     processObjects = (objs, rhs = value) ->
       assigns.push new Assign(
@@ -2778,12 +2798,17 @@ exports.Assign = class Assign extends Base
         rhs
       )
 
-    if isExpans
-      expansIndex = expans[0]
-      leftObjs = objects.slice 0, expansIndex
+    if splatsAndExpans.length
+      expansIndex = splatsAndExpans[0]
+      leftObjs = objects.slice 0, expansIndex + (if isSplat then 1 else 0)
       rightObjs = objects.slice expansIndex + 1
       processObjects leftObjs if leftObjs.length isnt 0
-      processObjects rightObjs, getSlice value, rightObjs.length * -1 if rightObjs.length isnt 0
+      processObjects(rightObjs,
+        if isSplat
+          getSplice objects[expansIndex].unwrapAll(), rightObjs.length * -1
+        else
+          getSlice value, rightObjs.length * -1
+      ) if rightObjs.length isnt 0
 
     (new Sequence assigns).compileToBabylon o, LEVEL_LIST
 
@@ -3788,7 +3813,8 @@ exports.Op = class Op extends Base
     return @compileUnaryToBabylon o if @isUnary()
 
     switch @operator
-      when '?' then return @compileExistenceToBabylon o, @second.isDefaultValue
+      when '?'  then return @compileExistenceToBabylon o, @second.isDefaultValue
+      when '%%' then return @compileModuloToBabylon o
 
     return new Parens(this).compileToBabylon o if o.level > LEVEL_OP
 
@@ -3842,10 +3868,11 @@ exports.Op = class Op extends Base
     @wrapInParentheses fragments
 
   compileExistenceToBabylon: (o, checkOnlyUndefined) ->
+    [cachedFirstAssign, first] = @first.cache o
     @withLocationData(
       new If(
-        new Existence @first, checkOnlyUndefined
-        @first
+        new Existence cachedFirstAssign, checkOnlyUndefined
+        first
         type: 'if'
       )
       .addElse(@second)
@@ -3911,6 +3938,10 @@ exports.Op = class Op extends Base
   compileModulo: (o) ->
     mod = new Value new Literal utility 'modulo', o
     new Call(mod, [@first, @second]).compileToFragments o
+
+  compileModuloToBabylon: (o) ->
+    mod = new Value new IdentifierLiteral utility_babylon 'modulo', o
+    new Call(mod, [@first, @second]).compileToBabylon o
 
   toString: (idt) ->
     super idt, @constructor.name + ' ' + @operator
@@ -4324,9 +4355,16 @@ exports.For = class For extends While
   compileBodyToBabylon: (o) ->
     @body.compileToBabylon o, LEVEL_TOP
 
-  compileObjectToBabylon: ({o, name, sourceVar, keyVar, resultsVar, cachedSourceVarAssign}) ->
+  compileObjectToBabylon: ({o, sourceVar, keyVar, resultsVar, cachedSourceVarAssign}) ->
     @wrapInResultAccumulatingBlock({o, resultsVar, cachedSourceVarAssign})
       type: 'ForInStatement'
+      left: keyVar.compileToBabylon o
+      right: sourceVar.compileToBabylon o
+      body: @compileBodyToBabylon o
+
+  compileFromToBabylon: ({o, sourceVar, keyVar, resultsVar, cachedSourceVarAssign}) ->
+    @wrapInResultAccumulatingBlock({o, resultsVar, cachedSourceVarAssign})
+      type: 'ForOfStatement'
       left: keyVar.compileToBabylon o
       right: sourceVar.compileToBabylon o
       body: @compileBodyToBabylon o
@@ -4338,7 +4376,12 @@ exports.For = class For extends While
     scope.find(name.value) if name and not @pattern
     index = @index
     scope.find(index.value) if index and @index not instanceof Value
-    indexVar = @object and index or (name or @).withLocationData new IdentifierLiteral scope.freeVariable 'i', single: true
+    indexVar =
+      if @from
+        new IdentifierLiteral scope.freeVariable 'x', single: true if @pattern
+      else
+        @object and index or (name or @).withLocationData new IdentifierLiteral scope.freeVariable 'i', single: true
+    name = indexVar if @pattern
     keyVar = ((@range or @from) and name) or index or indexVar
 
     @updateReturnsBasedOnLastBodyExpression()
@@ -4360,9 +4403,16 @@ exports.For = class For extends While
           name.withLocationData new IdentifierLiteral sourceVar.unwrap().value
           [new Index keyVar]
         )
-      ) if name
+      ) if name and not @from
 
-    return @compileObjectToBabylon {o, name, keyVar, sourceVar, resultsVar, cachedSourceVarAssign} if @object
+    if @pattern and @from
+      @body.expressions.unshift @withLocationData new Assign(
+        @name
+        keyVar
+      )
+
+    return @compileObjectToBabylon {o, keyVar, sourceVar, resultsVar, cachedSourceVarAssign} if @object
+    return @compileFromToBabylon {o, keyVar, sourceVar, resultsVar, cachedSourceVarAssign} if @from
 
     if @step and not @range
       [cachedStepVarAssign, stepVar] = @step.cache o, null, shouldCacheOrIsAssignable
@@ -4702,8 +4752,31 @@ UTILITIES =
   splice : -> '[].splice'
 
 UTILITIES_BABYLON =
-  # splice : -> new Value new Arr, new Access new PropertyName 'splice'
-  slice : -> new Value new Arr, [new Access new PropertyName 'slice']
+  splice : -> new Value new Arr, [new Access new PropertyName 'splice']
+  slice  : -> new Value new Arr, [new Access new PropertyName 'slice']
+  modulo: ->
+    a = new IdentifierLiteral 'a'
+    b = new IdentifierLiteral 'b'
+
+    new Code(
+      [
+        new Param a
+        new Param b
+      ]
+      Block.wrap [new Op(
+        '%'
+        new Op(
+          '+'
+          new Op(
+            '%'
+            new Op '+', a
+            new Assign b, new Op '+', b
+          )
+          b
+        )
+        b
+      )]
+    )
 
 # Levels indicate a node's position in the AST. Useful for knowing if
 # parens are necessary or superfluous.

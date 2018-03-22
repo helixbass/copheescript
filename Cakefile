@@ -454,7 +454,7 @@ runTests = (CoffeeScript, {justTestFile, usePrettier} = {}) ->
     files = files.filter (filename) -> filename isnt 'async.coffee'
 
   startTime = Date.now()
-  for file in files when helpers.isCoffee(file) and (not justTestFile or "#{justTestFile}.coffee" is file)
+  for file in files when helpers.isCoffee(file) and (not justTestFile or Array.isArray(justTestFile) and justTestFile.some((filename) -> "#{filename}.coffee" is file) or "#{justTestFile}.coffee" is file)
     literate = helpers.isLiterate file
     currentFile = filename = path.join 'test', file
     code = fs.readFileSync filename
@@ -469,8 +469,8 @@ runTests = (CoffeeScript, {justTestFile, usePrettier} = {}) ->
 
 task 'test', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript).catch -> process.exit 1
-task 'test:objects', 'run the CoffeeScript language test suite', ->
-  runTests(CoffeeScript, justTestFile: 'objects', usePrettier: yes).catch -> process.exit 1
+task 'test:prettier', 'run the CoffeeScript language test suite', ->
+  runTests(CoffeeScript, justTestFile: ['objects', 'arrays'], usePrettier: yes).catch -> process.exit 1
 
 
 task 'test:browser', 'run the test suite against the merged browser script', ->
