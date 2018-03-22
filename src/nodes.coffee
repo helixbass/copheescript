@@ -427,6 +427,9 @@ exports.Base = class Base
       answer = answer.concat fragments
     answer
 
+  wrapInParensIf: (shouldWrap) -> (node) ->
+    if shouldWrap then new Parens node else node
+
 #### HoistTarget
 
 # A **HoistTargetNode** represents the output location in the node tree for a hoisted node.
@@ -1032,7 +1035,7 @@ exports.Return = class Return extends Base
 
   _compileToBabylon: (o) ->
     type: 'ReturnStatement'
-    argument: @expression.compileToBabylon o
+    argument: @expression?.compileToBabylon(o) ? null
 
   compileNode: (o) ->
     answer = []
@@ -2983,9 +2986,6 @@ exports.Assign = class Assign extends Base
       fragments = new Op(@context[...-1], left, new Assign(right, @value, '=')).compileToFragments o
       if o.level <= LEVEL_LIST then fragments else @wrapInParentheses fragments
 
-  wrapInParensIf: (shouldWrap) -> (node) ->
-    if shouldWrap then new Parens node else node
-
   compileConditionalToBabylon: (o) ->
     [left, right] = @variable.cacheReference o
     # Disallow conditional assignment of undefined variables.
@@ -4075,29 +4075,31 @@ exports.Existence = class Existence extends Base
   invert: NEGATE
 
   _compileToBabylon: (o) ->
+    compareOp = if @negated then '===' else '!=='
+    joinOp    = if @negated then '||' else '&&'
     comparison =
       if @expression.unwrap() instanceof IdentifierLiteral and not o.scope.check @expression.unwrap().value
         do =>
           comparisonAgainstUndefined =
             @withLocationData new Op(
-              '!=='
+              compareOp
               new Op 'typeof', @expression
               new StringLiteral "'undefined'"
             )
           return comparisonAgainstUndefined if @comparisonTarget is 'undefined'
 
           @withLocationData new Op(
-            '&&'
+            joinOp
             comparisonAgainstUndefined
             new Op(
-              '!=='
+              compareOp
               @expression
               new NullLiteral
             )
           )
       else
         op = new Op(
-          if @negated then '===' else '!=='
+          compareOp
           @expression
           if @comparisonTarget is 'null'
             new NullLiteral
@@ -4109,10 +4111,7 @@ exports.Existence = class Existence extends Base
         op
 
     @withLocationData(
-      if o.level <= LEVEL_COND
-        comparison
-      else
-        new Parens comparison
+      @wrapInParensIf(o.level <= LEVEL_COND) comparison
     ).compileToBabylon o
 
   compileNode: (o) ->
