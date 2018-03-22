@@ -12,3 +12,5 @@ globals:
   arrayEq: no
   deepEqual: no
   doesNotThrow: no
+# rules:
+#   no-param-reassign: error

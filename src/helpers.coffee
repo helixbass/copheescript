@@ -241,6 +241,7 @@ exports.nameWhitespaceCharacter = (string) ->
     else string
 
 exports.getNumberValue = (number) ->
+  return number if isNumber number
   base = switch number.charAt 1
     when 'b' then 2
     when 'o' then 8

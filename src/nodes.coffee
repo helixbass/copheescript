@@ -12,7 +12,8 @@ prettier = require '../../../prettier'
 # Import the helpers we plan to use.
 {compact, flatten, extend, merge, del, starts, ends, some,
 addDataToNode, attachCommentsToNode, locationDataToString,
-throwSyntaxError, getNumberValue, dump, locationDataToBabylon} = require './helpers'
+throwSyntaxError, getNumberValue, dump, locationDataToBabylon
+isArray} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -645,8 +646,8 @@ exports.Block = class Block extends Base
         type: 'Identifier'
         name
       }
-      init: value # TODO: this is used to assign UTILITIES which are strings
-    } for {name, value} in o.scope.assignedVariables()
+      init: value.compileToBabylon o
+    } for {name, value} in o.scope.assignedVariableObjects()
 
   compileDeclarationsToBabylon: (o) ->
     {scope} = o
@@ -666,21 +667,25 @@ exports.Block = class Block extends Base
         kind: 'var'
     ]
 
+  asExpressionStatement: (compiled) ->
+    type: 'ExpressionStatement'
+    expression: compiled
+    loc: compiled.loc
+    range: compiled.range
+    start: compiled.start
+    end: compiled.end
+
   compileBodyToBabylon: (o) ->
     expressions = del o, 'expressions'
     expressions ?= @expressions
     flatten(
-      for node in expressions then do ->
+      for node in expressions then do =>
         compiled = node.compileToBabylon o
         return [] unless compiled
         return compiled.body if node instanceof Block
         return compiled if node.isStatement o
-        type: 'ExpressionStatement'
-        expression: compiled
-        loc: compiled.loc
-        range: compiled.range
-        start: compiled.start
-        end: compiled.end
+        return @asExpressionStatement compiled unless isArray compiled
+        @asExpressionStatement item for item in compiled
     )
 
   # If we happen to be the top-level **Block**, wrap everything in a safety
@@ -884,13 +889,14 @@ exports.Literal = class Literal extends Base
 
 exports.NumberLiteral = class NumberLiteral extends Literal
   _compileToBabylon: (o) ->
+    # TODO: unify the type of @value in the constructor (could be string or number)?
     numberValue = getNumberValue @value
 
     type: 'NumericLiteral'
     value: numberValue
     extra:
       rawValue: numberValue
-      raw: @value
+      raw: "#{@value}"
 
 exports.InfinityLiteral = class InfinityLiteral extends NumberLiteral
   compileNode: ->
@@ -1934,7 +1940,7 @@ exports.Obj = class Obj extends Base
 
 # An array literal.
 exports.Arr = class Arr extends Base
-  constructor: (objs, @lhs = no) ->
+  constructor: (objs, {@lhs = no} = {}) ->
     super()
     @objects = objs or []
 
@@ -1956,8 +1962,12 @@ exports.Arr = class Arr extends Base
     not @isAssignable()
 
   _compileToBabylon: (o) ->
-    type: 'ArrayExpression'
-    elements: obj.compileToBabylon(o) for obj in @objects
+    type:
+      if @lhs
+        'ArrayPattern'
+      else
+        'ArrayExpression'
+    elements: obj.compileToBabylon o, LEVEL_LIST for obj in @objects
 
   compileNode: (o) ->
     return [@makeCode '[]'] unless @objects.length
@@ -1999,7 +2009,7 @@ exports.Arr = class Arr extends Base
       # element isn't `Elision` or last element is `Elision` (e.g. [a,,b,,])
       if index isnt 0 and passedElision and (not fragmentIsElision(fragments) or index is olen - 1)
         answer.push @makeCode ', '
-      passedElision = passedElision or not fragmentIsElision fragments
+      passedElision or= not fragmentIsElision fragments
       answer.push fragments...
     if includesLineCommentsOnNonFirstElement or '\n' in fragmentsToText(answer)
       for fragment, fragmentIndex in answer
@@ -2521,9 +2531,8 @@ exports.ExportSpecifier = class ExportSpecifier extends ModuleSpecifier
 # The **Assign** is used to assign a local variable to value, or to set the
 # property of an object -- including within object literals.
 exports.Assign = class Assign extends Base
-  constructor: (@variable, @value, @context, options = {}) ->
+  constructor: (@variable, @value, @context, {@param, @subpattern, @operatorToken, @moduleDeclaration, @shorthand} = {}) ->
     super()
-    {@param, @subpattern, @operatorToken, @moduleDeclaration, @shorthand} = options
 
   children: ['variable', 'value']
 
@@ -2545,6 +2554,13 @@ exports.Assign = class Assign extends Base
 
   _compileToBabylon: (o) ->
     if @variable instanceof Value
+      if @variable.isArray() or @variable.isObject()
+        # This is the left-hand side of an assignment; let `Arr` and `Obj`
+        # know that, so that those nodes know that they’re assignable as
+        # destructured variables.
+        @variable.base.lhs = yes
+        return @compileDestructuringToBabylon o unless @variable.isAssignable()
+
       return @compileConditionalToBabylon o if @context in ['||=', '&&=', '?=']
 
     @addScopeVariables o
@@ -2737,6 +2753,40 @@ exports.Assign = class Assign extends Base
 
     fragments
 
+  compileDestructuringToBabylon: (o) ->
+    {value}   = this
+    {objects} = @variable.base
+    assigns   = []
+
+    # if value.unwrap() not instanceof IdentifierLiteral
+    #   [cachedValueAssign, value] = value.cache o, null, YES
+    #   assigns.push cachedValueAssign
+    # vvar     = value.compileToFragments o, LEVEL_LIST
+
+    expans = (i for obj, i in objects when obj instanceof Expansion)
+    isExpans = expans.length > 0
+
+    slicer = (type) -> (slicee, ...args) ->
+      slice = new Value (new IdentifierLiteral utility_babylon type, o), [new Access new PropertyName 'call']
+      new Value new Call slice, [slicee, ...(new NumberLiteral arg for arg in args)]
+
+    getSlice = slicer 'slice'
+
+    processObjects = (objs, rhs = value) ->
+      assigns.push new Assign(
+        new Value new Arr(objs, lhs: yes)
+        rhs
+      )
+
+    if isExpans
+      expansIndex = expans[0]
+      leftObjs = objects.slice 0, expansIndex
+      rightObjs = objects.slice expansIndex + 1
+      processObjects leftObjs if leftObjs.length isnt 0
+      processObjects rightObjs, getSlice value, rightObjs.length * -1 if rightObjs.length isnt 0
+
+    (new Sequence assigns).compileToBabylon o, LEVEL_LIST
+
   # Brief implementation of recursive pattern matching, when assigning array or
   # object literals to a value. Peeks at their properties to assign inner names.
   compileDestructuring: (o) ->
@@ -2768,8 +2818,8 @@ exports.Assign = class Assign extends Base
       # Sort 'splatsAndExpans' so we can show error at first disallowed token.
       objects[splatsAndExpans.sort()[1]].error "multiple splats/expansions are disallowed in an assignment"
 
-    isSplat = splats?.length > 0
-    isExpans = expans?.length > 0
+    isSplat = splats.length > 0
+    isExpans = expans.length > 0
     isObject = @variable.isObject()
     isArray = @variable.isArray()
 
@@ -2849,7 +2899,7 @@ exports.Assign = class Assign extends Base
 
     # "Simple" `objects` can be split and compiled to arrays, [a, b, c] = arr, [a, b, c...] = arr
     assignObjects = (objs, vvar, vvarTxt) =>
-      vvar = new Value new Arr(objs, yes)
+      vvar = new Value new Arr(objs, lhs: yes)
       vval = if vvarTxt instanceof Value then vvarTxt else new Value new Literal(vvarTxt)
       assigns.push new Assign(vvar, vval, null, param: @param, subpattern: yes).compileToFragments o, LEVEL_LIST
 
@@ -4651,6 +4701,10 @@ UTILITIES =
   slice  : -> '[].slice'
   splice : -> '[].splice'
 
+UTILITIES_BABYLON =
+  # splice : -> new Value new Arr, new Access new PropertyName 'splice'
+  slice : -> new Value new Arr, [new Access new PropertyName 'slice']
+
 # Levels indicate a node's position in the AST. Useful for knowing if
 # parens are necessary or superfluous.
 LEVEL_TOP    = 1  # ...;
@@ -4676,6 +4730,15 @@ utility = (name, o) ->
   else
     ref = root.freeVariable name
     root.assign ref, UTILITIES[name] o
+    root.utilities[name] = ref
+
+utility_babylon = (name, o) ->
+  {root} = o.scope
+  if name of root.utilities
+    root.utilities[name]
+  else
+    ref = root.freeVariable name
+    root.assign ref, UTILITIES_BABYLON[name] o
     root.utilities[name] = ref
 
 multident = (code, tab, includingFirstLine = yes) ->
