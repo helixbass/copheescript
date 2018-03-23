@@ -976,7 +976,9 @@ exports.RegexLiteral = class RegexLiteral extends Literal
     }
 
 exports.PassthroughLiteral = class PassthroughLiteral extends Literal
-  _compileToBabylon: (o) -> null
+  _compileToBabylon: (o) ->
+    return null unless @value.length
+    new IdentifierLiteral(@value).compileToBabylon o
 
 exports.IdentifierLiteral = class IdentifierLiteral extends Literal
   isAssignable: YES
