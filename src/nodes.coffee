@@ -1597,6 +1597,8 @@ exports.Range = class Range extends Base
     [@cachedFromVarAssign, @fromVar] = @from.cache o, null, shouldCache
     [@cachedToVarAssign, @toVar] = @to.cache o, null, shouldCache
     @cachedToVarAssign = null unless @cachedToVarAssign isnt @toVar
+    @fromNum = getNumberValue @from if @from.isNumber()
+    @toNum   = getNumberValue @to   if @to.isNumber()
     # @stepNum = if step?.isNumber() then Number @stepVar else null
 
   # When compiled normally, the range returns the contents of the *for loop*
@@ -1666,8 +1668,8 @@ exports.Range = class Range extends Base
 
       (x) -> new Assign(keyVar, x)
     known =
-      if @from.isNumber() and @to.isNumber()
-        if getNumberValue(@from) <= getNumberValue(@to) then '<' else '>'
+      if @fromNum and @toNum
+        if @fromNum <= @toNum then '<' else '>'
 
     init:
       new Sequence([
@@ -1682,7 +1684,7 @@ exports.Range = class Range extends Base
           new Op("#{known}#{@equals}", indexVar, @toVar)
         else
           new If(
-            new Op "<#{@equals}", @fromVar, @toVar
+            new Op '<=', @fromVar, @toVar
             new Op "<#{@equals}", indexVar, @toVar
           ).addElse(
             new Op ">#{@equals}", indexVar, @toVar
@@ -1697,7 +1699,7 @@ exports.Range = class Range extends Base
           )
         else
           new If(
-            new Op "<#{@equals}", @fromVar, @toVar
+            new Op '<=', @fromVar, @toVar
             new Op '++', indexVar, null, not named
           ).addElse(
             new Op '--', indexVar, null, not named
@@ -2649,6 +2651,7 @@ exports.Assign = class Assign extends Base
         @variable.base.lhs = yes
         return @compileDestructuringToBabylon o unless @variable.isAssignable()
 
+      return @compileSpliceToBabylon      o if @variable.isSplice()
       return @compileConditionalToBabylon o if @context in ['||=', '&&=', '?=']
 
     @addScopeVariables o
@@ -3103,6 +3106,38 @@ exports.Assign = class Assign extends Base
     [valDef, valRef] = @value.cache o, LEVEL_LIST
     answer = [].concat @makeCode("#{utility 'splice', o}.apply(#{name}, [#{fromDecl}, #{to}].concat("), valDef, @makeCode(")), "), valRef
     if o.level > LEVEL_TOP then @wrapInParentheses answer else answer
+
+  compileSpliceToBabylon: (o) ->
+    {range: {from, to, exclusive}} = @variable.properties.pop()
+    from ?= new NumberLiteral '0'
+    fromNum = getNumberValue from if from.isNumber()
+    toNum   = getNumberValue to   if to?.isNumber()
+    [cachedFromAssign, from] = from.cache o
+    [cachedValueAssign, value] = @value.cache o
+
+    @wrapInParensIf(o.level > LEVEL_TOP)(new Sequence([
+      utilityBabylon 'splice', merge o, appliedWithArgs: [
+        @variable
+        new Call(
+          new Value(
+            new Arr [
+              cachedFromAssign
+              if fromNum? and toNum?
+                diff = toNum - fromNum
+                new NumberLiteral if exclusive then diff else diff + 1
+              else if to
+                diff = new Op '-', to, from
+                if exclusive then diff else new Op '+', diff, new NumberLiteral '1'
+              else
+                new NumberLiteral '9e9'
+            ]
+            [new Access new PropertyName 'concat']
+          )
+          [cachedValueAssign]
+        )
+      ]
+      value
+    ])).compileToBabylon o
 
   eachName: (iterator) ->
     @variable.unwrapAll().eachName iterator
@@ -4900,7 +4935,8 @@ utility = (name, o) ->
     root.utilities[name] = ref
 
 utilityBabylon = (name, o) ->
-  calledWithArgs = del o, 'calledWithArgs'
+  calledWithArgs  = del o, 'calledWithArgs'
+  appliedWithArgs = del o, 'appliedWithArgs'
   {root} = o.scope
   ref = new IdentifierLiteral(
     if name of root.utilities
@@ -4910,10 +4946,10 @@ utilityBabylon = (name, o) ->
       root.assign ref, UTILITIES_BABYLON[name] o
       root.utilities[name] = ref
   )
-  return ref unless calledWithArgs
+  return ref unless calledWithArgs or appliedWithArgs
   new Call(
-    new Value ref, [new Access new PropertyName 'call']
-    calledWithArgs
+    new Value ref, [new Access new PropertyName if calledWithArgs then 'call' else 'apply']
+    calledWithArgs ? appliedWithArgs
   )
 
 multident = (code, tab, includingFirstLine = yes) ->
