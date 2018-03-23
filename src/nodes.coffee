@@ -606,6 +606,10 @@ exports.Block = class Block extends Base
   _compileToBabylon: (o) ->
     root = del o, 'root'
     withDeclarations = del o, 'withDeclarations'
+    top = o.level is LEVEL_TOP
+
+    if not top and not root
+      return @wrapInParensIf(o.level >= LEVEL_LIST)(new Sequence(@expressions)).compileToBabylon o
 
     if root and not o.bare
       code = new Code [], this
@@ -3212,6 +3216,8 @@ exports.Code = class Code extends Base
       type:
         if @isMethod
           'ClassMethod'
+        else if @bound
+          'ArrowFunctionExpression'
         else
           'FunctionExpression'
       generator: @isGenerator
@@ -3933,6 +3939,7 @@ exports.Op = class Op extends Base
 
     switch @operator
       when '?'  then return @compileExistenceToBabylon o, @second.isDefaultValue
+      when '**' then return @compilePowerToBabylon o
       when '%%' then return @compileModuloToBabylon o
 
     return new Parens(this).compileToBabylon o if o.level > LEVEL_OP
@@ -4043,10 +4050,16 @@ exports.Op = class Op extends Base
       parts.push [@makeCode ")"] if o.level >= LEVEL_PAREN
     @joinFragmentArrays parts, ''
 
-  compilePower: (o) ->
+  powerCall: ->
     # Make a Math.pow call
     pow = new Value new IdentifierLiteral('Math'), [new Access new PropertyName 'pow']
-    new Call(pow, [@first, @second]).compileToFragments o
+    new Call pow, [@first, @second]
+
+  compilePower: (o) ->
+    @powerCall().compileToFragments o
+
+  compilePowerToBabylon: (o) ->
+    @powerCall().compileToBabylon o
 
   compileFloorDivision: (o) ->
     floor = new Value new IdentifierLiteral('Math'), [new Access new PropertyName 'floor']
@@ -4397,6 +4410,8 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
 
     quasis = []
     expressions = []
+    justSawInterpolation = no
+    lastElement = null
     for element, index in elements
       if element instanceof StringLiteral
         @prepareElementValue(element)
@@ -4405,8 +4420,17 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
           value:
             raw: element.value
             tail: element is last
+        justSawInterpolation = no
       else
+        if justSawInterpolation
+          quasis.push lastElement.withBabylonLocationData
+            type: 'TemplateElement'
+            value:
+              raw: ''
+              tail: no
         expressions.push element.compileToBabylon o, LEVEL_PAREN
+        lastElement = element
+        justSawInterpolation = yes
 
     {
       type: 'TemplateLiteral'
