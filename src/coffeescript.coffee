@@ -104,7 +104,7 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
   parsed = parser.parse(tokens)
   # dump {parsed}
   js = do =>
-    return renderWithPrettier parsed, options if options.usePrettier
+    return parsed.prettier options if options.usePrettier
 
     fragments = parsed.compileToFragments options
 
@@ -203,17 +203,6 @@ exports.babylon = compileToBabylon = withPrettyErrors (source, options) ->
   ast = parsed.compileToBabylon options
   return ast unless options.withTokens
   {ast, tokens}
-
-renderWithPrettier = (parsed, options) ->
-  parsed.prettier options
-exports.prettier = withPrettyErrors (source, options) ->
-  parsed =
-    if typeof source is 'string'
-      parser.parse lexer.tokenize source, options
-    else
-      parser.parse source
-
-  renderWithPrettier parsed, options
 
 {dump, flatten, isPlainObject} = helpers
 espreeTokenTypes =

@@ -241,15 +241,26 @@ exports.nameWhitespaceCharacter = (string) ->
     else string
 
 exports.getNumberValue = (number) ->
+  orig = number
   return number if isNumber number
-  number = number.unwrap().value unless isString number
+  invert = no
+  unless isString number
+    number = do ->
+      number = number.unwrap()
+      if number.operator
+        invert = yes if number.operator is '-'
+        number.first.unwrap().value
+      else
+        number.value
   base = switch number.charAt 1
     when 'b' then 2
     when 'o' then 8
     when 'x' then 16
     else null
 
-  if base? then parseInt(number[2..], base) else parseFloat(number)
+  val = if base? then parseInt(number[2..], base) else parseFloat(number)
+  return val unless invert
+  val * -1
 
 exports.dump = (...args, obj) -> console.log ...args, util.inspect obj, no, null
 

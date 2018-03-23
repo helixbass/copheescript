@@ -139,11 +139,15 @@ exports.Base = class Base
   compileClosureToBabylon: (o) ->
     o.sharedScope = yes
 
+    func = new Code [], Block.wrap [this]
     @withLocationData(
-      new Call(
-        new Code [], Block.wrap [this]
-        []
-      )
+      if @contains isLiteralArguments
+        new Call(
+          new Value func, [new Access new PropertyName 'apply']
+          [new ThisLiteral, new IdentifierLiteral 'arguments']
+        )
+      else
+        new Call func, []
     ).compileToBabylon o
 
   compileToFragmentsWithoutComments: (o, lvl) ->
@@ -590,17 +594,19 @@ exports.Block = class Block extends Base
     # end up being declared on this block.
     o.scope.parameter name for name in o.locals or []
 
+  addDirective: (compiledDirective) ->
   compileRootToBabylon: (o) ->
     # @spaced   = yes
     @initializeScope o
 
     @withBabylonLocationData
       type: 'File'
-      program:
+      program: {
         type: 'Program'
         sourceType: 'module'
         body: @compileWithDeclarationsToBabylon merge o, root: yes
-        directives: []
+        directives: @directives
+      }
       comments: []
 
   _compileToBabylon: (o) ->
@@ -611,6 +617,7 @@ exports.Block = class Block extends Base
     if not top and not root
       return @wrapInParensIf(o.level >= LEVEL_LIST)(new Sequence(@expressions)).compileToBabylon o
 
+    @directives = []
     if root and not o.bare
       code = new Code [], this
       code.noReturn = true
@@ -633,6 +640,7 @@ exports.Block = class Block extends Base
         else
           'BlockStatement'
       body
+      @directives
     }
 
   compileWithDeclarationsToBabylon: (o) ->
@@ -691,11 +699,19 @@ exports.Block = class Block extends Base
       for node in expressions then do =>
         compiled = node.compileToBabylon o
         return [] unless compiled
-        return compiled.body if node instanceof Block
+        return @extractDirectives compiled.body, o if node instanceof Block
         return compiled if node.isStatement o
+        compiled = @extractDirectives compiled, o
+        return [] unless compiled
         return @asExpressionStatement compiled unless isArray compiled
         @asExpressionStatement item for item in compiled
     )
+
+  extractDirectives: (nodes, o) ->
+    return (@extractDirectives node, o for node in nodes) if isArray nodes
+    return nodes unless nodes?.type is 'Directive'
+    @directives.push nodes
+    null
 
   # If we happen to be the top-level **Block**, wrap everything in a safety
   # closure, unless requested not to. It would be better not to generate them
@@ -885,13 +901,6 @@ exports.Literal = class Literal extends Base
   compileNode: (o) ->
     [@makeCode @value]
 
-  _compileToBabylon: (o) -> {
-    type: @babylonType
-    @value
-    extra:
-      raw: @value
-  }
-
   toString: ->
     # This is only intended for debugging.
     " #{if @isStatement() then super() else @constructor.name}: #{@value}"
@@ -926,9 +935,25 @@ exports.NaNLiteral = class NaNLiteral extends NumberLiteral
     new Op('/', new NumberLiteral('0'), new NumberLiteral('0')).compileToBabylon o
 
 exports.StringLiteral = class StringLiteral extends Literal
-  babylonType: 'StringLiteral'
   compileNode: (o) ->
     res = if @csx then [@makeCode @unquote(yes, yes)] else super()
+
+  isDirective: -> @unquote() is 'use strict' # TODO: refine
+
+  _compileToBabylon: (o) ->
+    isDirective = @isDirective()
+    compiled =
+      type:
+        if isDirective
+          'DirectiveLiteral'
+        else
+          'StringLiteral'
+      value: @unquote()
+      extra:
+        raw: @value
+    return compiled unless isDirective
+    type: 'Directive'
+    value: compiled
 
   unquote: (doubleQuote = no, newLine = no) ->
     unquoted = @value[1...-1]
@@ -1132,6 +1157,7 @@ exports.Value = class Value extends Base
   isAssignable   : -> @hasProperties() or @base.isAssignable()
   isNumber       : -> @bareLiteral(NumberLiteral)
   isString       : -> @bareLiteral(StringLiteral)
+  isDirective    : -> @isString() and @base.isDirective()
   isRegex        : -> @bareLiteral(RegexLiteral)
   isUndefined    : -> @bareLiteral(UndefinedLiteral)
   isNull         : -> @bareLiteral(NullLiteral)
@@ -1251,6 +1277,10 @@ exports.Value = class Value extends Base
       @base.eachName iterator
     else
       @error 'tried to assign to unassignable value'
+
+  makeReturn: (res) ->
+    return super res unless @isDirective()
+    return this
 
 #### HereComment
 
@@ -1609,13 +1639,10 @@ exports.Range = class Range extends Base
 
   compileVariablesForBabylon: (o) ->
     o = merge o, top: true
-    shouldCache = del o, 'shouldCache'
-    [@cachedFromVarAssign, @fromVar] = @from.cache o, null, shouldCache
-    [@cachedToVarAssign, @toVar] = @to.cache o, null, shouldCache
-    @cachedToVarAssign = null unless @cachedToVarAssign isnt @toVar
+    @step = del o, 'step'
     @fromNum = getNumberValue @from if @from.isNumber()
     @toNum   = getNumberValue @to   if @to.isNumber()
-    # @stepNum = if step?.isNumber() then Number @stepVar else null
+    @stepNum = getNumberValue @step if @step?.isNumber()
 
   # When compiled normally, the range returns the contents of the *for loop*
   # needed to iterate over the values in the range. Used by comprehensions.
@@ -1653,7 +1680,7 @@ exports.Range = class Range extends Base
          else
           "(#{@fromVar} <= #{@toVar} ? #{lowerBound} : #{upperBound})"
 
-    cond = if @stepVar then "#{@stepVar} > 0" else "#{@fromVar} <= #{@toVar}"
+    cond = "#{@fromVar} <= #{@toVar}"
 
     # Generate the step.
     stepPart = if @stepVar
@@ -1678,44 +1705,67 @@ exports.Range = class Range extends Base
   compileForToBabylon: (o) ->
     indexVar = del o, 'indexVar'
     keyVar = del o, 'keyVar'
+    shouldCache = del o, 'shouldCache'
     named = keyVar and keyVar isnt indexVar
     wrapInAssignToKeyVar = do ->
       return ((x) -> x) unless named
 
       (x) -> new Assign(keyVar, x)
     known =
-      if @fromNum? and @toNum?
+      if @stepNum?
+        if @stepNum > 0 then '<' else '>'
+      else if @fromNum? and @toNum?
         if @fromNum <= @toNum then '<' else '>'
+
+    [cachedFromVarAssign, fromVar] = @from.cache o, null, shouldCache
+    [cachedToVarAssign,   toVar  ] = @to.cache   o, null, shouldCache
+    cachedToVarAssign = null unless cachedToVarAssign isnt toVar
+    if @step
+      [cachedStepVarAssign, stepVar] = @step.cache o, null, shouldCache
+      cachedStepVarAssign = null unless cachedStepVarAssign isnt stepVar
+    wrapInStepGuard =
+      if @step and not @stepNum
+        (node) => new Op '&&',
+          new Op '!==', stepVar, new NumberLiteral '0'
+          node
+      else
+        (node) -> node
 
     init:
       new Sequence([
         @from.withLocationData(wrapInAssignToKeyVar(
-          new Assign(indexVar, @cachedFromVarAssign)
+          new Assign(indexVar, cachedFromVarAssign)
         ))
-        ...(if @cachedToVarAssign then [@cachedToVarAssign] else [])
+        ...(if cachedToVarAssign   then [cachedToVarAssign]   else [])
+        ...(if cachedStepVarAssign then [cachedStepVarAssign] else [])
       ]).compileToBabylon o
     test:
-      @to.withLocationData(
+      @to.withLocationData(wrapInStepGuard(
         if known
-          new Op("#{known}#{@equals}", indexVar, @toVar)
+          new Op("#{known}#{@equals}", indexVar, toVar)
         else
           new If(
-            new Op '<=', @fromVar, @toVar
-            new Op "<#{@equals}", indexVar, @toVar
+            if @step
+              new Op '>', stepVar, new NumberLiteral '0'
+            else
+              new Op '<=', fromVar, toVar
+            new Op "<#{@equals}", indexVar, toVar
           ).addElse(
-            new Op ">#{@equals}", indexVar, @toVar
+            new Op ">#{@equals}", indexVar, toVar
           )
-      ).compileToBabylon o, LEVEL_PAREN
+      )).compileToBabylon o, LEVEL_PAREN
     update:
       @withLocationData(wrapInAssignToKeyVar(
-        if known
+        if @step
+          new Op '+=', indexVar, stepVar
+        else if known
           new Op(
             if known is '<' then '++' else '--'
             indexVar, null, not named
           )
         else
           new If(
-            new Op '<=', @fromVar, @toVar
+            new Op '<=', fromVar, toVar
             new Op '++', indexVar, null, not named
           ).addElse(
             new Op '--', indexVar, null, not named
@@ -1738,8 +1788,11 @@ exports.Range = class Range extends Base
 
     @withLocationData(new Parens new For(
       null
-      source: new Value this
-      accumulateIndex: yes
+      {
+        source: new Value this
+        accumulateIndex: yes
+        @step
+      }
     )).compileToBabylon o
 
   # When used as a value, expand the range into the equivalent array.
@@ -1782,10 +1835,7 @@ exports.Slice = class Slice extends Base
 
     toNum = do ->
       return unless to?.isNumber()
-      if to instanceof Op
-        getNumberValue(to.first) * if to.operator is '-' then -1 else 1
-      else
-        getNumberValue to
+      getNumberValue to
 
     args = [from ? new NumberLiteral '0']
     args.push(
@@ -4599,7 +4649,7 @@ exports.For = class For extends While
       type: 'ForStatement'
       ...(
         if @range
-          @source.base.compileToBabylon merge o, {indexVar, keyVar, shouldCache: shouldCacheOrIsAssignable}
+          @source.base.compileToBabylon merge o, {indexVar, keyVar, @step, shouldCache: shouldCacheOrIsAssignable}
         else
           @compileForPartsToBabylon {o, keyVar, indexVar, sourceVar, stepVar}
       )

@@ -8,7 +8,7 @@
 fs             = require 'fs'
 path           = require 'path'
 util           = require 'util'
-helpers        = require './helpers'
+{extend, ends, baseFileName, isCoffee, isLiterate, invertLiterate, merge} = require './helpers'
 optparse       = require './optparse'
 CoffeeScript   = require './'
 {spawn, exec}  = require 'child_process'
@@ -17,7 +17,7 @@ CoffeeScript   = require './'
 useWinPathSep  = path.sep is '\\'
 
 # Allow CoffeeScript to emit Node.js events.
-helpers.extend CoffeeScript, new EventEmitter
+extend CoffeeScript, new EventEmitter
 
 printLine = (line) -> process.stdout.write line + '\n'
 printWarn = (line) -> process.stderr.write line + '\n'
@@ -111,7 +111,7 @@ exports.run = ->
     outputBasename = path.basename opts.output
     if '.' in outputBasename and
        outputBasename not in ['.', '..'] and
-       not helpers.ends(opts.output, path.sep)
+       not ends(opts.output, path.sep)
       # An output filename was specified, e.g. `/dist/scripts.js`.
       opts.outputFilename = outputBasename
       opts.outputPath = path.resolve path.dirname opts.output
@@ -143,7 +143,7 @@ exports.run = ->
 makePrelude = (requires) ->
   requires.map (module) ->
     [full, name, module] = match if match = module.match(/^(.*)=(.*)$/)
-    name or= helpers.baseFileName module, yes, useWinPathSep
+    name or= baseFileName module, yes, useWinPathSep
     "global['#{name}'] = require('#{module}')"
   .join ';'
 
@@ -175,7 +175,7 @@ compilePath = (source, topLevel, base) ->
       if err.code is 'ENOENT' then return else throw err
     for file in files
       compilePath (path.join source, file), no, base
-  else if topLevel or helpers.isCoffee source
+  else if topLevel or isCoffee source
     sources.push source
     sourceCode.push null
     delete notSources[source]
@@ -212,25 +212,23 @@ compileScript = (file, input, base = null) ->
       printLine CoffeeScript.nodes(task.input, task.options).toString().trim()
     else if opts.babylon
       console.log util.inspect CoffeeScript.babylon(task.input, task.options), no, null
-    else if opts.prettier
-      printLine CoffeeScript.prettier(task.input, task.options)
     else if opts.run
       CoffeeScript.register()
       CoffeeScript.eval opts.prelude, task.options if opts.prelude
       CoffeeScript.run task.input, task.options
     else if opts.join and task.file isnt opts.join
-      task.input = helpers.invertLiterate task.input if helpers.isLiterate file
+      task.input = invertLiterate task.input if isLiterate file
       sourceCode[sources.indexOf(task.file)] = task.input
       compileJoin()
     else
-      compiled = CoffeeScript.compile task.input, task.options
+      compiled = CoffeeScript.compile task.input, merge task.options, usePrettier: opts.prettier
       task.output = compiled
       if opts.map
         task.output = compiled.js
         task.sourceMap = compiled.v3SourceMap
 
       CoffeeScript.emit 'success', task
-      if opts.print
+      if opts.print or opts.prettier
         printLine task.output.trim()
       else if opts.compile or opts.map
         saveTo = if opts.outputFilename and sources.length is 1
@@ -377,7 +375,7 @@ silentUnlink = (path) ->
 
 # Get the corresponding output JavaScript path for a source file.
 outputPath = (source, base, extension=".js") ->
-  basename  = helpers.baseFileName source, yes, useWinPathSep
+  basename  = baseFileName source, yes, useWinPathSep
   srcDir    = path.dirname source
   dir = unless opts.outputPath
     srcDir
@@ -413,7 +411,7 @@ writeJs = (base, sourcePath, js, jsPath, generatedSourceMap = null) ->
   compile = ->
     if opts.compile
       js = ' ' if js.length <= 0
-      if generatedSourceMap then js = "#{js}\n//# sourceMappingURL=#{helpers.baseFileName sourceMapPath, no, useWinPathSep}\n"
+      if generatedSourceMap then js = "#{js}\n//# sourceMappingURL=#{baseFileName sourceMapPath, no, useWinPathSep}\n"
       fs.writeFile jsPath, js, (err) ->
         if err
           printLine err.message
@@ -448,7 +446,7 @@ printTokens = (tokens) ->
 parseOptions = ->
   o = opts      = optionParser.parse process.argv[2..]
   o.compile     or=  !!o.output
-  o.run         = not (o.compile or o.print or o.map)
+  o.run         = not (o.compile or o.print or o.map or o.prettier)
   o.print       = !!  (o.print or (o.eval or o.stdio and o.compile))
 
 # The compile-time options to pass to the CoffeeScript compiler.
@@ -500,7 +498,7 @@ compileOptions = (filename, base) ->
 
   answer =
     filename: filename
-    literate: opts.literate or helpers.isLiterate(filename)
+    literate: opts.literate or isLiterate(filename)
     bare: opts.bare
     header: opts.compile and not opts['no-header']
     transpile: opts.transpile
@@ -512,17 +510,17 @@ compileOptions = (filename, base) ->
       cwd = process.cwd()
       jsPath = outputPath filename, base
       jsDir = path.dirname jsPath
-      answer = helpers.merge answer, {
+      answer = merge answer, {
         jsPath
         sourceRoot: path.relative jsDir, cwd
         sourceFiles: [path.relative cwd, filename]
-        generatedFile: helpers.baseFileName(jsPath, no, useWinPathSep)
+        generatedFile: baseFileName(jsPath, no, useWinPathSep)
       }
     else
-      answer = helpers.merge answer,
+      answer = merge answer,
         sourceRoot: ""
-        sourceFiles: [helpers.baseFileName filename, no, useWinPathSep]
-        generatedFile: helpers.baseFileName(filename, yes, useWinPathSep) + ".js"
+        sourceFiles: [baseFileName filename, no, useWinPathSep]
+        generatedFile: baseFileName(filename, yes, useWinPathSep) + ".js"
   answer
 
 # Start up a new Node.js instance with the arguments in `--nodejs` passed to
