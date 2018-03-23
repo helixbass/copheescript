@@ -1201,10 +1201,13 @@ exports.Value = class Value extends Base
     ret = @base.compileToBabylon o, if props.length then LEVEL_ACCESS else null
     for prop in props
       ret =
-        type: 'MemberExpression'
-        object: ret
-        property: prop.compileToBabylon o
-        computed: prop instanceof Index
+        if prop instanceof Slice
+          prop.compileValueToBabylon o, ret
+        else
+          type: 'MemberExpression'
+          object: ret
+          property: prop.compileToBabylon o
+          computed: prop instanceof Index
     ret
 
   # Unfold a soak into an `If`: `a?.b` -> `a.b if a?`
@@ -1588,6 +1591,14 @@ exports.Range = class Range extends Base
     @toNum   = if @to.isNumber()   then Number @toVar   else null
     @stepNum = if step?.isNumber() then Number @stepVar else null
 
+  compileVariablesForBabylon: (o) ->
+    o = merge o, top: true
+    shouldCache = del o, 'shouldCache'
+    [@cachedFromVarAssign, @fromVar] = @from.cache o, null, shouldCache
+    [@cachedToVarAssign, @toVar] = @to.cache o, null, shouldCache
+    @cachedToVarAssign = null unless @cachedToVarAssign isnt @toVar
+    # @stepNum = if step?.isNumber() then Number @stepVar else null
+
   # When compiled normally, the range returns the contents of the *for loop*
   # needed to iterate over the values in the range. Used by comprehensions.
   compileNode: (o) ->
@@ -1649,28 +1660,52 @@ exports.Range = class Range extends Base
   compileForToBabylon: (o) ->
     indexVar = del o, 'indexVar'
     keyVar = del o, 'keyVar'
+    named = keyVar and keyVar isnt indexVar
+    wrapInAssignToKeyVar = do ->
+      return ((x) -> x) unless named
+
+      (x) -> new Assign(keyVar, x)
+    known =
+      if @from.isNumber() and @to.isNumber()
+        if getNumberValue(@from) <= getNumberValue(@to) then '<' else '>'
 
     init:
-      @from.withLocationData(
-        new Assign(
-          keyVar,
-          new Assign(indexVar, @from)
-        )
-      ).compileToBabylon o
+      new Sequence([
+        @from.withLocationData(wrapInAssignToKeyVar(
+          new Assign(indexVar, @cachedFromVarAssign)
+        ))
+        ...(if @cachedToVarAssign then [@cachedToVarAssign] else [])
+      ]).compileToBabylon o
     test:
       @to.withLocationData(
-        new Op("<#{@equals}", indexVar, @to)
-      ).compileToBabylon o
+        if known
+          new Op("#{known}#{@equals}", indexVar, @toVar)
+        else
+          new If(
+            new Op "<#{@equals}", @fromVar, @toVar
+            new Op "<#{@equals}", indexVar, @toVar
+          ).addElse(
+            new Op ">#{@equals}", indexVar, @toVar
+          )
+      ).compileToBabylon o, LEVEL_PAREN
     update:
-      @withLocationData(
-        new Assign(
-          keyVar,
-          new Op '++', indexVar, null
-        )
-      ).compileToBabylon o
+      @withLocationData(wrapInAssignToKeyVar(
+        if known
+          new Op(
+            if known is '<' then '++' else '--'
+            indexVar, null, not named
+          )
+        else
+          new If(
+            new Op "<#{@equals}", @fromVar, @toVar
+            new Op '++', indexVar, null, not named
+          ).addElse(
+            new Op '--', indexVar, null, not named
+          )
+      )).compileToBabylon o, LEVEL_PAREN
 
   _compileToBabylon: (o) ->
-    @compileVariables o unless @fromVar
+    @compileVariablesForBabylon o
     return @compileArrayToBabylon(o) unless o.indexVar
     @compileForToBabylon o
 
@@ -1682,6 +1717,12 @@ exports.Range = class Range extends Base
       return new Arr(
         new NumberLiteral "#{num}" for num in range
       ).compileToBabylon o
+
+    @withLocationData(new Parens new For(
+      null
+      source: new Value this
+      accumulateIndex: yes
+    )).compileToBabylon o
 
   # When used as a value, expand the range into the equivalent array.
   compileArray: (o) ->
@@ -1717,6 +1758,38 @@ exports.Slice = class Slice extends Base
 
   constructor: (@range) ->
     super()
+
+  compileValueToBabylon: (o, compiledValue) ->
+    {to, from, exclusive} = @range
+
+    toNum = do ->
+      return unless to?.isNumber()
+      if to instanceof Op
+        getNumberValue(to.first) * if to.operator is '-' then -1 else 1
+      else
+        getNumberValue to
+
+    args = [from ? new NumberLiteral '0']
+    args.push(
+      if exclusive
+        to
+      else if toNum?
+        new NumberLiteral toNum + 1
+      else
+        new Op '||',
+          new Op '+',
+            new Op '+', to
+            new NumberLiteral '1'
+          new NumberLiteral '9e9'
+    ) if to and not (not exclusive and toNum is -1)
+
+    @withBabylonLocationData
+      type: 'CallExpression'
+      callee:
+        type: 'MemberExpression'
+        object: compiledValue
+        property: new IdentifierLiteral('slice').compileToBabylon o
+      arguments: arg.compileToBabylon o for arg in args
 
   # We have to be careful when trying to slice through the end of the array,
   # `9e9` is used because not all implementations respect `undefined` or `1/0`.
@@ -2789,8 +2862,7 @@ exports.Assign = class Assign extends Base
     isExpans = expans.length > 0
 
     slicer = (type) -> (slicee, ...args) ->
-      slice = new Value (new IdentifierLiteral utility_babylon type, o), [new Access new PropertyName 'call']
-      new Value new Call slice, [slicee, ...(new NumberLiteral arg for arg in args)]
+      new Value utilityBabylon type, merge o, calledWithArgs: [slicee, ...(new NumberLiteral arg for arg in args)]
 
     getSlice = slicer 'slice'
     getSplice = slicer 'splice'
@@ -3940,7 +4012,7 @@ exports.Op = class Op extends Base
     new Call(mod, [@first, @second]).compileToFragments o
 
   compileModuloToBabylon: (o) ->
-    mod = new Value new IdentifierLiteral utility_babylon 'modulo', o
+    mod = new Value utilityBabylon 'modulo', o
     new Call(mod, [@first, @second]).compileToBabylon o
 
   toString: (idt) ->
@@ -3955,14 +4027,22 @@ exports.In = class In extends Base
 
   invert: NEGATE
 
+  isNonSplatArray: ->
+    return no unless @array instanceof Value and @array.isArray() and @array.base.objects.length
+    return no for obj in @array.base.objects when obj instanceof Splat
+    yes
+
+  _compileToBabylon: (o) ->
+    if @isNonSplatArray()
+      @compileOrTestToBabylon o
+    else
+      @compileLoopTestToBabylon o
+
   compileNode: (o) ->
-    if @array instanceof Value and @array.isArray() and @array.base.objects.length
-      for obj in @array.base.objects when obj instanceof Splat
-        hasSplat = yes
-        break
-      # `compileOrTest` only if we have an array literal with no splats
-      return @compileOrTest o unless hasSplat
-    @compileLoopTest o
+    if @isNonSplatArray()
+      @compileOrTest o
+    else
+      @compileLoopTest o
 
   compileOrTest: (o) ->
     [sub, ref] = @object.cache o, LEVEL_OP
@@ -3972,6 +4052,13 @@ exports.In = class In extends Base
       if i then tests.push @makeCode cnj
       tests = tests.concat (if i then ref else sub), @makeCode(cmp), item.compileToFragments(o, LEVEL_ACCESS)
     if o.level < LEVEL_OP then tests else @wrapInParentheses tests
+
+  compileLoopTestToBabylon: (o) ->
+    @wrapInParensIf(o.level < LEVEL_LIST)(
+      new Op '>=',
+        utilityBabylon 'indexOf', merge o, calledWithArgs: [@array, @object]
+        new NumberLiteral '0'
+    ).compileToBabylon o
 
   compileLoopTest: (o) ->
     [sub, ref] = @object.cache o, LEVEL_LIST
@@ -4044,6 +4131,10 @@ exports.Throw = class Throw extends Base
 
   # A **Throw** is already a return, of sorts...
   makeReturn: THIS
+
+  _compileToBabylon: (o) ->
+    type: 'ThrowStatement'
+    argument: @expression.compileToBabylon o, LEVEL_LIST
 
   compileNode: (o) ->
     fragments = @expression.compileToFragments o, LEVEL_LIST
@@ -4317,7 +4408,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
 exports.For = class For extends While
   constructor: (body, source) ->
     super()
-    {@source, @guard, @step, @name, @index} = source
+    {@source, @guard, @step, @name, @index, @accumulateIndex} = source
     @body    = Block.wrap [body]
     @own     = source.own?
     @object  = source.object?
@@ -4385,6 +4476,8 @@ exports.For = class For extends While
 
     @updateReturnsBasedOnLastBodyExpression()
 
+    @body.expressions.push indexVar if @accumulateIndex
+
     if @returns
       resultsVar = @withLocationData new IdentifierLiteral(scope.freeVariable 'results')
       @body.makeReturn resultsVar.value
@@ -4421,7 +4514,7 @@ exports.For = class For extends While
       type: 'ForStatement'
       ...(
         if @range
-          @source.base.compileToBabylon merge o, {indexVar, keyVar}
+          @source.base.compileToBabylon merge o, {indexVar, keyVar, shouldCache: shouldCacheOrIsAssignable}
         else
           @compileForPartsToBabylon {o, keyVar, indexVar, sourceVar, stepVar}
       )
@@ -4556,6 +4649,7 @@ exports.Sequence = class Sequence extends Base
     super()
 
   _compileToBabylon: (o) ->
+    # return @expressions[0].compileToBabylon o if @expressions.length is 1
     type: 'SequenceExpression'
     expressions:
       for expression in @expressions
@@ -4751,6 +4845,7 @@ UTILITIES =
   splice : -> '[].splice'
 
 UTILITIES_BABYLON =
+  indexOf: -> new Value new Arr, [new Access new PropertyName 'indexOf']
   splice : -> new Value new Arr, [new Access new PropertyName 'splice']
   slice  : -> new Value new Arr, [new Access new PropertyName 'slice']
   modulo: ->
@@ -4804,14 +4899,22 @@ utility = (name, o) ->
     root.assign ref, UTILITIES[name] o
     root.utilities[name] = ref
 
-utility_babylon = (name, o) ->
+utilityBabylon = (name, o) ->
+  calledWithArgs = del o, 'calledWithArgs'
   {root} = o.scope
-  if name of root.utilities
-    root.utilities[name]
-  else
-    ref = root.freeVariable name
-    root.assign ref, UTILITIES_BABYLON[name] o
-    root.utilities[name] = ref
+  ref = new IdentifierLiteral(
+    if name of root.utilities
+      root.utilities[name]
+    else
+      ref = root.freeVariable name
+      root.assign ref, UTILITIES_BABYLON[name] o
+      root.utilities[name] = ref
+  )
+  return ref unless calledWithArgs
+  new Call(
+    new Value ref, [new Access new PropertyName 'call']
+    calledWithArgs
+  )
 
 multident = (code, tab, includingFirstLine = yes) ->
   endsWithNewLine = code[code.length - 1] is '\n'
