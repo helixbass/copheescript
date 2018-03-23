@@ -394,6 +394,12 @@ runTests = (CoffeeScript, {justTestFile, usePrettier} = {}) ->
 
   # Convenience aliases.
   global.CoffeeScript = CoffeeScript
+  _compile = CoffeeScript.compile
+  _eval = CoffeeScript.eval
+  global.CoffeeScript.compile = (code, options = {}) ->
+    _compile code, {...options, usePrettier}
+  global.CoffeeScript.eval = (code, options = {}) ->
+    _eval code, {...options, usePrettier}
   global.Repl   = require './lib/coffeescript/repl'
   global.bold   = bold
   global.red    = red
@@ -470,8 +476,7 @@ runTests = (CoffeeScript, {justTestFile, usePrettier} = {}) ->
 task 'test', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript).catch -> process.exit 1
 task 'test:prettier', 'run the CoffeeScript language test suite', ->
-  runTests(CoffeeScript, justTestFile: ['argument_parsing', 'arrays', 'booleans', 'objects', 'slicing_and_splicing'], usePrettier: yes).catch -> process.exit 1
-
+  runTests(CoffeeScript, justTestFile: ['argument_parsing', 'arrays', 'booleans', 'numbers', 'objects', 'slicing_and_splicing'], usePrettier: yes).catch -> process.exit 1
 
 task 'test:browser', 'run the test suite against the merged browser script', ->
   source = fs.readFileSync "docs/v#{majorVersion}/browser-compiler/coffeescript.js", 'utf-8'

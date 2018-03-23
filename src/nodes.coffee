@@ -905,6 +905,9 @@ exports.InfinityLiteral = class InfinityLiteral extends NumberLiteral
   compileNode: ->
     [@makeCode '2e308']
 
+  _compileToBabylon: (o) ->
+    new NumberLiteral('2e308').compileToBabylon o
+
 exports.NaNLiteral = class NaNLiteral extends NumberLiteral
   constructor: ->
     super 'NaN'
@@ -912,6 +915,9 @@ exports.NaNLiteral = class NaNLiteral extends NumberLiteral
   compileNode: (o) ->
     code = [@makeCode '0/0']
     if o.level >= LEVEL_OP then @wrapInParentheses code else code
+
+  _compileToBabylon: (o) ->
+    new Op('/', new NumberLiteral('0'), new NumberLiteral('0')).compileToBabylon o
 
 exports.StringLiteral = class StringLiteral extends Literal
   babylonType: 'StringLiteral'
