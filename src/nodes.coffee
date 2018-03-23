@@ -137,6 +137,8 @@ exports.Base = class Base
     node.updateLocationDataIfMissing @locationData
 
   compileClosureToBabylon: (o) ->
+    o.sharedScope = yes
+
     @withLocationData(
       new Call(
         new Code [], Block.wrap [this]
@@ -983,9 +985,13 @@ exports.StatementLiteral = class StatementLiteral extends Literal
     return this if @value is 'continue' and not o?.loop
 
   _compileToBabylon: (o) ->
-    if @value is 'continue'
-      type: 'ContinueStatement'
-      label: null
+    switch @value
+      when 'continue'
+        type: 'ContinueStatement'
+        label: null
+      when 'break'
+        type: 'BreakStatement'
+        label: null
 
   compileNode: (o) ->
     [@makeCode "#{@tab}#{@value};"]
@@ -1674,7 +1680,7 @@ exports.Range = class Range extends Base
 
       (x) -> new Assign(keyVar, x)
     known =
-      if @fromNum and @toNum
+      if @fromNum? and @toNum?
         if @fromNum <= @toNum then '<' else '>'
 
     init:
@@ -4130,6 +4136,20 @@ exports.Try = class Try extends Base
     @recovery = @recovery.makeReturn res if @recovery
     this
 
+  _compileToBabylon: (o) ->
+    if @recovery or not @ensure
+      placeholder = new IdentifierLiteral o.scope.freeVariable 'error', reserve: no
+      @recovery.unshift new Assign @errorVariable, placeholder if @errorVariable
+
+    type: 'TryStatement'
+    block: @attempt.compileToBabylon o, LEVEL_TOP
+    handler: {
+      type: 'CatchClause'
+      param: placeholder.compileToBabylon o
+      body: (@recovery or @withLocationData new Block).compileToBabylon o, LEVEL_TOP
+    } if placeholder
+    finalizer: @ensure?.compileToBabylon o, LEVEL_TOP
+
   # Compilation is more or less as you would expect -- the *finally* clause
   # is optional, the *catch* is not.
   compileNode: (o) ->
@@ -4145,7 +4165,7 @@ exports.Try = class Try extends Base
         @recovery.unshift new Assign @errorVariable, placeholder
       [].concat @makeCode(" catch ("), placeholder.compileToFragments(o), @makeCode(") {\n"),
         @recovery.compileToFragments(o, LEVEL_TOP), @makeCode("\n#{@tab}}")
-    else unless @ensure or @recovery
+    else unless @ensure
       generatedErrorVariableName = o.scope.freeVariable 'error', reserve: no
       [@makeCode(" catch (#{generatedErrorVariableName}) {}")]
     else
@@ -4717,6 +4737,41 @@ exports.Switch = class Switch extends Base
     @otherwise or= new Block [new Literal 'void 0'] if res
     @otherwise?.makeReturn res
     this
+
+  _compileToBabylon: (o) ->
+    lastCaseIndex = @cases.length - 1
+    type: 'SwitchStatement'
+    discriminant: (@subject ? new BooleanLiteral 'false').compileToBabylon o, LEVEL_PAREN
+    cases: [
+      ...flatten(
+        for kase, caseIndex in @cases
+          [tests, consequent] = kase
+          tests = flatten [tests]
+          lastTestIndex = tests.length - 1
+          test.withBabylonLocationData(do =>
+            consequent.expressions.push new StatementLiteral 'break' if do =>
+              return no if caseIndex is lastCaseIndex and not @otherwise
+              lastExpr = @lastNode consequent.expressions
+              return no if lastExpr instanceof Return
+              return no if lastExpr instanceof Throw
+              return no if lastExpr instanceof Literal and lastExpr.jumps() and lastExpr.value isnt 'debugger'
+              yes
+
+            type: 'SwitchCase'
+            test: (if @subject then test else test.invert()).compileToBabylon o, LEVEL_PAREN
+            consequent:
+              if testIndex is lastTestIndex
+                consequent.compileToBabylon(o, LEVEL_TOP).body
+              else []
+          ) for test, testIndex in tests
+      )
+      ...(
+        if @otherwise?.expressions.length then [
+          type: 'SwitchCase'
+          test: null
+          consequent: @otherwise.compileToBabylon(o, LEVEL_TOP).body
+        ] else [])
+    ]
 
   compileNode: (o) ->
     idt1 = o.indent + TAB

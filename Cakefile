@@ -476,7 +476,9 @@ runTests = (CoffeeScript, {justTestFile, usePrettier} = {}) ->
 task 'test', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript).catch -> process.exit 1
 task 'test:prettier', 'run the CoffeeScript language test suite', ->
-  runTests(CoffeeScript, justTestFile: ['argument_parsing', 'arrays', 'booleans', 'numbers', 'objects', 'slicing_and_splicing'], usePrettier: yes).catch -> process.exit 1
+  runTests(CoffeeScript, justTestFile: [
+    'argument_parsing', 'arrays', 'booleans', 'exception_handling', 'numbers', 'objects', 'slicing_and_splicing'
+  ], usePrettier: yes).catch -> process.exit 1
 
 task 'test:browser', 'run the test suite against the merged browser script', ->
   source = fs.readFileSync "docs/v#{majorVersion}/browser-compiler/coffeescript.js", 'utf-8'
