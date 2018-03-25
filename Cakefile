@@ -479,6 +479,7 @@ task 'test:prettier', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript, justTestFile: [
     'argument_parsing', 'arrays', 'booleans', 'exception_handling'
     'interpolation', 'numbers', 'objects', 'ranges', 'slicing_and_splicing'
+    'strict',
   ], usePrettier: yes).catch -> process.exit 1
 
 task 'test:browser', 'run the test suite against the merged browser script', ->

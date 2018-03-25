@@ -1915,30 +1915,43 @@ exports.Obj = class Obj extends Base
     no
 
   _compileToBabylon: (o) ->
-    type: 'ObjectExpression'
+    type:
+      if @lhs
+        'ObjectPattern'
+      else
+        'ObjectExpression'
     properties:
       for prop in @expandProperties(o)
-        { variable, value, shorthand } = prop
+        {variable, value, shorthand} = prop
         isComputedPropertyName = variable instanceof Value and variable.base instanceof ComputedPropertyName
 
+        compiledKey =
+          (if isComputedPropertyName
+            variable.base.value
+          else
+            variable.unwrap()
+          ).compileToBabylon o, LEVEL_LIST
+        compiledValue = value.compileToBabylon o, LEVEL_LIST
         prop.withBabylonLocationData
           type: 'ObjectProperty'
-          key: (
-            if isComputedPropertyName
-              variable.base.value
+          key: compiledKey
+          value:
+            if prop instanceof Assign and prop.context isnt 'object'
+              type: 'AssignmentPattern'
+              left: compiledKey
+              right: compiledValue
             else
-              variable.unwrap()
-          ).compileToBabylon o, LEVEL_LIST
-          value: value.compileToBabylon o, LEVEL_LIST
+              compiledValue
           shorthand: !!shorthand
           computed: isComputedPropertyName or variable.shouldCache()
 
   expandProperties: (o) ->
-    for prop in @properties then do ->
+    for prop in @properties then do =>
       key = if prop instanceof Assign and prop.context is 'object'
         prop.variable
       else if prop instanceof Assign
         prop.operatorToken.error "unexpected #{prop.operatorToken.value}" unless @lhs
+        prop.shorthand = yes
         prop.variable
       else
         prop
@@ -2724,10 +2737,17 @@ exports.Assign = class Assign extends Base
 
     @addScopeVariables o
 
-    type: 'AssignmentExpression'
-    operator: @context or '='
-    left: @variable.compileToBabylon o, LEVEL_LIST
-    right: @value.compileToBabylon o, LEVEL_LIST
+    {
+      ...(
+        if @param
+          type: 'AssignmentPattern'
+        else
+          type: 'AssignmentExpression'
+          operator: @context or '='
+      )
+      left: @variable.compileToBabylon o, LEVEL_LIST
+      right: @value.compileToBabylon o, LEVEL_LIST
+    }
 
   addScopeVariables: (o) ->
     varBase = @variable.unwrapAll()
@@ -2774,9 +2794,6 @@ exports.Assign = class Assign extends Base
   compileNode: (o) ->
     isValue = @variable instanceof Value
     if isValue
-      # When compiling `@variable`, remember if it is part of a function parameter.
-      @variable.param = @param
-
       # If `@variable` is an array or an object, we’re destructuring;
       # if it’s also `isAssignable()`, the destructuring syntax is supported
       # in ES and we can output it as is; otherwise we `@compileDestructuring`
@@ -3252,16 +3269,38 @@ exports.Code = class Code extends Base
 
   makeScope: (parentScope) -> new Scope parentScope, @body, this
 
-  compileParamsToBabylon: (o) ->
-    for param in @params
+  compileParamsToBabylon: (params, o) ->
+    for param in params
       o.scope.parameter fragmentsToText param.compileToFragmentsWithoutComments o
-      param.name.compileToBabylon o
+      param.compileToBabylon o
+
+  processParams: (o) ->
+    exprs = []
+    params =
+      for param in @params
+        {name, value} = param
+
+        if name instanceof Arr or param.name instanceof Obj
+          # This parameter is destructured.
+          name.lhs = yes
+
+          unless param.shouldCache()
+            name.eachName ({value}) ->
+              o.scope.parameter value
+
+        if value
+          new Assign new Value(name), value, null, param: yes
+        else
+          param
+
+    {params, exprs}
 
   _compileToBabylon: (o) ->
     @updateOptions o
     wasEmpty = @body.isEmpty()
     {thisAssignments} = @expandThisParams o
     @body.expressions.unshift thisAssignments... unless @expandCtorSuper thisAssignments
+    {params, exprs} = @processParams o
     @body.makeReturn() unless wasEmpty or @noReturn
 
     {
@@ -3274,7 +3313,7 @@ exports.Code = class Code extends Base
           'FunctionExpression'
       generator: @isGenerator
       async: @isAsync
-      params: @compileParamsToBabylon o
+      params: @compileParamsToBabylon params, o
       body: @body.compileWithDeclarationsToBabylon o
       ...@addtlMethodBabylonFields o
     }
@@ -3610,6 +3649,9 @@ exports.Param = class Param extends Base
       token.error "unexpected #{token.value}"
 
   children: ['name', 'value']
+
+  compileToBabylon: (o) ->
+    @name.compileToBabylon o, LEVEL_LIST
 
   compileToFragments: (o) ->
     @name.compileToFragments o, LEVEL_LIST
@@ -3987,6 +4029,11 @@ exports.Op = class Op extends Base
         if o.level <= LEVEL_OP then answer else @wrapInParentheses answer
 
   _compileToBabylon: (o) ->
+    if @operator is 'delete' and o.scope.check(@first.unwrapAll().value)
+      @error 'delete operand may not be argument or var'
+    if @operator in ['--', '++']
+      message = isUnassignable @first.unwrapAll().value
+      @first.error message if message
     return @compileUnaryToBabylon o if @isUnary()
 
     switch @operator
