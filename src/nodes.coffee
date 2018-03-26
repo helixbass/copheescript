@@ -13,7 +13,7 @@ prettier = require '../../../prettier'
 {compact, flatten, extend, merge, del, starts, ends, some,
 addDataToNode, attachCommentsToNode, locationDataToString,
 throwSyntaxError, getNumberValue, dump, locationDataToBabylon
-isArray, isString} = require './helpers'
+isArray} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -2703,14 +2703,8 @@ exports.ExportSpecifier = class ExportSpecifier extends ModuleSpecifier
 # The **Assign** is used to assign a local variable to value, or to set the
 # property of an object -- including within object literals.
 exports.Assign = class Assign extends Base
-  # constructor: (@variable, @value, {@context, @param, @subpattern, @operatorToken, @moduleDeclaration, @shorthand} = {}) ->
-  constructor: (@variable, @value, context, opts = {}) ->
+  constructor: (@variable, @value, {@context, @param, @subpattern, @operatorToken, @moduleDeclaration, @shorthand} = {}) ->
     super()
-    if isString context
-      opts.context = context
-    else
-      opts = (context ?= {})
-    {@context, @param, @subpattern, @operatorToken, @moduleDeclaration, @shorthand} = opts
 
   children: ['variable', 'value']
 
