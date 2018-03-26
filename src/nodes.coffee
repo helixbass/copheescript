@@ -1889,11 +1889,8 @@ exports.Slice = class Slice extends Base
 
 # An object literal, nothing fancy.
 exports.Obj = class Obj extends Base
-  # constructor: (props, {@generated = no, @lhs = no} = {}) ->
-  constructor: (props, @generated, @lhs) ->
+  constructor: (props, {@generated = no} = {}) ->
     super()
-    if @generated? and not isBoolean @generated
-      {@generated, @lhs} = @generated
 
     @objects = @properties = props or []
 
