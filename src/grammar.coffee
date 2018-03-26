@@ -200,16 +200,12 @@ grammar =
   AssignObj: [
     o 'ObjAssignable',                          -> new Value $1
     o 'ObjRestValue'
-    o 'ObjAssignable : Expression',             -> new Assign LOC(1)(new Value $1), $3, 'object',
-                                                              operatorToken: LOC(2)(new Literal $2)
+    o 'ObjAssignable : Expression',             -> new Assign LOC(1)(new Value $1), $3, context: 'object', operatorToken: LOC(2)(new Literal $2)
     o 'ObjAssignable :
-       INDENT Expression OUTDENT',              -> new Assign LOC(1)(new Value $1), $4, 'object',
-                                                              operatorToken: LOC(2)(new Literal $2)
-    o 'SimpleObjAssignable = Expression',       -> new Assign LOC(1)(new Value $1), $3, null,
-                                                              operatorToken: LOC(2)(new Literal $2)
+       INDENT Expression OUTDENT',              -> new Assign LOC(1)(new Value $1), $4, context: 'object', operatorToken: LOC(2)(new Literal $2)
+    o 'SimpleObjAssignable = Expression',       -> new Assign LOC(1)(new Value $1), $3, operatorToken: LOC(2)(new Literal $2)
     o 'SimpleObjAssignable =
-       INDENT Expression OUTDENT',              -> new Assign LOC(1)(new Value $1), $4, null,
-                                                              operatorToken: LOC(2)(new Literal $2)
+       INDENT Expression OUTDENT',              -> new Assign LOC(1)(new Value $1), $4, operatorToken: LOC(2)(new Literal $2)
   ]
 
   SimpleObjAssignable: [
@@ -450,12 +446,9 @@ grammar =
     o 'EXPORT { }',                                          -> new ExportNamedDeclaration new ExportSpecifierList []
     o 'EXPORT { ExportSpecifierList OptComma }',             -> new ExportNamedDeclaration new ExportSpecifierList $3
     o 'EXPORT Class',                                        -> new ExportNamedDeclaration $2
-    o 'EXPORT Identifier = Expression',                      -> new ExportNamedDeclaration new Assign $2, $4, null,
-                                                                                                      moduleDeclaration: 'export'
-    o 'EXPORT Identifier = TERMINATOR Expression',           -> new ExportNamedDeclaration new Assign $2, $5, null,
-                                                                                                      moduleDeclaration: 'export'
-    o 'EXPORT Identifier = INDENT Expression OUTDENT',       -> new ExportNamedDeclaration new Assign $2, $5, null,
-                                                                                                      moduleDeclaration: 'export'
+    o 'EXPORT Identifier = Expression',                      -> new ExportNamedDeclaration new Assign $2, $4, moduleDeclaration: 'export'
+    o 'EXPORT Identifier = TERMINATOR Expression',           -> new ExportNamedDeclaration new Assign $2, $5, moduleDeclaration: 'export'
+    o 'EXPORT Identifier = INDENT Expression OUTDENT',       -> new ExportNamedDeclaration new Assign $2, $5, moduleDeclaration: 'export'
     o 'EXPORT DEFAULT Expression',                           -> new ExportDefaultDeclaration $3
     o 'EXPORT DEFAULT INDENT Object OUTDENT',                -> new ExportDefaultDeclaration new Value $4
     o 'EXPORT EXPORT_ALL FROM String',                       -> new ExportAllDeclaration new Literal($2), $4
@@ -841,11 +834,11 @@ grammar =
         new Op $2, $1, $3
 
     o 'SimpleAssignable COMPOUND_ASSIGN
-       Expression',                             -> new Assign $1, $3, $2
+       Expression',                             -> new Assign $1, $3, context: $2
     o 'SimpleAssignable COMPOUND_ASSIGN
-       INDENT Expression OUTDENT',              -> new Assign $1, $4, $2
+       INDENT Expression OUTDENT',              -> new Assign $1, $4, context: $2
     o 'SimpleAssignable COMPOUND_ASSIGN TERMINATOR
-       Expression',                             -> new Assign $1, $4, $2
+       Expression',                             -> new Assign $1, $4, context: $2
   ]
 
 # Precedence

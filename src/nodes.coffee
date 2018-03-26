@@ -13,7 +13,7 @@ prettier = require '../../../prettier'
 {compact, flatten, extend, merge, del, starts, ends, some,
 addDataToNode, attachCommentsToNode, locationDataToString,
 throwSyntaxError, getNumberValue, dump, locationDataToBabylon
-isArray} = require './helpers'
+isArray, isString} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -1736,7 +1736,7 @@ exports.Range = class Range extends Base
     init:
       new Sequence([
         @from.withLocationData(wrapInAssignToKeyVar(
-          new Assign(indexVar, cachedFromVarAssign)
+          new Assign indexVar, cachedFromVarAssign
         ))
         ...(if cachedToVarAssign   then [cachedToVarAssign]   else [])
         ...(if cachedStepVarAssign then [cachedStepVarAssign] else [])
@@ -1958,19 +1958,19 @@ exports.Obj = class Obj extends Base
       if key instanceof Value and key.hasProperties()
         key.error 'invalid object key' unless prop.context isnt 'object' and key.this
         key  = key.properties[0].name
-        prop = new Assign key, prop, 'object'
+        prop = new Assign key, prop, context: 'object'
       return prop unless key is prop
       prop.withLocationData(
         if prop.shouldCache()
           [key, value] = prop.base.cache o
           key  = key.withLocationData new PropertyName key.value if key instanceof IdentifierLiteral
-          new Assign key, value, 'object'
+          new Assign key, value, context: 'object'
         else if prop instanceof Value and prop.base instanceof ComputedPropertyName
           # `{ [foo()] }` output as `{ [ref = foo()]: ref }`.
           if prop.base.value.shouldCache()
             [key, value] = prop.base.value.cache o
             key = key.withLocationData new Value new ComputedPropertyName key.value if key instanceof IdentifierLiteral
-            new Assign key, value, 'object'
+            new Assign key, value, context: 'object'
           else
             # `{ [expression] }` output as `{ [expression]: expression }`.
             new Assign(
@@ -1978,10 +1978,11 @@ exports.Obj = class Obj extends Base
                 prop.base.value
               else
                 prop
-              prop.base.value, 'object'
+              prop.base.value
+              context: 'object'
             )
         else
-          new Assign prop, prop, 'object', shorthand: prop.bareLiteral? IdentifierLiteral
+          new Assign prop, prop, context: 'object', shorthand: prop.bareLiteral? IdentifierLiteral
       )
 
   compileNode: (o) ->
@@ -2038,23 +2039,23 @@ exports.Obj = class Obj extends Base
       if key instanceof Value and key.hasProperties()
         key.error 'invalid object key' unless prop.context isnt 'object' and key.this
         key  = key.properties[0].name
-        prop = new Assign key, prop, 'object'
+        prop = new Assign key, prop, context: 'object'
       if key is prop
         if prop.shouldCache()
           [key, value] = prop.base.cache o
           key  = new PropertyName key.value if key instanceof IdentifierLiteral
-          prop = new Assign key, value, 'object'
+          prop = new Assign key, value, context: 'object'
         else if key instanceof Value and key.base instanceof ComputedPropertyName
           # `{ [foo()] }` output as `{ [ref = foo()]: ref }`.
           if prop.base.value.shouldCache()
             [key, value] = prop.base.value.cache o
             key  = new Value new ComputedPropertyName key.value if key instanceof IdentifierLiteral
-            prop = new Assign key, value, 'object'
+            prop = new Assign key, value, context: 'object'
           else
             # `{ [expression] }` output as `{ [expression]: expression }`.
-            prop = new Assign key, prop.base.value, 'object'
+            prop = new Assign key, prop.base.value, context: 'object'
         else if not prop.bareLiteral?(IdentifierLiteral)
-          prop = new Assign prop, prop, 'object'
+          prop = new Assign prop, prop, context: 'object'
       if indent then answer.push @makeCode indent
       answer.push prop.compileToFragments(o, LEVEL_TOP)...
       if join then answer.push @makeCode join
@@ -2238,7 +2239,7 @@ exports.Class = class Class extends Base
       [@variable, @variableRef] = @variable.cache o unless @variableRef?
 
     if @variable
-      node = new Assign @variable, node, null, { @moduleDeclaration }
+      node = new Assign @variable, node, { @moduleDeclaration }
 
     @compileNode = @compileClassDeclaration
     try
@@ -2256,7 +2257,7 @@ exports.Class = class Class extends Base
     node = @
 
     if @variable
-      node = new Assign @variable, node, null, { @moduleDeclaration }
+      node = new Assign @variable, node, { @moduleDeclaration }
 
     @_compileToBabylon = @compileClassDeclarationToBabylon
 
@@ -2702,8 +2703,14 @@ exports.ExportSpecifier = class ExportSpecifier extends ModuleSpecifier
 # The **Assign** is used to assign a local variable to value, or to set the
 # property of an object -- including within object literals.
 exports.Assign = class Assign extends Base
-  constructor: (@variable, @value, @context, {@param, @subpattern, @operatorToken, @moduleDeclaration, @shorthand} = {}) ->
+  # constructor: (@variable, @value, {@context, @param, @subpattern, @operatorToken, @moduleDeclaration, @shorthand} = {}) ->
+  constructor: (@variable, @value, context, opts = {}) ->
     super()
+    if isString context
+      opts.context = context
+    else
+      opts = (context ?= {})
+    {@context, @param, @subpattern, @operatorToken, @moduleDeclaration, @shorthand} = opts
 
   children: ['variable', 'value']
 
@@ -2919,7 +2926,7 @@ exports.Assign = class Assign extends Base
 
     for restElement in restElements
       value = new Call new Value(new Literal utility 'objectWithoutKeys', o), [restElement.source, restElement.excludeProps]
-      result.push new Assign new Value(restElement.name), value, null, param: if @param then 'alwaysDeclare' else null
+      result.push new Assign new Value(restElement.name), value, param: if @param then 'alwaysDeclare' else null
 
     fragments = result.compileToFragments o
     if o.level is LEVEL_TOP
@@ -3083,13 +3090,13 @@ exports.Assign = class Assign extends Base
             else new Value new Literal(vvarTxt), [new Index new NumberLiteral i]
         message = isUnassignable vvar.unwrap().value
         vvar.error message if message
-        assigns.push new Assign(vvar, vval, null, param: @param, subpattern: yes).compileToFragments o, LEVEL_LIST
+        assigns.push new Assign(vvar, vval, param: @param, subpattern: yes).compileToFragments o, LEVEL_LIST
 
     # "Simple" `objects` can be split and compiled to arrays, [a, b, c] = arr, [a, b, c...] = arr
     assignObjects = (objs, vvar, vvarTxt) =>
       vvar = new Value new Arr(objs, lhs: yes)
       vval = if vvarTxt instanceof Value then vvarTxt else new Value new Literal(vvarTxt)
-      assigns.push new Assign(vvar, vval, null, param: @param, subpattern: yes).compileToFragments o, LEVEL_LIST
+      assigns.push new Assign(vvar, vval, param: @param, subpattern: yes).compileToFragments o, LEVEL_LIST
 
     processObjects = (objs, vvar, vvarTxt) ->
       if complexObjects objs
@@ -3141,9 +3148,9 @@ exports.Assign = class Assign extends Base
       @variable.error "the variable \"#{left.base.value}\" can't be assigned with #{@context} because it has not been declared before"
     if "?" in @context
       o.isExistentialEquals = true
-      new If(new Existence(left), right, type: 'if').addElse(new Assign(right, @value, '=')).compileToFragments o
+      new If(new Existence(left), right, type: 'if').addElse(new Assign(right, @value, context: '=')).compileToFragments o
     else
-      fragments = new Op(@context[...-1], left, new Assign(right, @value, '=')).compileToFragments o
+      fragments = new Op(@context[...-1], left, new Assign(right, @value, context: '=')).compileToFragments o
       if o.level <= LEVEL_LIST then fragments else @wrapInParentheses fragments
 
   compileConditionalToBabylon: (o) ->
@@ -3154,10 +3161,10 @@ exports.Assign = class Assign extends Base
       @variable.error "the variable \"#{left.base.value}\" can't be assigned with #{@context} because it has not been declared before"
     if "?" in @context
       o.isExistentialEquals = true
-      new If(new Existence(left), right, type: 'if').addElse(new Assign(right, @value, '=')).compileToBabylon o
+      new If(new Existence(left), right, type: 'if').addElse(new Assign(right, @value, context: '=')).compileToBabylon o
     else
       @wrapInParensIf(o.level <= LEVEL_LIST)(
-        new Op(@context[...-1], left, new Assign(right, @value, '='))
+        new Op(@context[...-1], left, new Assign(right, @value, context: '='))
       ).compileToBabylon o
 
   # Convert special math assignment operators like `a **= b` to the equivalent
@@ -3289,7 +3296,7 @@ exports.Code = class Code extends Base
               o.scope.parameter value
 
         if value
-          new Assign new Value(name), value, null, param: yes
+          new Assign new Value(name), value, param: yes
         else
           param
 
@@ -3348,7 +3355,7 @@ exports.Code = class Code extends Base
         replacement = param.withLocationData(
           if param.name instanceof Obj and obj instanceof Assign and
               obj.operatorToken.value is '='
-            new Assign (new IdentifierLiteral name), target, 'object' #, operatorToken: new Literal ':'
+            new Assign (new IdentifierLiteral name), target, context: 'object' #, operatorToken: new Literal ':'
           else
             target
         )
@@ -3444,7 +3451,7 @@ exports.Code = class Code extends Base
             ifTrue = new Assign new Value(param.name), param.value
             exprs.push new If condition, ifTrue
           else
-            exprs.push new Assign new Value(param.name), param.asReference(o), null, param: 'alwaysDeclare'
+            exprs.push new Assign new Value(param.name), param.asReference(o), param: 'alwaysDeclare'
 
         # If this parameter comes before the splat or expansion, it will go
         # in the function definition parameter list.
@@ -3457,7 +3464,7 @@ exports.Code = class Code extends Base
             ref = param.asReference o
           else
             if param.value? and not param.assignedInBody
-              ref = new Assign new Value(param.name), param.value, null, param: yes
+              ref = new Assign new Value(param.name), param.value, param: yes
             else
               ref = param
           # Add this parameter’s reference(s) to the function scope.
@@ -3470,10 +3477,10 @@ exports.Code = class Code extends Base
               splatParamName = o.scope.freeVariable 'arg'
               o.scope.parameter splatParamName
               ref = new Value new IdentifierLiteral splatParamName
-              exprs.push new Assign new Value(param.name), ref, null, param: 'alwaysDeclare'
+              exprs.push new Assign new Value(param.name), ref, param: 'alwaysDeclare'
               # Compile `foo({a, b...} = {}) ->` to `foo(arg = {}) -> {a, b...} = arg`.
               if param.value? and not param.assignedInBody
-                ref = new Assign ref, param.value, null, param: yes
+                ref = new Assign ref, param.value, param: yes
             else unless param.shouldCache()
               param.name.eachName (prop) ->
                 o.scope.parameter prop.value
@@ -3735,7 +3742,7 @@ exports.Param = class Param extends Base
         if node.this and key.value is newNode.value
           new Value newNode
         else
-          new Assign new Value(key), newNode, 'object'
+          new Assign new Value(key), newNode, context: 'object'
       else
         newNode
 
@@ -4211,6 +4218,26 @@ exports.In = class In extends Base
       if i then tests.push @makeCode cnj
       tests = tests.concat (if i then ref else sub), @makeCode(cmp), item.compileToFragments(o, LEVEL_ACCESS)
     if o.level < LEVEL_OP then tests else @wrapInParentheses tests
+
+  compileOrTestToBabylon: (o) ->
+    {objects: items} = @array.base
+    [cachedObjectVarAssign, objectVar] = @object.cache o
+
+    compareOp = if @negated then '!==' else '==='
+    joinOp    = if @negated then '&&'  else '||'
+    @withBabylonLocationData (do =>
+      ret = null
+      for item, index in items
+        comparison = new Op compareOp,
+          if index is 0 then cachedObjectVarAssign else objectVar
+          item
+        ret =
+          if index is 0
+            comparison
+          else
+            new Op joinOp, ret, comparison
+      ret
+    ).compileToBabylon o
 
   compileLoopTestToBabylon: (o) ->
     @wrapInParensIf(o.level < LEVEL_LIST)(
@@ -4712,12 +4739,12 @@ exports.For = class For extends While
     wrapInAssignToKeyVar = do ->
       return ((x) -> x) unless keyVar isnt indexVar
 
-      (x) -> new Assign(keyVar, x)
+      (x) -> new Assign keyVar, x
 
     init:
       indexVar.withLocationData(new Sequence [
         wrapInAssignToKeyVar(
-          new Assign(indexVar, new NumberLiteral '0')
+          new Assign indexVar, new NumberLiteral '0'
         )
         new Assign(
           lengthVar

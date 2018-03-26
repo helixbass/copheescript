@@ -43,7 +43,7 @@ replDefaults =
       # Generate the AST of the tokens.
       ast = CoffeeScript.nodes tokens
       # Add assignment to `__` variable to force the input to be an expression.
-      ast = new Block [new Assign (new Value new Literal '__'), ast, '=']
+      ast = new Block [new Assign (new Value new Literal '__'), ast, context: '=']
       # Wrap the expression in a closure to support top-level `await`.
       ast     = new Code [], ast
       isAsync = ast.isAsync
