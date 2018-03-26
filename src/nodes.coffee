@@ -13,7 +13,7 @@ prettier = require '../../../prettier'
 {compact, flatten, extend, merge, del, starts, ends, some,
 addDataToNode, attachCommentsToNode, locationDataToString,
 throwSyntaxError, getNumberValue, dump, locationDataToBabylon
-isArray} = require './helpers'
+isArray, isBoolean} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -1889,8 +1889,11 @@ exports.Slice = class Slice extends Base
 
 # An object literal, nothing fancy.
 exports.Obj = class Obj extends Base
-  constructor: (props, @generated = no, @lhs = no) ->
+  # constructor: (props, {@generated = no, @lhs = no} = {}) ->
+  constructor: (props, @generated, @lhs) ->
     super()
+    if @generated? and not isBoolean @generated
+      {@generated, @lhs} = @generated
 
     @objects = @properties = props or []
 
@@ -2330,7 +2333,7 @@ exports.Class = class Class extends Base
         exprs     = []
         end       = 0
         start     = 0
-        pushSlice = -> exprs.push new Value new Obj properties[start...end], true if end > start
+        pushSlice = -> exprs.push new Value new Obj properties[start...end], generated: true if end > start
 
         while assign = properties[end]
           if initializerExpression = @addInitializerExpression assign
