@@ -282,3 +282,9 @@ exports.isNumber = isNumber = (obj) -> Object::toString.call(obj) is '[object Nu
 exports.isString = isString = (obj) -> Object::toString.call(obj) is '[object String]'
 exports.isBoolean = isBoolean = (obj) -> obj is yes or obj is no or Object::toString.call(obj) is '[object Boolean]'
 exports.isPlainObject = (obj) -> typeof obj is 'object' and !!obj and not isArray(obj) and not isNumber(obj) and not isString(obj) and not isBoolean(obj)
+
+exports.mapValues = (obj, fn) ->
+  Object.keys(obj).reduce (result, key) ->
+    result[key] = fn obj[key], key
+    result
+  , {}

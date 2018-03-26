@@ -13,7 +13,7 @@ prettier = require '../../../prettier'
 {compact, flatten, extend, merge, del, starts, ends, some,
 addDataToNode, attachCommentsToNode, locationDataToString,
 throwSyntaxError, getNumberValue, dump, locationDataToBabylon
-isArray, isBoolean} = require './helpers'
+isArray, isBoolean, isPlainObject, mapValues} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -269,6 +269,10 @@ exports.Base = class Base
     @compileToFragments = (o) ->
       target.update compileToFragments, o
 
+    _compileToBabylon = @_compileToBabylon
+    @_compileToBabylon = (o) ->
+      target.updateBabylon _compileToBabylon, o
+
     target
 
   cacheToCodeFragments: (cacheValues) ->
@@ -447,6 +451,12 @@ exports.HoistTarget = class HoistTarget extends Base
       fragments[i..i] = @expand fragment.fragments
     fragments
 
+  @expandBabylon = (compiled) =>
+    return (@expandBabylon obj for obj in compiled) if isArray compiled
+    return compiled unless isPlainObject compiled
+    return @expandBabylon compiled._hoistTarget if compiled?._hoistTarget
+    mapValues compiled, @expandBabylon
+
   constructor: (@source) ->
     super()
 
@@ -454,7 +464,8 @@ exports.HoistTarget = class HoistTarget extends Base
     @options = {}
 
     # Placeholder fragments to be replaced by the source node’s compilation.
-    @targetFragments = { fragments: [] }
+    @targetFragments = fragments: []
+    @targetBabylon = _hoistTarget: null
 
   isStatement: (o) ->
     @source.isStatement o
@@ -464,6 +475,19 @@ exports.HoistTarget = class HoistTarget extends Base
   # presentational options).
   update: (compile, o) ->
     @targetFragments.fragments = compile.call @source, merge o, @options
+
+  updateBabylon: (compile, o) ->
+    @targetBabylon._hoistTarget = compile.call @source, merge o, @options
+
+  _compileToBabylon: (o) ->
+    @compileToBabylon o
+
+  compileToBabylon: (o, level) ->
+    @options.level = level ? o.level
+    @targetBabylon
+
+  compileClosureToBabylon: (o) ->
+    @compileToBabylon o
 
   # Copies the target indent and level, and returns the placeholder fragments
   compileToFragments: (o, level) ->
@@ -604,7 +628,7 @@ exports.Block = class Block extends Base
       program: {
         type: 'Program'
         sourceType: 'module'
-        body: @compileWithDeclarationsToBabylon merge o, root: yes
+        body: HoistTarget.expandBabylon @compileWithDeclarationsToBabylon merge o, root: yes
         directives: @directives
       }
       comments: []
@@ -699,6 +723,7 @@ exports.Block = class Block extends Base
       for node in expressions then do =>
         compiled = node.compileToBabylon o
         return [] unless compiled
+        return [] if node.hoisted
         return @extractDirectives compiled.body, o if node instanceof Block
         return compiled if node.isStatement o
         compiled = @extractDirectives compiled, o
@@ -1032,7 +1057,11 @@ exports.ThisLiteral = class ThisLiteral extends Literal
     super 'this'
 
   _compileToBabylon: (o) ->
-    type: 'ThisExpression'
+    if @value is 'this'
+      type: 'ThisExpression'
+    else
+      type: 'Identifier' # TODO: refine/share code?
+      name: @value
 
   compileNode: (o) ->
     code = if o.scope.method?.bound then o.scope.method.context else @value
@@ -1889,10 +1918,10 @@ exports.Slice = class Slice extends Base
 
 # An object literal, nothing fancy.
 exports.Obj = class Obj extends Base
-  constructor: (props, {@generated = no} = {}) ->
+  constructor: (@properties = [], {@generated = no} = {}) ->
     super()
 
-    @objects = @properties = props or []
+    @objects = @properties
 
   children: ['properties']
 
@@ -2249,12 +2278,15 @@ exports.Class = class Class extends Base
 
   _compileToBabylon: (o) ->
     @name = @determineName()
-    @walkBody()
+    executableBody = @walkBody()
     @prepareConstructor()
 
     @body.isClassBody = yes
 
     node = @
+
+    if executableBody# or @hasNameClash
+      node = new ExecutableClassBody node, executableBody
 
     if @variable
       node = new Assign @variable, node, { @moduleDeclaration }
@@ -2267,7 +2299,11 @@ exports.Class = class Class extends Base
       delete @_compileToBabylon
 
   compileClassDeclarationToBabylon: (o) ->
-    type: 'ClassExpression'
+    type:
+      if o.level is LEVEL_TOP
+        'ClassDeclaration'
+      else
+        'ClassExpression'
     id: new IdentifierLiteral(@name).compileToBabylon o
     superClass: null
     body: @body.compileToBabylon o, LEVEL_TOP
@@ -2388,12 +2424,13 @@ exports.Class = class Class extends Base
   # Checks if the given node is a valid ES class initializer method.
   validInitializerMethod: (node) ->
     return no unless node instanceof Assign and node.value instanceof Code
-    return yes if node.context is 'object' and not node.variable.hasProperties()
-    return node.variable.looksStatic(@name) and (@name or not node.value.bound)
+    {value: {bound}, context, variable} = node
+    return yes if context is 'object' and not variable.hasProperties()
+    return no if bound and not @name
+    return variable.looksStatic @name
 
   # Returns a configured class initializer method
-  addInitializerMethod: (assign) ->
-    { variable, value: method } = assign
+  addInitializerMethod: ({variable, value: method}) ->
     method.isMethod = yes
     method.isStatic = variable.looksStatic @name
 
@@ -2401,8 +2438,9 @@ exports.Class = class Class extends Base
       method.name = variable.properties[0]
     else
       methodName  = variable.base
-      method.name = new (if methodName.shouldCache() then Index else Access) methodName
-      method.name.updateLocationDataIfMissing methodName.locationData
+      method.name = methodName.withLocationData(
+        new (if methodName.shouldCache() then Index else Access) methodName
+      )
       method.ctor = (if @parent then 'derived' else 'base') if methodName.value is 'constructor'
       method.error 'Cannot define a constructor as a bound (fat arrow) function' if method.bound and method.ctor
 
@@ -2439,6 +2477,22 @@ exports.ExecutableClassBody = class ExecutableClassBody extends Base
 
   constructor: (@class, @body = new Block) ->
     super()
+
+  _compileToBabylon: (o) ->
+    @name = @class.name# ? o.classScope.freeVariable @defaultClassVariableName
+    ident = new IdentifierLiteral @name
+    @walkBody()
+    @setContext()
+
+    @body.expressions.unshift @class
+    @body.expressions.push ident
+
+    new Parens(new Call(
+      new Value(
+        new Code [], @body
+        [new Access new PropertyName 'call'])
+      [new ThisLiteral]
+    )).compileToBabylon o
 
   compileNode: (o) ->
     if jumpNode = @body.jumps()
