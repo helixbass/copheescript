@@ -238,7 +238,11 @@ exports.Base = class Base
   # If `level` is passed, then returns `[val, ref]`, where `val` is the compiled value, and `ref`
   # is the compiled reference. If `level` is not passed, this returns `[val, ref]` where
   # the two values are raw nodes which have not been compiled.
-  cache: (o, level, shouldCache) ->
+  cache: (o, level, opts = {}) ->
+    if isPlainObject level
+      opts = level
+      {level} = opts
+    {shouldCache, onlyIfCached} = opts
     complex = if shouldCache? then shouldCache this else @shouldCache()
     if complex
       ref = new IdentifierLiteral o.scope.freeVariable 'ref'
@@ -246,7 +250,10 @@ exports.Base = class Base
       if level then [sub.compileToFragments(o, level), [@makeCode(ref.value)]] else [sub, ref]
     else
       ref = if level then @compileToFragments o, level else this
-      [ref, ref]
+      [
+        if onlyIfCached then null else ref
+        ref
+      ]
 
   # Occasionally it may be useful to make an expression behave as if it was 'hoisted', whereby the
   # result of the expression is available before its location in the source, but the expression's
@@ -1465,7 +1472,7 @@ exports.Call = class Call extends Base
     varAccess = @variable?.properties?[0] instanceof Access
     argCode = (arg for arg in (@args || []) when arg instanceof Code)
     if argCode.length > 0 and varAccess and not @variable.base.cached
-      [cache] = @variable.base.cache o, LEVEL_ACCESS, -> no
+      [cache] = @variable.base.cache o, LEVEL_ACCESS, shouldCache: -> no
       @variable.base.cached = cache
 
     for arg, argIndex in @args
@@ -1527,7 +1534,7 @@ exports.SuperCall = class SuperCall extends Call
 
     if o.level > LEVEL_TOP
       # If we might be in an expression we need to cache and return the result
-      [superCall, ref] = superCall.cache o, null, YES
+      [superCall, ref] = superCall.cache o, shouldCache: YES
       replacement.push ref
 
     replacement.unshift superCall
@@ -1661,9 +1668,9 @@ exports.Range = class Range extends Base
   compileVariables: (o) ->
     o = merge o, top: true
     shouldCache = del o, 'shouldCache'
-    [@fromC, @fromVar] = @cacheToCodeFragments @from.cache o, LEVEL_LIST, shouldCache
-    [@toC, @toVar]     = @cacheToCodeFragments @to.cache o, LEVEL_LIST, shouldCache
-    [@step, @stepVar]  = @cacheToCodeFragments step.cache o, LEVEL_LIST, shouldCache if step = del o, 'step'
+    [@fromC, @fromVar] = @cacheToCodeFragments @from.cache o, LEVEL_LIST, {shouldCache}
+    [@toC, @toVar]     = @cacheToCodeFragments @to.cache o, LEVEL_LIST, {shouldCache}
+    [@step, @stepVar]  = @cacheToCodeFragments step.cache o, LEVEL_LIST, {shouldCache} if step = del o, 'step'
     @fromNum = if @from.isNumber() then Number @fromVar else null
     @toNum   = if @to.isNumber()   then Number @toVar   else null
     @stepNum = if step?.isNumber() then Number @stepVar else null
@@ -1748,12 +1755,9 @@ exports.Range = class Range extends Base
       else if @fromNum? and @toNum?
         if @fromNum <= @toNum then '<' else '>'
 
-    [cachedFromVarAssign, fromVar] = @from.cache o, null, shouldCache
-    [cachedToVarAssign,   toVar  ] = @to.cache   o, null, shouldCache
-    cachedToVarAssign = null unless cachedToVarAssign isnt toVar
-    if @step
-      [cachedStepVarAssign, stepVar] = @step.cache o, null, shouldCache
-      cachedStepVarAssign = null unless cachedStepVarAssign isnt stepVar
+    [cachedFromVarAssign, fromVar] = @from.cache o, {shouldCache}
+    [cachedToVarAssign,   toVar  ] = @to.cache   o, {shouldCache, onlyIfCached: yes}
+    [cachedStepVarAssign, stepVar] = @step.cache o, {shouldCache, onlyIfCached: yes} if @step
     wrapInStepGuard =
       if @step and not @stepNum
         (node) => new Op '&&',
@@ -2304,7 +2308,7 @@ exports.Class = class Class extends Base
         'ClassDeclaration'
       else
         'ClassExpression'
-    id: new IdentifierLiteral(@name).compileToBabylon o
+    id: new IdentifierLiteral(@name).compileToBabylon o if @name
     superClass: null
     body: @body.compileToBabylon o, LEVEL_TOP
 
@@ -2479,17 +2483,24 @@ exports.ExecutableClassBody = class ExecutableClassBody extends Base
     super()
 
   _compileToBabylon: (o) ->
-    @name = @class.name# ? o.classScope.freeVariable @defaultClassVariableName
+    wrapper = new Code [], @body
+    o.classScope = wrapper.makeScope o.scope
+    @name = @class.name ? o.classScope.freeVariable @defaultClassVariableName
     ident = new IdentifierLiteral @name
     @walkBody()
     @setContext()
 
-    @body.expressions.unshift @class
+    @body.expressions.unshift(
+      if @name isnt @class.name
+        new Assign (new IdentifierLiteral @name), @class
+      else
+        @class
+    )
     @body.expressions.push ident
 
     new Parens(new Call(
       new Value(
-        new Code [], @body
+        wrapper
         [new Access new PropertyName 'call'])
       [new ThisLiteral]
     )).compileToBabylon o
@@ -2789,6 +2800,7 @@ exports.Assign = class Assign extends Base
 
       return @compileSpliceToBabylon      o if @variable.isSplice()
       return @compileConditionalToBabylon o if @context in ['||=', '&&=', '?=']
+      return @compileSpecialMathToBabylon o if @context in ['**=', '//=', '%%=']
 
     @addScopeVariables o
 
@@ -2992,7 +3004,7 @@ exports.Assign = class Assign extends Base
     return @wrapInParensIf(o.level >= LEVEL_OP)(value).compileToBabylon o unless objects.length
 
     # if value.unwrap() not instanceof IdentifierLiteral
-    #   [cachedValueAssign, value] = value.cache o, null, YES
+    #   [cachedValueAssign, value] = value.cache o, shouldCache: YES
     #   assigns.push cachedValueAssign
     # vvar     = value.compileToFragments o, LEVEL_LIST
 
@@ -3218,8 +3230,14 @@ exports.Assign = class Assign extends Base
   # Convert special math assignment operators like `a **= b` to the equivalent
   # extended form `a = a ** b` and then compiles that.
   compileSpecialMath: (o) ->
+    @specialMathAssign(o).compileToFragments o
+
+  specialMathAssign: (o) ->
     [left, right] = @variable.cacheReference o
-    new Assign(left, new Op(@context[...-1], right, @value)).compileToFragments o
+    new Assign left, new Op @context[...-1], right, @value
+
+  compileSpecialMathToBabylon: (o) ->
+    @specialMathAssign(o).compileToBabylon o
 
   # Compile the assignment from an array splice literal, using JavaScript's
   # `Array#splice` method.
@@ -4084,16 +4102,19 @@ exports.Op = class Op extends Base
         if o.level <= LEVEL_OP then answer else @wrapInParentheses answer
 
   _compileToBabylon: (o) ->
+    isChain = @isChainable() and @first.isChainable()
     if @operator is 'delete' and o.scope.check(@first.unwrapAll().value)
       @error 'delete operand may not be argument or var'
     if @operator in ['--', '++']
       message = isUnassignable @first.unwrapAll().value
       @first.error message if message
     return @compileUnaryToBabylon o if @isUnary()
+    return @compileChainToBabylon o if isChain
 
     switch @operator
       when '?'  then return @compileExistenceToBabylon o, @second.isDefaultValue
       when '**' then return @compilePowerToBabylon o
+      when '//' then return @compileFloorDivisionToBabylon o
       when '%%' then return @compileModuloToBabylon o
 
     return new Parens(this).compileToBabylon o if o.level > LEVEL_OP
@@ -4134,6 +4155,16 @@ exports.Op = class Op extends Base
     @operator
     right: @second.compileToBabylon o, LEVEL_OP
   }
+
+  compileChainToBabylon: (o) ->
+    [@first.second, shared] = @first.second.cache o
+
+    new Op((if @invert then '&&' else '||'),
+      @first
+      new Op @operator,
+        shared
+        @second
+    ).compileToBabylon o
 
   # Mimic Python's chained comparisons when multiple comparison operators are
   # used sequentially. For example:
@@ -4216,10 +4247,16 @@ exports.Op = class Op extends Base
     @powerCall().compileToBabylon o
 
   compileFloorDivision: (o) ->
+    @floorDivisionCall(o).compileToFragments o
+
+  floorDivisionCall: (o) ->
     floor = new Value new IdentifierLiteral('Math'), [new Access new PropertyName 'floor']
     second = if @second.shouldCache() then new Parens @second else @second
     div = new Op '/', @first, second
-    new Call(floor, [div]).compileToFragments o
+    new Call floor, [div]
+
+  compileFloorDivisionToBabylon: (o) ->
+    @floorDivisionCall(o).compileToBabylon o
 
   compileModulo: (o) ->
     mod = new Value new Literal utility 'modulo', o
@@ -4288,10 +4325,16 @@ exports.In = class In extends Base
     ).compileToBabylon o
 
   compileLoopTestToBabylon: (o) ->
-    @wrapInParensIf(o.level < LEVEL_LIST)(
-      new Op '>=',
-        utilityBabylon 'indexOf', merge o, calledWithArgs: [@array, @object]
-        new NumberLiteral '0'
+    [cachedObjVarAssign, objVar] = @object.cache o, onlyIfCached: yes
+
+    indexOfCheck = new Op (if @negated then '<' else '>='),
+      utilityBabylon 'indexOf', merge o, calledWithArgs: [@array, objVar]
+      new NumberLiteral '0'
+
+    (if cachedObjVarAssign
+      new Sequence [cachedObjVarAssign, indexOfCheck]
+    else
+      indexOfCheck
     ).compileToBabylon o
 
   compileLoopTest: (o) ->
@@ -4744,7 +4787,7 @@ exports.For = class For extends While
     @body = @bodyWithGuard()
 
     unless @range
-      [cachedSourceVarAssign, sourceVar] = sourceVar.cache o, null, (source) =>
+      [cachedSourceVarAssign, sourceVar] = sourceVar.cache o, shouldCache: (source) =>
         (name or @own) and source.unwrap() not instanceof IdentifierLiteral
       cachedSourceVarAssign = null unless cachedSourceVarAssign isnt sourceVar
 
@@ -4766,8 +4809,7 @@ exports.For = class For extends While
     return @compileFromToBabylon {o, keyVar, sourceVar, resultsVar, cachedSourceVarAssign} if @from
 
     if @step and not @range
-      [cachedStepVarAssign, stepVar] = @step.cache o, null, shouldCacheOrIsAssignable
-      cachedStepVarAssign = null unless cachedStepVarAssign isnt stepVar
+      [cachedStepVarAssign, stepVar] = @step.cache o, shouldCache: shouldCacheOrIsAssignable, onlyIfCached: yes
 
     @wrapInResultAccumulatingBlock({o, resultsVar, cachedSourceVarAssign, cachedStepVarAssign}) {
       type: 'ForStatement'
@@ -4781,7 +4823,9 @@ exports.For = class For extends While
     }
 
   compileForPartsToBabylon: ({o, keyVar, indexVar, sourceVar, stepVar}) ->
-    lengthVar = sourceVar.withLocationData new IdentifierLiteral(o.scope.freeVariable 'len')# unless @step and stepNum? and down
+    stepNum = getNumberValue @step if @step?.isNumber()
+    down = stepNum? and stepNum < 0
+    lengthVar = sourceVar.withLocationData new IdentifierLiteral(o.scope.freeVariable 'len') unless down
 
     shouldWrapInAssignToKeyVar = keyVar isnt indexVar
     wrapInAssignToKeyVar = do ->
@@ -4789,20 +4833,48 @@ exports.For = class For extends While
 
       (x) -> new Assign keyVar, x
 
-    init:
-      indexVar.withLocationData(new Sequence [
+    sourceLength = new Value(
+      @withLocationData new IdentifierLiteral sourceVar.unwrap().value
+      [new Access new PropertyName 'length']
+    )
+
+    normalInit =
+      new Sequence [
         wrapInAssignToKeyVar(
-          new Assign indexVar, new NumberLiteral '0'
-        )
-        new Assign(
-          lengthVar
-          new Value(
-            @withLocationData new IdentifierLiteral sourceVar.unwrap().value
-            [new Access new PropertyName 'length']
-          )
-        )
-      ]).compileToBabylon o
-    test: @withLocationData(new Op('<', indexVar, lengthVar)).compileToBabylon o
+          new Assign indexVar, new NumberLiteral '0')
+        new Assign lengthVar, sourceLength
+      ]
+    downInit = wrapInAssignToKeyVar(
+      new Assign indexVar,
+        new Op '-', sourceLength, new NumberLiteral '1')
+
+    normalTest = new Op '<',  indexVar, lengthVar
+    downTest   = new Op '>=', indexVar, new NumberLiteral '0'
+
+    init:
+      indexVar.withLocationData(
+        if down
+          downInit
+        else if @step and not stepNum?
+          new If(
+            new Op '>', stepVar, new NumberLiteral '0'
+            normalInit
+          ).addElse downInit
+        else
+          normalInit
+      ).compileToBabylon o, LEVEL_PAREN
+    test:
+      @withLocationData(
+        if down
+          downTest
+        else if @step and not stepNum?
+          new If(
+            new Op '>', stepVar, new NumberLiteral '0'
+            normalTest
+          ).addElse downTest
+        else
+          normalTest
+      ).compileToBabylon o, LEVEL_PAREN
     update:
       @withLocationData(
         wrapInAssignToKeyVar(
@@ -4811,7 +4883,7 @@ exports.For = class For extends While
           else
             new Op '++', indexVar, null, !shouldWrapInAssignToKeyVar
         )
-      ).compileToBabylon o
+      ).compileToBabylon o, LEVEL_PAREN
 
   updateReturnsBasedOnLastBodyExpression: ->
     [..., last] = @body.expressions
@@ -4838,7 +4910,7 @@ exports.For = class For extends While
     kvar        = ((@range or @from) and name) or index or ivar
     kvarAssign  = if kvar isnt ivar then "#{kvar} = " else ""
     if @step and not @range
-      [step, stepVar] = @cacheToCodeFragments @step.cache o, LEVEL_LIST, shouldCacheOrIsAssignable
+      [step, stepVar] = @cacheToCodeFragments @step.cache o, LEVEL_LIST, shouldCache: shouldCacheOrIsAssignable
       stepNum   = Number stepVar if @step.isNumber()
     name        = ivar if @pattern
     varPart     = ''
