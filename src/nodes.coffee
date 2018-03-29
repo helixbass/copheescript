@@ -1095,6 +1095,10 @@ exports.BooleanLiteral = class BooleanLiteral extends Literal
     type: 'BooleanLiteral'
     value: if @value is 'true' then yes else no
 
+exports.SuperLiteral = class SuperLiteral extends Literal
+  _compileToBabylon: (o) ->
+    type: 'Super'
+
 #### Return
 
 # A `return` is a *pureStatement*—wrapping it in a closure wouldn’t make sense.
@@ -1546,7 +1550,13 @@ exports.Super = class Super extends Base
 
   children: ['accessor']
 
-  compileNode: (o) ->
+  _compileToBabylon: (o) ->
+    @setAccessor o
+
+    new Value(new SuperLiteral, if @accessor then [@accessor] else [])
+    .compileToBabylon o
+
+  setAccessor: (o) ->
     method = o.scope.namedMethod()
     @error 'cannot use super outside of an instance method' unless method?.isMethod
 
@@ -1556,6 +1566,9 @@ exports.Super = class Super extends Base
         nref = new IdentifierLiteral o.scope.parent.freeVariable 'name'
         name.index = new Assign nref, name.index
       @accessor = if nref? then new Index nref else name
+
+  compileNode: (o) ->
+    @setAccessor o
 
     if @accessor?.name?.comments
       # A `super()` call gets compiled to e.g. `super.method()`, which means
@@ -1948,6 +1961,8 @@ exports.Obj = class Obj extends Base
     no
 
   _compileToBabylon: (o) ->
+    @propagateLhs()
+
     type:
       if @lhs
         'ObjectPattern'
@@ -1969,7 +1984,7 @@ exports.Obj = class Obj extends Base
           type: 'ObjectProperty'
           key: compiledKey
           value:
-            if prop instanceof Assign and prop.context isnt 'object'
+            if prop instanceof Assign and prop.context isnt 'object' # TODO: restructure this Assign in expandProperties() to avoid this special case?
               type: 'AssignmentPattern'
               left: compiledKey
               right: compiledValue
@@ -2018,6 +2033,17 @@ exports.Obj = class Obj extends Base
           new Assign prop, prop, context: 'object', shorthand: prop.bareLiteral? IdentifierLiteral
       )
 
+  propagateLhs: ->
+    return unless @lhs
+
+    for prop in @properties when prop instanceof Assign
+      {value} = prop
+      unwrappedVal = value.unwrapAll()
+      if unwrappedVal instanceof Arr or unwrappedVal instanceof Obj
+        unwrappedVal.lhs = yes
+      else if unwrappedVal instanceof Assign
+        unwrappedVal.nestedLhs = yes
+
   compileNode: (o) ->
     props = @properties
     if @generated
@@ -2035,14 +2061,7 @@ exports.Obj = class Obj extends Base
 
     # If this object is the left-hand side of an assignment, all its children
     # are too.
-    if @lhs
-      for prop in props when prop instanceof Assign
-        {value} = prop
-        unwrappedVal = value.unwrapAll()
-        if unwrappedVal instanceof Arr or unwrappedVal instanceof Obj
-          unwrappedVal.lhs = yes
-        else if unwrappedVal instanceof Assign
-          unwrappedVal.nestedLhs = yes
+    @propagateLhs()
 
     isCompact = yes
     for prop in @properties
@@ -2309,7 +2328,7 @@ exports.Class = class Class extends Base
       else
         'ClassExpression'
     id: new IdentifierLiteral(@name).compileToBabylon o if @name
-    superClass: null
+    superClass: @parent.compileToBabylon o if @parent
     body: @body.compileToBabylon o, LEVEL_TOP
 
   prepareConstructor: ->
@@ -2806,11 +2825,11 @@ exports.Assign = class Assign extends Base
 
     {
       ...(
-        if @param
+        if @param or @nestedLhs
           type: 'AssignmentPattern'
         else
           type: 'AssignmentExpression'
-          operator: @context or '='
+          operator: @context or '=' # TODO: using @context here is wrong?
       )
       left: @variable.compileToBabylon o, LEVEL_LIST
       right: @value.compileToBabylon o, LEVEL_LIST
@@ -3003,10 +3022,9 @@ exports.Assign = class Assign extends Base
 
     return @wrapInParensIf(o.level >= LEVEL_OP)(value).compileToBabylon o unless objects.length
 
-    # if value.unwrap() not instanceof IdentifierLiteral
-    #   [cachedValueAssign, value] = value.cache o, shouldCache: YES
-    #   assigns.push cachedValueAssign
-    # vvar     = value.compileToFragments o, LEVEL_LIST
+    if value.unwrap() not instanceof IdentifierLiteral or @variable.assigns(value.unwrap().value)
+      [cachedValueAssign, value] = value.cache o, shouldCache: YES
+      assigns.push cachedValueAssign
 
     splats = (i for obj, i in objects when obj instanceof Splat)
     expans = (i for obj, i in objects when obj instanceof Expansion)
@@ -3342,38 +3360,60 @@ exports.Code = class Code extends Base
 
   makeScope: (parentScope) -> new Scope parentScope, @body, this
 
-  compileParamsToBabylon: (params, o) ->
-    for param in params
-      o.scope.parameter fragmentsToText param.compileToFragmentsWithoutComments o
-      param.compileToBabylon o
+  compileParamsToBabylon: ({params, haveSplatParam, o}) ->
+    lastIndex = params.length - 1
+    for param, index in params
+      if haveSplatParam and index is lastIndex
+        param.withBabylonLocationData
+          type: 'RestElement'
+          argument: param.compileToBabylon o
+      else
+        param.compileToBabylon o
 
   processParams: (o) ->
     exprs = []
-    params =
+    haveSplatParam = no
+    paramsAfterSplat = []
+    params = compact(
       for param in @params
-        {name, value} = param
+        {name, value, splat} = param
+        if splat or param instanceof Expansion
+          haveSplatParam = yes
+          splatParamName = param.asReference o
+          o.scope.parameter splatParamName.unwrap().value
+          splatParamName
+        else unless haveSplatParam
+          if name instanceof Arr or name instanceof Obj
+            # This parameter is destructured.
+            name.lhs = yes
 
-        if name instanceof Arr or param.name instanceof Obj
-          # This parameter is destructured.
-          name.lhs = yes
+            unless param.shouldCache()
+              name.eachName ({value}) ->
+                o.scope.parameter value
+          else
+            o.scope.parameter fragmentsToText param.compileToFragmentsWithoutComments o
 
-          unless param.shouldCache()
-            name.eachName ({value}) ->
-              o.scope.parameter value
-
-        if value
-          new Assign new Value(name), value, param: yes
+          if value
+            new Assign new Value(name), value, param: yes
+          else
+            param
         else
-          param
+          paramsAfterSplat.push param
+          o.scope.add name.value, 'var', yes if name?.value?
+          null
+    )
 
-    {params, exprs}
+    @assignParamsAfterSplat {exprs, splatParamName, paramsAfterSplat, o} if paramsAfterSplat.length isnt 0
+
+    {params, exprs, haveSplatParam}
 
   _compileToBabylon: (o) ->
     @updateOptions o
     wasEmpty = @body.isEmpty()
     {thisAssignments} = @expandThisParams o
     @body.expressions.unshift thisAssignments... unless @expandCtorSuper thisAssignments
-    {params, exprs} = @processParams o
+    {params, exprs, haveSplatParam} = @processParams o
+    @body.expressions.unshift exprs...
     @body.makeReturn() unless wasEmpty or @noReturn
 
     {
@@ -3386,7 +3426,8 @@ exports.Code = class Code extends Base
           'FunctionExpression'
       generator: @isGenerator
       async: @isAsync
-      params: @compileParamsToBabylon params, o
+      static: @isMethod and @isStatic
+      params: @compileParamsToBabylon {params, haveSplatParam, o}
       body: @body.compileWithDeclarationsToBabylon o
       ...@addtlMethodBabylonFields o
     }
@@ -3418,14 +3459,17 @@ exports.Code = class Code extends Base
         # `Param` is object destructuring with a default value: ({@prop = 1}) ->
         # In a case when the variable name is already reserved, we have to assign
         # a new variable name to the destructured variable: ({prop:prop1 = 1}) ->
-        replacement = param.withLocationData(
-          if param.name instanceof Obj and obj instanceof Assign and
-              obj.operatorToken.value is '='
-            new Assign (new IdentifierLiteral name), target, context: 'object' #, operatorToken: new Literal ':'
-          else
-            target
-        )
-        param.renameParam node, replacement
+        if param.name instanceof Obj and obj instanceof Assign and obj.operatorToken.value is '='
+          replacement = param.withLocationData(
+            new Assign(
+              new IdentifierLiteral name
+              new Assign target, obj.value
+              context: 'object' #, operatorToken: new Literal ':'
+            ))
+          param.renameParam obj, replacement, expandAssign: no
+        else
+          replacement = param.withLocationData(target)
+          param.renameParam node, replacement
         thisAssignments.push @funcGlyph.withLocationData new Assign(
           node
           new IdentifierLiteral target.value
@@ -3439,6 +3483,12 @@ exports.Code = class Code extends Base
     o.indent        += TAB
     delete o.bare
     delete o.isExistentialEquals
+
+  assignParamsAfterSplat: ({exprs, splatParamName, paramsAfterSplat, o}) ->
+    # Create a destructured assignment, e.g. `[a..., b, c] = ref`
+    exprs.unshift new Assign new Value(
+        new Arr [new Splat(splatParamName), (param.asReference o for param in paramsAfterSplat)...]
+      ), new Value splatParamName
 
   # Compilation creates a new scope unless explicitly asked to share with the
   # outer scope. Handles splat parameters in the parameter list by setting
@@ -3795,10 +3845,10 @@ exports.Param = class Param extends Base
 
   # Rename a param by replacing the given AST node for a name with a new node.
   # This needs to ensure that the the source for object destructuring does not change.
-  renameParam: (node, newNode) ->
+  renameParam: (node, newNode, {expandAssign = yes} = {}) ->
     isNode      = (candidate) -> candidate is node
     replacement = (node, parent) =>
-      if parent instanceof Obj
+      if parent instanceof Obj and expandAssign
         key = node
         key = node.properties[0].name if node.this
         # No need to assign a new variable for the destructured variable if the variable isn't reserved.
