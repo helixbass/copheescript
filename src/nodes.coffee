@@ -1431,7 +1431,9 @@ exports.Call = class Call extends Base
         [left, rite] = new Value(@variable).cacheReference o
       rite = new Call rite, @args
       rite.isNew = @isNew
-      left = new Literal "typeof #{ left.compile o } === \"function\""
+      left = new Op '===',
+        new Op 'typeof', left
+        new StringLiteral '"function"'
       return new If left, new Value(rite), soak: yes
     call = this
     list = []
