@@ -477,7 +477,7 @@ task 'test', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript).catch -> process.exit 1
 task 'test:prettier', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript, justTestFile: [
-    'argument_parsing', 'arrays', 'booleans', 'exception_handling'
+    'argument_parsing', 'arrays', 'booleans', 'comprehensions', 'exception_handling'
     'function_invocation', 'interpolation', 'numbers', 'objects', 'operators'
     'ranges', 'slicing_and_splicing', 'strict'
   ], usePrettier: yes).catch -> process.exit 1

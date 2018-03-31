@@ -1765,7 +1765,7 @@ exports.Range = class Range extends Base
     known =
       if @stepNum?
         if @stepNum > 0 then '<' else '>'
-      else if @fromNum? and @toNum?
+      else if @fromNum? and @toNum? and not (@step and not @stepNum?)
         if @fromNum <= @toNum then '<' else '>'
 
     [cachedFromVarAssign, fromVar] = @from.cache o, {shouldCache}
@@ -4798,6 +4798,12 @@ exports.For = class For extends While
     @body.compileToBabylon o, LEVEL_TOP
 
   compileObjectToBabylon: ({o, sourceVar, keyVar, resultsVar, cachedSourceVarAssign}) ->
+    if @own
+      @body.expressions.unshift new If(
+        new Op '!',
+          utilityBabylon 'hasProp', merge o, calledWithArgs: [sourceVar, keyVar]
+        new StatementLiteral 'continue'
+      )
     @wrapInResultAccumulatingBlock({o, resultsVar, cachedSourceVarAssign})
       type: 'ForInStatement'
       left: keyVar.compileToBabylon o
@@ -4814,8 +4820,8 @@ exports.For = class For extends While
   _compileToBabylon: (o) ->
     {scope} = o
     sourceVar = if @range then @source.base else @source
-    name = @name
-    scope.find(name.value) if name and not @pattern
+    name = @name unless @pattern
+    scope.find(name.value) if name
     index = @index
     scope.find(index.value) if index and @index not instanceof Value
     indexVar =
@@ -4842,7 +4848,10 @@ exports.For = class For extends While
       cachedSourceVarAssign = null unless cachedSourceVarAssign isnt sourceVar
 
       @body.expressions.unshift @withLocationData new Assign(
-        name
+        if @pattern
+          @name
+        else
+          name
         new Value(
           name.withLocationData new IdentifierLiteral sourceVar.unwrap().value
           [new Index keyVar]
@@ -4950,7 +4959,7 @@ exports.For = class For extends While
     scope       = o.scope
     name        = @name  and (@name.compile o, LEVEL_LIST) if not @pattern
     index       = @index and (@index.compile o, LEVEL_LIST)
-    scope.find(name)  if name and not @pattern
+    scope.find(name)  if name
     scope.find(index) if index and @index not instanceof Value
     rvar        = scope.freeVariable 'results' if @returns
     if @from
@@ -5054,7 +5063,7 @@ exports.Switch = class Switch extends Base
 
   makeReturn: (res) ->
     pair[1].makeReturn res for pair in @cases
-    @otherwise or= new Block [new Literal 'void 0'] if res
+    @otherwise or= new Block [new UndefinedLiteral] if res
     @otherwise?.makeReturn res
     this
 
@@ -5179,7 +5188,7 @@ exports.If = class If extends Base
         new UndefinedLiteral().compileToBabylon o
 
   makeReturn: (res) ->
-    @elseBody  or= new Block [new Literal 'void 0'] if res
+    @elseBody  or= new Block [new UndefinedLiteral] if res
     @body     and= new Block [@body.makeReturn res]
     @elseBody and= new Block [@elseBody.makeReturn res]
     this
@@ -5264,6 +5273,7 @@ UTILITIES_BABYLON =
   indexOf: -> new Value new Arr, [new Access new PropertyName 'indexOf']
   splice : -> new Value new Arr, [new Access new PropertyName 'splice']
   slice  : -> new Value new Arr, [new Access new PropertyName 'slice']
+  hasProp: -> new Value new Obj, [new Access new PropertyName 'hasOwnProperty']
   modulo: ->
     a = new IdentifierLiteral 'a'
     b = new IdentifierLiteral 'b'
