@@ -1603,6 +1603,11 @@ exports.TaggedTemplateCall = class TaggedTemplateCall extends Call
     arg = new StringWithInterpolations Block.wrap([ new Value arg ]) if arg instanceof StringLiteral
     super variable, [ arg ], soak
 
+  _compileToBabylon: (o) ->
+    type: 'TaggedTemplateExpression'
+    tag: @variable.compileToBabylon o, LEVEL_ACCESS
+    quasi: @args[0].compileToBabylon o, LEVEL_LIST
+
   compileNode: (o) ->
     @variable.compileToFragments(o, LEVEL_ACCESS).concat @args[0].compileToFragments(o, LEVEL_LIST)
 
