@@ -140,7 +140,12 @@ exports.Base = class Base
     o.sharedScope = yes
 
     func = new Code [], Block.wrap [this]
-    @withLocationData(
+    wrapInAwait =
+      if func.isAsync
+        (node) -> new Op 'await', node
+      else
+        (node) -> node
+    @withLocationData(wrapInAwait(
       if @contains isLiteralArguments
         new Call(
           new Value func, [new Access new PropertyName 'apply']
@@ -148,7 +153,7 @@ exports.Base = class Base
         )
       else
         new Call func, []
-    ).compileToBabylon o
+    )).compileToBabylon o
 
   compileToFragmentsWithoutComments: (o, lvl) ->
     @compileWithoutComments o, lvl, 'compileToFragments'
@@ -4165,6 +4170,7 @@ exports.Op = class Op extends Base
     if @operator in ['--', '++']
       message = isUnassignable @first.unwrapAll().value
       @first.error message if message
+    return @compileContinuationToBabylon o if @isAwait()
     return @compileUnaryToBabylon o if @isUnary()
     return @compileChainToBabylon o if isChain
 
@@ -4274,6 +4280,10 @@ exports.Op = class Op extends Base
     parts.push @first.compileToFragments o, LEVEL_OP
     parts.reverse() if @flip
     @joinFragmentArrays parts, ''
+
+  compileContinuationToBabylon: (o) ->
+    type: 'AwaitExpression'
+    argument: @first.compileToBabylon o
 
   compileContinuation: (o) ->
     parts = []
