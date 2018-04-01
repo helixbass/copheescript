@@ -1,3 +1,7 @@
+prettier = require 'prettier'
+formatWithPrettier = (js) ->
+  prettier.format "FORCE_NON_DIRECTIVE; #{js}"
+
 # See [http://wiki.ecmascript.org/doku.php?id=harmony:egal](http://wiki.ecmascript.org/doku.php?id=harmony:egal).
 egal = (a, b) ->
   if a is b
@@ -35,6 +39,6 @@ exports.arrayEq = (a, b, msg) ->
 exports.eqJS = (input, expectedOutput, msg) ->
   actualOutput = CoffeeScript.compile input, bare: yes
   .replace /^\s+|\s+$/g, '' # Trim leading/trailing whitespace.
-  ok egal(expectedOutput, actualOutput), msg or diffOutput expectedOutput, actualOutput
+  ok egal(formatWithPrettier(expectedOutput), formatWithPrettier(actualOutput)), msg or diffOutput expectedOutput, actualOutput
 
 exports.isWindows = -> process.platform is 'win32'

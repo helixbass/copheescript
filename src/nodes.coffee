@@ -7,7 +7,8 @@ Error.stackTraceLimit = Infinity
 
 {Scope} = require './scope'
 {isUnassignable, JS_FORBIDDEN} = require './lexer'
-prettier = require '../../../prettier'
+prettier = require 'prettier'
+babylon = require 'babylon'
 
 # Import the helpers we plan to use.
 {compact, flatten, extend, merge, del, starts, ends, some,
@@ -721,6 +722,7 @@ exports.Block = class Block extends Base
     ]
 
   asExpressionStatement: (compiled) ->
+    return compiled if compiled.type is 'VariableDeclaration'
     type: 'ExpressionStatement'
     expression: compiled
     loc: compiled.loc
@@ -1015,7 +1017,11 @@ exports.RegexLiteral = class RegexLiteral extends Literal
 exports.PassthroughLiteral = class PassthroughLiteral extends Literal
   _compileToBabylon: (o) ->
     return null unless @value.length
-    new IdentifierLiteral(@value).compileToBabylon o
+    try
+      return babylon.parseExpression @value
+    catch
+    babylon.parse(@value).program.body
+    # new IdentifierLiteral(@value).compileToBabylon o
 
 exports.IdentifierLiteral = class IdentifierLiteral extends Literal
   isAssignable: YES
