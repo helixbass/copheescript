@@ -430,8 +430,8 @@ grammar =
   ImportSpecifier: [
     o 'Identifier',                             -> new ImportSpecifier $1
     o 'Identifier AS Identifier',               -> new ImportSpecifier $1, $3
-    o 'DEFAULT',                                -> new ImportSpecifier new Literal $1
-    o 'DEFAULT AS Identifier',                  -> new ImportSpecifier new Literal($1), $3
+    o 'DEFAULT',                                -> new ImportSpecifier new DefaultLiteral $1
+    o 'DEFAULT AS Identifier',                  -> new ImportSpecifier new DefaultLiteral($1), $3
   ]
 
   ImportDefaultSpecifier: [

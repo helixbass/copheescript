@@ -53,6 +53,7 @@
   },
   "dependencies": {
     "babel-eslint": "^7.2.2",
+    "babylon": "^7.0.0-beta.42",
     "eslint": "^4.19.0",
     "eslint-config-prettier": "^2.9.0",
     "eslint-config-standard": "^11.0.0",

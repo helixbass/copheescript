@@ -1021,7 +1021,7 @@ exports.PassthroughLiteral = class PassthroughLiteral extends Literal
     try
       return babylon.parseExpression @value
     catch
-    babylon.parse(@value).program.body
+    babylon.parse(@value, sourceType: 'module').program.body
     # new IdentifierLiteral(@value).compileToBabylon o
 
 exports.IdentifierLiteral = class IdentifierLiteral extends Literal
@@ -2758,6 +2758,7 @@ exports.ExportNamedDeclaration = class ExportNamedDeclaration extends ExportDecl
           specifiers: []
           declaration: @clause.compileToBabylon o
       )
+      source: @source?.compileToBabylon o
       exportKind: 'value'
     }
 
@@ -2768,6 +2769,10 @@ exports.ExportDefaultDeclaration = class ExportDefaultDeclaration extends Export
     declaration: @clause.compileToBabylon o
 
 exports.ExportAllDeclaration = class ExportAllDeclaration extends ExportDeclaration
+  _compileToBabylon: (o) ->
+    type: 'ExportAllDeclaration'
+    source: @source.compileToBabylon o
+    exportKind: 'value'
 
 exports.ModuleSpecifierList = class ModuleSpecifierList extends Base
   constructor: (@specifiers) ->
