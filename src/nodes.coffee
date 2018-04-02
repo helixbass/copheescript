@@ -980,7 +980,15 @@ exports.StringLiteral = class StringLiteral extends Literal
 
   isDirective: -> @unquote() is 'use strict' # TODO: refine
 
+  compileCSXTextToBabylon: (o) ->
+    unquoted = @unquote yes, yes
+    type: 'JSXText'
+    value: unquoted
+    extra:
+      raw: unquoted
+
   _compileToBabylon: (o) ->
+    return @compileCSXTextToBabylon o if @csx
     isDirective = @isDirective()
     compiled =
       type:
@@ -1000,6 +1008,9 @@ exports.StringLiteral = class StringLiteral extends Literal
     unquoted = unquoted.replace /\\"/g, '"'  if doubleQuote
     unquoted = unquoted.replace /\\n/g, '\n' if newLine
     unquoted
+
+  isEmpty: ->
+    not @unquote().length
 
 exports.RegexLiteral = class RegexLiteral extends Literal
   REGEX_REGEX: /^\/(.*)\/(\w*)$/
@@ -1031,10 +1042,17 @@ exports.IdentifierLiteral = class IdentifierLiteral extends Literal
     iterator @
 
   _compileToBabylon: (o) ->
-    type: 'Identifier'
+    type:
+      if @csx
+        'JSXIdentifier'
+      else
+        'Identifier'
     name: @value
 
 exports.CSXTag = class CSXTag extends IdentifierLiteral
+  _compileToBabylon: (o) ->
+    type: 'JSXIdentifier'
+    name: @value
 
 exports.PropertyName = class PropertyName extends Literal
   isAssignable: YES
@@ -1472,6 +1490,7 @@ exports.Call = class Call extends Base
     ifn
 
   _compileToBabylon: (o) ->
+    return @compileCSXToBabylon o if @csx
     type:
       if @isNew
         'NewExpression'
@@ -1509,6 +1528,48 @@ exports.Call = class Call extends Base
     fragments.push @variable.compileToFragments(o, LEVEL_ACCESS)...
     fragments.push @makeCode('('), compiledArgs..., @makeCode(')')
     fragments
+
+  compileCSXToBabylon: (o) ->
+    [attributes, content] = @args
+    tagName = @variable.base
+    {
+      ...(
+        unless tagName.value.length
+          type: 'JSXFragment'
+          openingFragment: tagName.withBabylonLocationData
+            type: 'JSXOpeningFragment'
+          closingFragment: tagName.withBabylonLocationData
+            type: 'JSXClosingFragment'
+        else
+          type: 'JSXElement'
+          openingElement:
+            type: 'JSXOpeningElement'
+            name: tagName.compileToBabylon o#, LEVEL_ACCESS
+            attributes: flatten(
+              if attributes.base instanceof Arr
+                for {base: attr} in attributes.base.objects
+                  attr.csx = yes
+                  compiled = attr.compileToBabylon o#, LEVEL_PAREN
+                  if attr instanceof IdentifierLiteral
+                    type: 'JSXAttribute'
+                    name: compiled
+                  else
+                    compiled
+              else [])
+            selfClosing: not content
+          closingElement:
+            if content
+              type: 'JSXClosingElement'
+              name: tagName.compileToBabylon o
+      )
+      children:
+        if content and not content.base.isEmpty?()
+          content.base.csx = yes
+          compact flatten [
+            content.compileToBabylon o#, LEVEL_LIST
+          ]
+        else []
+    }
 
   compileCSX: (o) ->
     [attributes, content] = @args
@@ -1985,6 +2046,7 @@ exports.Obj = class Obj extends Base
     no
 
   _compileToBabylon: (o) ->
+    return @compileCSXAttributesToBabylon o if @csx
     @propagateLhs()
 
     type:
@@ -2069,19 +2131,19 @@ exports.Obj = class Obj extends Base
         unwrappedVal.nestedLhs = yes
 
   compileNode: (o) ->
+    # CSX attributes <div id="val" attr={aaa} {props...} />
+    return @compileCSXAttributes o if @csx
+
     props = @properties
     if @generated
       for node in props when node instanceof Value
         node.error 'cannot have an implicit value in an implicit object'
 
     # Object spread properties. https://github.com/tc39/proposal-object-rest-spread/blob/master/Spread.md
-    return @compileSpread o if @hasSplat() and not @csx
+    return @compileSpread o if @hasSplat()
 
     idt      = o.indent += TAB
     lastNode = @lastNode @properties
-
-    # CSX attributes <div id="val" attr={aaa} {props...} />
-    return @compileCSXAttributes o if @csx
 
     # If this object is the left-hand side of an assignment, all its children
     # are too.
@@ -2172,6 +2234,11 @@ exports.Obj = class Obj extends Base
     slices.unshift new Obj unless slices[0] instanceof Obj
     _extends = new Value new Literal utility '_extends', o
     (new Call _extends, slices).compileToFragments o
+
+  compileCSXAttributesToBabylon: (o) ->
+    for prop in @properties
+      prop.csx = yes
+      prop.compileToBabylon o#, LEVEL_TOP
 
   compileCSXAttributes: (o) ->
     props = @properties
@@ -2891,6 +2958,7 @@ exports.Assign = class Assign extends Base
     unfoldSoak o, this, 'variable'
 
   _compileToBabylon: (o) ->
+    return @compileCSXAttributeToBabylon o if @csx
     if @variable instanceof Value
       if @variable.isArray() or @variable.isObject()
         # This is the left-hand side of an assignment; let `Arr` and `Obj`
@@ -2903,7 +2971,7 @@ exports.Assign = class Assign extends Base
       return @compileConditionalToBabylon o if @context in ['||=', '&&=', '?=']
       return @compileSpecialMathToBabylon o if @context in ['**=', '//=', '%%=']
 
-    @addScopeVariables o
+    @addScopeVariables o# unless @context
 
     if @moduleDeclaration
       return
@@ -2927,6 +2995,18 @@ exports.Assign = class Assign extends Base
       left: @variable.compileToBabylon o, LEVEL_LIST
       right: @value.compileToBabylon o, LEVEL_LIST
     }
+
+  compileCSXAttributeToBabylon: (o) ->
+    type: 'JSXAttribute'
+    name: @variable.base.withBabylonLocationData
+      type: 'JSXIdentifier'
+      name: @variable.base.value
+    value:
+      if @value.base instanceof StringLiteral
+        @value.base.compileToBabylon o
+      else
+        type: 'JSXExpressionContainer'
+        expression: @value.base.compileToBabylon o
 
   addScopeVariables: (o) ->
     varBase = @variable.unwrapAll()
@@ -3977,7 +4057,11 @@ exports.Splat = class Splat extends Base
     @name.assigns name
 
   _compileToBabylon: (o) ->
-    type: 'SpreadElement'
+    type:
+      if @csx
+        'JSXSpreadAttribute'
+      else
+        'SpreadElement'
     argument: @name.compileToBabylon o, LEVEL_OP
 
   compileNode: (o) ->
@@ -4733,7 +4817,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
 
   shouldCache: -> @body.shouldCache()
 
-  extractElementsAndComments: ->
+  extractElements: ->
     # Assumes that `expr` is `Value` » `StringLiteral` or `Op`
     expr = @body.unwrap()
 
@@ -4766,10 +4850,11 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
         delete node.comments
       return yes
 
-    {elements, salvagedComments}
+    elements
 
   _compileToBabylon: (o) ->
-    {elements, salvagedComments} = @extractElementsAndComments()
+    return @compileCSXContentToBabylon o if @csx
+    elements = @extractElements()
     [first] = elements
     elements.unshift (@startQuote ? @).withLocationData new StringLiteral '' unless first instanceof StringLiteral
     [..., last] = elements
@@ -4804,6 +4889,28 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
       expressions, quasis
     }
 
+  compileCSXContentToBabylon: (o) ->
+    elements = @extractElements()
+
+    for element in elements
+      hasComment = do ->
+        hasComment = no
+        element.traverseChildren no, ({comments}) ->
+          if comments
+            hasComment = yes
+            no
+        hasComment
+      element.csx = yes
+      compiled = element.compileToBabylon o
+      if element instanceof StringLiteral
+        compiled unless element.isEmpty()
+      else if compiled.type is 'JSXElement' and not hasComment
+        compiled
+      else
+        element.withBabylonLocationData
+          type: 'JSXExpressionContainer'
+          expression: compiled
+
   prepareElementValue: (element) ->
     element.value = element.unquote yes, @csx
     unless @csx
@@ -4820,7 +4927,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
       wrapped.csxAttribute = yes
       return wrapped.compileNode o
 
-    {elements, salvagedComments} = @extractElementsAndComments()
+    elements = @extractElements()
 
     fragments = []
     fragments.push @makeCode '`' unless @csx

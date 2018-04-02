@@ -1,13 +1,17 @@
 prettier = require 'prettier'
 babylon = require 'babylon'
 formatWithPrettier = (js) ->
-  formatted = prettier.format "FORCE_NON_DIRECTIVE; #{js}"
+  # formatted = prettier.format "FORCE_NON_DIRECTIVE; #{js}"
+  {parsed: {ast}, opts} = prettier.__debug.parse "FORCE_NON_DIRECTIVE; #{js}"
+  opts.originalText = js
+  {formatted} = prettier.__debug.formatAST ast, opts
+  # formatted = prettier.format formatted
   {tokens} = babylon.parse formatted,
     tokens: yes
     sourceType: 'module'
     allowImportExportEverywhere: yes
     plugins: ['jsx']
-  (value ? type.label for {value, type} in tokens when type isnt 'CommentLine')
+  (value ? type.label for {value, type} in tokens)# when type isnt 'CommentLine'
   .join ' '
 
 # See [http://wiki.ecmascript.org/doku.php?id=harmony:egal](http://wiki.ecmascript.org/doku.php?id=harmony:egal).
