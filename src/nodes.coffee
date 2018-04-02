@@ -3057,9 +3057,7 @@ exports.Assign = class Assign extends Base
         # know that, so that those nodes know that they’re assignable as
         # destructured variables.
         @variable.base.lhs = yes
-        # Check if @variable contains Obj with splats.
-        hasSplat = @variable.contains (node) -> node instanceof Obj and node.hasSplat()
-        return @compileDestructuring o if not @variable.isAssignable() or @variable.isArray() and hasSplat
+        return @compileDestructuring o unless @variable.isAssignable()
 
       return @compileSplice       o if @variable.isSplice()
       return @compileConditional  o if @context in ['||=', '&&=', '?=']
@@ -3458,32 +3456,51 @@ exports.Code = class Code extends Base
         {name, value, splat} = param
         if splat or param instanceof Expansion
           haveSplatParam = yes
-          if name instanceof Arr
+          if param instanceof Expansion
+            splatParamName = new Value new IdentifierLiteral o.scope.freeVariable 'args'
+          else if name instanceof Arr
             splatParamName = new Value new IdentifierLiteral o.scope.freeVariable 'arg'
             exprs.push new Assign new Value(name), splatParamName
           else
             splatParamName = param.asReference o
           o.scope.parameter splatParamName.unwrap().value
           splatParamName
-        else unless haveSplatParam
-          if name instanceof Arr or name instanceof Obj
-            # This parameter is destructured.
-            name.lhs = yes
-
-            unless param.shouldCache()
-              name.eachName ({value}) ->
-                o.scope.parameter value
-          else
-            o.scope.parameter fragmentsToText param.compileToFragmentsWithoutComments o
-
-          if value
-            new Assign new Value(name), value, param: yes
-          else
-            param
         else
-          paramsAfterSplat.push param
-          o.scope.add name.value, 'var', yes if name?.value?
-          null
+          asRef =
+            if param.shouldCache()
+              param.asReference o
+            else
+              param.name
+          processedParam =
+            unless haveSplatParam
+              ref =
+                if value?
+                  new Assign new Value(asRef), value, param: yes
+                else
+                  asRef
+              if name instanceof Arr or name instanceof Obj
+                # This parameter is destructured.
+                name.lhs = yes
+
+                unless param.shouldCache()
+                  name.eachName ({value}) ->
+                    o.scope.parameter value
+              else
+                paramToAddToScope = if param.value? then param else ref
+                o.scope.parameter fragmentsToText paramToAddToScope.compileToFragmentsWithoutComments o
+
+              ref
+            else
+              paramsAfterSplat.push param
+              if value?
+                condition = new Op '===', asRef, new UndefinedLiteral
+                ifTrue = new Assign new Value(asRef), value
+                exprs.push new If condition, ifTrue
+              o.scope.add name.value, 'var', yes if name?.value?
+              null
+          if param.shouldCache()
+            exprs.push new Assign new Value(name), asRef, param: 'alwaysDeclare'
+          processedParam
     )
 
     @assignParamsAfterSplat {exprs, splatParamName, paramsAfterSplat, o} if paramsAfterSplat.length isnt 0
@@ -3553,7 +3570,7 @@ exports.Code = class Code extends Base
             ))
           param.renameParam obj, replacement, expandAssign: no
         else
-          replacement = param.withLocationData(target)
+          replacement = node.withLocationData(target)
           param.renameParam node, replacement
         thisAssignments.push @funcGlyph.withLocationData new Assign(
           node
@@ -3595,7 +3612,6 @@ exports.Code = class Code extends Base
     exprs            = []
     paramsAfterSplat = []
     haveSplatParam   = no
-    haveBodyParam    = no
 
     {thisAssignments} = @expandThisParams o
 
@@ -3640,34 +3656,19 @@ exports.Code = class Code extends Base
       # encountered, add these other parameters to the list to be output in
       # the function definition.
       else
-        if param.shouldCache() or haveBodyParam
-          param.assignedInBody = yes
-          haveBodyParam = yes
-          # This parameter cannot be declared or assigned in the parameter
-          # list. So put a reference in the parameter list and add a statement
-          # to the function body assigning it, e.g.
-          # `(arg) => { var a = arg.a; }`, with a default value if it has one.
-          if param.value?
-            condition = new Op '===', param, new UndefinedLiteral
-            ifTrue = new Assign new Value(param.name), param.value
-            exprs.push new If condition, ifTrue
+        asRef =
+          if param.shouldCache()
+            param.asReference o
           else
-            exprs.push new Assign new Value(param.name), param.asReference(o), param: 'alwaysDeclare'
-
+            param.name
         # If this parameter comes before the splat or expansion, it will go
         # in the function definition parameter list.
         unless haveSplatParam
-          # If this parameter has a default value, and it hasn’t already been
-          # set by the `shouldCache()` block above, define it as a statement in
-          # the function body. This parameter comes after the splat parameter,
-          # so we can’t define its default value in the parameter list.
-          if param.shouldCache()
-            ref = param.asReference o
-          else
-            if param.value? and not param.assignedInBody
-              ref = new Assign new Value(param.name), param.value, param: yes
+          ref =
+            if param.value?
+              new Assign new Value(asRef), param.value, param: yes
             else
-              ref = param
+              asRef
           # Add this parameter’s reference(s) to the function scope.
           if param.name instanceof Arr or param.name instanceof Obj
             # This parameter is destructured.
@@ -3689,13 +3690,15 @@ exports.Code = class Code extends Base
           # If this parameter had a default value, since it’s no longer in the
           # function parameter list we need to assign its default value
           # (if necessary) as an expression in the body.
-          if param.value? and not param.shouldCache()
-            condition = new Op '===', param, new UndefinedLiteral
-            ifTrue = new Assign new Value(param.name), param.value
+          if param.value?
+            condition = new Op '===', asRef, new UndefinedLiteral
+            ifTrue = new Assign new Value(asRef), param.value
             exprs.push new If condition, ifTrue
           # Add this parameter to the scope, since it wouldn’t have been added
           # yet since it was skipped earlier.
           o.scope.add param.name.value, 'var', yes if param.name?.value?
+        if param.shouldCache()
+          exprs.push new Assign new Value(param.name), asRef, param: 'alwaysDeclare'
 
     # If there were parameters after the splat or expansion parameter, those
     # parameters need to be assigned in the body of the function.
@@ -5137,7 +5140,7 @@ exports.Sequence = class Sequence extends Base
     super()
 
   _compileToBabylon: (o) ->
-    # return @expressions[0].compileToBabylon o if @expressions.length is 1
+    return @expressions[0].compileToBabylon o if @expressions.length is 1
     type: 'SequenceExpression'
     expressions:
       for expression in @expressions

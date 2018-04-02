@@ -396,10 +396,13 @@ runTests = (CoffeeScript, {justTestFile, usePrettier} = {}) ->
   global.CoffeeScript = CoffeeScript
   _compile = CoffeeScript.compile
   _eval = CoffeeScript.eval
+  _run = CoffeeScript.run
   global.CoffeeScript.compile = (code, options = {}) ->
     _compile code, {...options, usePrettier}
   global.CoffeeScript.eval = (code, options = {}) ->
     _eval code, {...options, usePrettier}
+  global.CoffeeScript.run = (code, options = {}) ->
+    _run code, {...options, usePrettier}
   global.Repl   = require './lib/coffeescript/repl'
   global.bold   = bold
   global.red    = red
