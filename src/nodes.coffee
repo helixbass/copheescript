@@ -3098,6 +3098,9 @@ exports.Assign = class Assign extends Base
 
     return @wrapInParensIf(o.level >= LEVEL_OP)(value).compileToBabylon o unless objects.length
 
+    # if objects.length is 1 and objects[0] instanceof Expansion
+    #   objects[0].error 'Destructuring assignment has no target'
+
     if value.unwrap() not instanceof IdentifierLiteral or @variable.assigns(value.unwrap().value)
       [cachedValueAssign, value] = value.cache o, shouldCache: YES
       assigns.push cachedValueAssign
@@ -3116,10 +3119,11 @@ exports.Assign = class Assign extends Base
     getSlice = slicer 'slice'
     getSplice = slicer 'splice'
 
-    processObjects = (objs, rhs = value) ->
+    processObjects = (objs, rhs = value) =>
       assigns.push new Assign(
         new Value new Arr(objs, lhs: yes)
         rhs
+        {@param}
       )
 
     if splatsAndExpans.length
@@ -3440,12 +3444,17 @@ exports.Code = class Code extends Base
   compileParamsToBabylon: ({params, haveSplatParam, o}) ->
     lastIndex = params.length - 1
     for param, index in params
+      scopeVariablesCount = o.scope.variables.length
+      compiled = param.compileToBabylon o
+      if scopeVariablesCount isnt o.scope.variables.length
+        generatedVariables = o.scope.variables.splice scopeVariablesCount
+        o.scope.parent.variables.push generatedVariables...
       if haveSplatParam and index is lastIndex
         param.withBabylonLocationData
           type: 'RestElement'
-          argument: param.compileToBabylon o
+          argument: compiled
       else
-        param.compileToBabylon o
+        compiled
 
   processParams: (o) ->
     exprs = []
@@ -3455,6 +3464,10 @@ exports.Code = class Code extends Base
       for param in @params
         {name, value, splat} = param
         if splat or param instanceof Expansion
+          if haveSplatParam
+            param.error 'only one splat or expansion parameter is allowed per function definition'
+          else if param instanceof Expansion and @params.length is 1
+            param.error 'an expansion parameter cannot be the only parameter in a function definition'
           haveSplatParam = yes
           if param instanceof Expansion
             splatParamName = new Value new IdentifierLiteral o.scope.freeVariable 'args'
