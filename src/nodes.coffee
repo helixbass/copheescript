@@ -2277,6 +2277,14 @@ exports.Arr = class Arr extends Base
     not @isAssignable()
 
   _compileToBabylon: (o) ->
+    for obj in @objects
+      unwrappedObj = obj.unwrapAll()
+      if @lhs
+        if unwrappedObj instanceof Arr or unwrappedObj instanceof Obj
+          unwrappedObj.lhs = yes
+        else if unwrappedObj instanceof Assign
+          unwrappedObj.nestedLhs = yes
+
     type:
       if @lhs
         'ArrayPattern'
@@ -3552,7 +3560,11 @@ exports.Code = class Code extends Base
         {name, value, splat} = param
         if splat or param instanceof Expansion
           haveSplatParam = yes
-          splatParamName = param.asReference o
+          if name instanceof Arr
+            splatParamName = new Value new IdentifierLiteral o.scope.freeVariable 'arg'
+            exprs.push new Assign new Value(name), splatParamName
+          else
+            splatParamName = param.asReference o
           o.scope.parameter splatParamName.unwrap().value
           splatParamName
         else unless haveSplatParam
@@ -3635,7 +3647,7 @@ exports.Code = class Code extends Base
         # In a case when the variable name is already reserved, we have to assign
         # a new variable name to the destructured variable: ({prop:prop1 = 1}) ->
         if param.name instanceof Obj and obj instanceof Assign and obj.operatorToken.value is '='
-          replacement = param.withLocationData(
+          replacement = obj.withLocationData(
             new Assign(
               new IdentifierLiteral name
               new Assign target, obj.value
@@ -4030,10 +4042,12 @@ exports.Param = class Param extends Base
         # Examples:
         # `({@foo}) ->`  should compile to `({foo}) { this.foo = foo}`
         # `foo = 1; ({@foo}) ->` should compile to `foo = 1; ({foo:foo1}) { this.foo = foo1 }`
-        if node.this and key.value is newNode.value
-          new Value newNode
-        else
-          new Assign new Value(key), newNode, context: 'object'
+        newNode.withLocationData(
+          if node.this and key.value is newNode.value
+            new Value newNode
+          else
+            new Assign new Value(key), newNode, context: 'object'
+        )
       else
         newNode
 
