@@ -104,7 +104,7 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
   parsed = parser.parse(tokens)
   # dump {parsed}
   js = do =>
-    return parsed.prettier options if options.usePrettier
+    return parsed.prettier merge options, {code} if options.usePrettier
 
     fragments = parsed.compileToFragments options
 
@@ -204,7 +204,7 @@ exports.babylon = compileToBabylon = withPrettyErrors (source, options) ->
   return ast unless options.withTokens
   {ast, tokens}
 
-{dump, flatten, isPlainObject} = helpers
+{dump, flatten, isPlainObject, merge} = helpers
 espreeTokenTypes =
   '{': 'Punctuator'
   '}': 'Punctuator'

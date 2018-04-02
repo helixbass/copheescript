@@ -617,9 +617,10 @@ exports.Block = class Block extends Base
     if compiledNodes.length > 1 and o.level >= LEVEL_LIST then @wrapInParentheses answer else answer
 
   prettier: (o) ->
+    code = del o, 'code'
     { opts } = prettier.__debug.parseAndAttachComments ''
     ast = @compileToBabylon o
-    prettier.__debug.formatAST(ast, opts).formatted
+    prettier.__debug.formatAST(ast, merge opts, originalText: code).formatted
 
   compileToBabylon: (o, level) ->
     return @compileRootToBabylon(o) unless o.scope
@@ -1109,6 +1110,11 @@ exports.BooleanLiteral = class BooleanLiteral extends Literal
 exports.SuperLiteral = class SuperLiteral extends Literal
   _compileToBabylon: (o) ->
     type: 'Super'
+
+exports.DefaultLiteral = class DefaultLiteral extends Literal
+  _compileToBabylon: (o) ->
+    type: 'Identifier'
+    name: 'default'
 
 #### Return
 
@@ -2668,6 +2674,12 @@ exports.ModuleDeclaration = class ModuleDeclaration extends Base
       @error "#{moduleDeclarationType} statements must be at top-level scope"
 
 exports.ImportDeclaration = class ImportDeclaration extends ModuleDeclaration
+  _compileToBabylon: (o) ->
+    type: 'ImportDeclaration'
+    specifiers: @clause?.compileToBabylon(o) ? []
+    source: @source.compileToBabylon o
+    importKind: 'value' if @clause
+
   compileNode: (o) ->
     @checkScope o, 'import'
     o.importedSymbols = []
@@ -2688,6 +2700,12 @@ exports.ImportClause = class ImportClause extends Base
     super()
 
   children: ['defaultBinding', 'namedImports']
+
+  _compileToBabylon: (o) ->
+    compact flatten [
+      @defaultBinding?.compileToBabylon o
+      @namedImports?.compileToBabylon o
+    ]
 
   compileNode: (o) ->
     code = []
@@ -2728,8 +2746,26 @@ exports.ExportDeclaration = class ExportDeclaration extends ModuleDeclaration
     code
 
 exports.ExportNamedDeclaration = class ExportNamedDeclaration extends ExportDeclaration
+  _compileToBabylon: (o) ->
+    @clause.moduleDeclaration = 'export'
+
+    {
+      type: 'ExportNamedDeclaration'
+      ...(
+        if @clause instanceof ExportSpecifierList
+          specifiers: @clause.compileToBabylon o
+        else
+          specifiers: []
+          declaration: @clause.compileToBabylon o
+      )
+      exportKind: 'value'
+    }
 
 exports.ExportDefaultDeclaration = class ExportDefaultDeclaration extends ExportDeclaration
+  _compileToBabylon: (o) ->
+    @clause.isExport = yes
+    type: 'ExportDefaultDeclaration'
+    declaration: @clause.compileToBabylon o
 
 exports.ExportAllDeclaration = class ExportAllDeclaration extends ExportDeclaration
 
@@ -2738,6 +2774,9 @@ exports.ModuleSpecifierList = class ModuleSpecifierList extends Base
     super()
 
   children: ['specifiers']
+
+  _compileToBabylon: (o) ->
+    specifier.compileToBabylon o for specifier in @specifiers
 
   compileNode: (o) ->
     code = []
@@ -2783,6 +2822,12 @@ exports.ImportSpecifier = class ImportSpecifier extends ModuleSpecifier
   constructor: (imported, local) ->
     super imported, local, 'import'
 
+  _compileToBabylon: (o) ->
+    compiledOriginal = @original.compileToBabylon o
+    type: 'ImportSpecifier'
+    imported: compiledOriginal
+    local: @alias?.compileToBabylon(o) ? compiledOriginal
+
   compileNode: (o) ->
     # Per the spec, symbols can’t be imported multiple times
     # (e.g. `import { foo, foo } from 'lib'` is invalid)
@@ -2793,12 +2838,26 @@ exports.ImportSpecifier = class ImportSpecifier extends ModuleSpecifier
     super o
 
 exports.ImportDefaultSpecifier = class ImportDefaultSpecifier extends ImportSpecifier
+  _compileToBabylon: (o) ->
+    type: 'ImportDefaultSpecifier'
+    local: @original.compileToBabylon o
 
 exports.ImportNamespaceSpecifier = class ImportNamespaceSpecifier extends ImportSpecifier
+  _compileToBabylon: (o) ->
+    type: 'ImportNamespaceSpecifier'
+    local: do =>
+      return @alias.compileToBabylon o if @alias
+      @original.compileToBabylon o
 
 exports.ExportSpecifier = class ExportSpecifier extends ModuleSpecifier
   constructor: (local, exported) ->
     super local, exported, 'export'
+
+  _compileToBabylon: (o) ->
+    compiledOriginal = @original.compileToBabylon o
+    type: 'ExportSpecifier'
+    local: compiledOriginal
+    exported: @alias?.compileToBabylon(o) ? compiledOriginal
 
 #### Assign
 
@@ -2840,6 +2899,17 @@ exports.Assign = class Assign extends Base
       return @compileSpecialMathToBabylon o if @context in ['**=', '//=', '%%=']
 
     @addScopeVariables o
+
+    if @moduleDeclaration
+      return
+        type: 'VariableDeclaration'
+        declarations: [
+          @withBabylonLocationData
+            type: 'VariableDeclarator'
+            id:   @variable.compileToBabylon o
+            init: @value.compileToBabylon o
+        ]
+        kind: 'var'
 
     {
       ...(
@@ -3440,6 +3510,8 @@ exports.Code = class Code extends Base
           'ClassMethod'
         else if @bound
           'ArrowFunctionExpression'
+        else if @isExport
+          'FunctionDeclaration'
         else
           'FunctionExpression'
       generator: @isGenerator
