@@ -487,8 +487,8 @@ task 'test:prettier', 'run the CoffeeScript language test suite', ->
     'argument_parsing', 'arrays', 'async', 'booleans', 'comprehensions'
     'control_flow', 'csx', 'exception_handling', 'function_invocation'
     'functions', 'helpers', 'importing', 'interpolation', 'javascript_literals'
-    'modules', 'numbers', 'objects', 'operators', 'ranges', 'scope'
-    'slicing_and_splicing', 'soaks', 'strict', 'strings'
+    'modules', 'numbers', 'object_rest_spread', 'objects', 'operators', 'ranges'
+    'scope', 'slicing_and_splicing', 'soaks', 'strict', 'strings'
     'tagged_template_literals'
   ], usePrettier: yes).catch -> process.exit 1
 

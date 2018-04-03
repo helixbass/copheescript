@@ -2069,6 +2069,7 @@ exports.Obj = class Obj extends Base
 
   _compileToBabylon: (o) ->
     return @compileCSXAttributesToBabylon o if @csx
+    @reorderProperties() if @hasSplat() and @lhs
     @propagateLhs()
 
     type:
@@ -2077,7 +2078,8 @@ exports.Obj = class Obj extends Base
       else
         'ObjectExpression'
     properties:
-      for prop in @expandProperties(o)
+      for prop in @expandProperties(o) then do =>
+        return prop.compileToBabylon o if prop instanceof Splat
         {variable, value, shorthand} = prop
         isComputedPropertyName = variable instanceof Value and variable.base instanceof ComputedPropertyName
 
@@ -2137,6 +2139,8 @@ exports.Obj = class Obj extends Base
               prop.base.value
               context: 'object'
             )
+        else if prop instanceof Splat
+          prop
         else
           new Assign prop, prop, context: 'object', shorthand: prop.bareLiteral? IdentifierLiteral
       )
@@ -2144,22 +2148,30 @@ exports.Obj = class Obj extends Base
   propagateLhs: ->
     return unless @lhs
 
-    for prop in @properties when prop instanceof Assign
-      {value} = prop
-      unwrappedVal = value.unwrapAll()
-      if unwrappedVal instanceof Arr or unwrappedVal instanceof Obj
-        unwrappedVal.lhs = yes
-      else if unwrappedVal instanceof Assign
-        unwrappedVal.nestedLhs = yes
+    for prop in @properties
+      if prop instanceof Assign
+        {value} = prop
+        unwrappedVal = value.unwrapAll()
+        if unwrappedVal instanceof Arr or unwrappedVal instanceof Obj
+          unwrappedVal.lhs = yes
+        else if unwrappedVal instanceof Assign
+          unwrappedVal.nestedLhs = yes
+      else if prop instanceof Splat
+        prop.lhs = yes
 
   # Move rest property to the end of the list.
   # `{a, rest..., b} = obj` -> `{a, b, rest...} = obj`
   # `foo = ({a, rest..., b}) ->` -> `foo = {a, b, rest...}) ->`
   reorderProperties: ->
     props = @properties
+    lastIndex = props.length - 1
+    prevLast = props[lastIndex]
     splatProps = (prop for prop in props when prop instanceof Splat)
+    props[splatProps[1]].error "multiple spread elements are disallowed" if splatProps.length > 1
     objProps = (prop for prop in props when prop not instanceof Splat)
-    @objects = @properties = [].concat objProps, splatProps
+    @objects = @properties = [...objProps, ...splatProps].map (prop, index) ->
+      return prop unless index is lastIndex
+      prevLast.withLocationData prop, force: yes
 
   compileNode: (o) ->
     # CSX attributes <div id="val" attr={aaa} {props...} />
@@ -2173,10 +2185,6 @@ exports.Obj = class Obj extends Base
 
     idt      = o.indent += TAB
     lastNode = @lastNode @properties
-
-    if @hasSplat() and @lhs
-      splatProps = (ix for prop, ix in props when prop instanceof Splat)
-      props[splatProps[1]].error "multiple spread elements are disallowed" if splatProps?.length > 1
 
     # If this object is the left-hand side of an assignment, all its children
     # are too.
@@ -3230,10 +3238,6 @@ exports.Assign = class Assign extends Base
     # Helper which outputs `[].splice` code.
     compSplice = slicer "splice"
 
-    # Check if `objects` array contains object spread (`{a, r...}`), e.g. `[a, b, {c, r...}]`.
-    hasObjSpreads = (objs) ->
-      (i for obj, i in objs when obj.base instanceof Obj and obj.base.hasSplat())
-
     # Check if `objects` array contains any instance of `Assign`, e.g. {a:1}.
     hasObjAssigns = (objs) ->
       (i for obj, i in objs when obj instanceof Assign and obj.context is 'object')
@@ -3246,12 +3250,11 @@ exports.Assign = class Assign extends Base
     # `objects` are complex when there is object spread ({a...}), object assign ({a:1}),
     # unassignable object, or just a single node.
     complexObjects = (objs) ->
-      hasObjSpreads(objs).length or hasObjAssigns(objs).length or objIsUnassignable(objs) or olen is 1
+      hasObjAssigns(objs).length or objIsUnassignable(objs) or olen is 1
 
     # "Complex" `objects` are processed in a loop.
     # Examples: [a, b, {c, r...}, d], [a, ..., {b, r...}, c, d]
     loopObjects = (objs, vvar, vvarTxt) =>
-      objSpreads = hasObjSpreads objs
       for obj, i in objs
         # `Elision` can be skipped.
         continue if obj instanceof Elision
@@ -3270,7 +3273,6 @@ exports.Assign = class Assign extends Base
           # `obj` is [a...], {a...} or a
           vvar = switch
             when obj instanceof Splat then new Value obj.name
-            when i in objSpreads then new Value obj.base
             else obj
           vval = switch
             when obj instanceof Splat then compSlice(vvarTxt, i)
@@ -4010,6 +4012,8 @@ exports.Splat = class Splat extends Base
     type:
       if @csx
         'JSXSpreadAttribute'
+      else if @lhs
+        'RestElement'
       else
         'SpreadElement'
     argument: @name.compileToBabylon o, LEVEL_OP
