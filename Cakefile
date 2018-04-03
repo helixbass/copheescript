@@ -467,7 +467,7 @@ runTests = (CoffeeScript, {justTestFile, usePrettier} = {}) ->
     filename not in testFilesToSkip
 
   startTime = Date.now()
-  for file in files when helpers.isCoffee(file) and (not justTestFile or Array.isArray(justTestFile) and justTestFile.some((filename) -> "#{filename}.coffee" is file) or "#{justTestFile}.coffee" is file)
+  for file in files when helpers.isCoffee(file) and (not justTestFile or Array.isArray(justTestFile) and justTestFile.some((filename) -> "#{filename}.coffee" is file or "#{filename}.litcoffee" is file) or "#{justTestFile}.coffee" is file or "#{justTestFile}.litcoffee" is file)
     literate = helpers.isLiterate file
     currentFile = filename = path.join 'test', file
     code = fs.readFileSync filename
@@ -485,10 +485,11 @@ task 'test', 'run the CoffeeScript language test suite', ->
 task 'test:prettier', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript, justTestFile: [
     'argument_parsing', 'arrays', 'async', 'booleans', 'comprehensions'
-    'control_flow', 'csx', 'exception_handling', 'function_invocation'
-    'functions', 'helpers', 'importing', 'interpolation', 'javascript_literals'
-    'modules', 'numbers', 'object_rest_spread', 'objects', 'operators', 'ranges'
-    'scope', 'slicing_and_splicing', 'soaks', 'strict', 'strings'
+    'control_flow', 'csx', 'exception_handling', 'formatting'
+    'function_invocation', 'functions', 'helpers', 'importing', 'interpolation'
+    'javascript_literals', 'literate', 'literate_tabbed', 'modules', 'numbers'
+    'object_rest_spread', 'objects', 'operators', 'ranges', 'parser', 'regex'
+    'regex_dotall', 'scope', 'slicing_and_splicing', 'soaks', 'strict', 'strings'
     'tagged_template_literals'
   ], usePrettier: yes).catch -> process.exit 1
 
