@@ -152,6 +152,11 @@ exports.Base = class Base
           new Value func, [new Access new PropertyName 'apply']
           [new ThisLiteral, new IdentifierLiteral 'arguments']
         )
+      else if @contains isLiteralThis
+        new Call(
+          new Value func, [new Access new PropertyName 'call']
+          [new ThisLiteral]
+        )
       else
         new Call func, []
     )).compileToBabylon o
@@ -653,6 +658,7 @@ exports.Block = class Block extends Base
     top = o.level is LEVEL_TOP
 
     if not top and not root
+      return @withLocationData(new UndefinedLiteral).compileToBabylon o unless @expressions.length
       return @wrapInParensIf(o.level >= LEVEL_LIST)(new Sequence(@expressions)).compileToBabylon o
 
     @directives = []
@@ -1150,6 +1156,10 @@ exports.Return = class Return extends Base
   compileToFragments: (o, level) ->
     expr = @expression?.makeReturn()
     if expr and expr not instanceof Return then expr.compileToFragments o, level else super o, level
+
+  compileToBabylon: (o, level) ->
+    expr = @expression?.makeReturn()
+    if expr and expr not instanceof Return then expr.compileToBabylon o, level else super o, level
 
   _compileToBabylon: (o) ->
     type: 'ReturnStatement'
@@ -5289,7 +5299,13 @@ exports.If = class If extends Base
     type: 'IfStatement'
     test: @condition.compileToBabylon o, LEVEL_PAREN
     consequent: @ensureBlock(@body).compileToBabylon o
-    alternate: @elseBody.compileToBabylon(o, LEVEL_TOP) if @elseBody
+    alternate: do =>
+      return unless @elseBody
+      compiled = @elseBody.compileToBabylon o, LEVEL_TOP
+      if compiled.type is 'BlockStatement' and compiled.body.length is 1 and compiled.body[0].type is 'IfStatement'
+        compiled.body[0]
+      else
+        compiled
 
   compileExpressionToBabylon: (o) ->
     type: 'ConditionalExpression'
