@@ -141,6 +141,8 @@ exports.Base = class Base
     o.sharedScope = yes
 
     func = new Code [], Block.wrap [this]
+    if @contains ((node) -> node instanceof SuperCall)
+      func.bound = yes
     wrapInAwait =
       if func.isAsync
         (node) -> new Op 'await', node
@@ -745,7 +747,7 @@ exports.Block = class Block extends Base
         compiled = node.compileToBabylon o
         return [] unless compiled
         return [] if node.hoisted
-        return @extractDirectives compiled.body, o if node instanceof Block
+        return @extractDirectives compiled.body, o if node instanceof Block or compiled.type is 'BlockStatement'
         return compiled if node.isStatement o
         compiled = @extractDirectives compiled, o
         return [] unless compiled
@@ -1615,6 +1617,16 @@ exports.SuperCall = class SuperCall extends Call
   isStatement: (o) ->
     @expressions?.length and o.level is LEVEL_TOP
 
+  _compileToBabylon: (o) ->
+    compilingExpressions = del o, 'compilingSuperCallExpressions'
+    return super o unless @expressions?.length and not compilingExpressions
+
+    o.compilingSuperCallExpressions = yes
+    new Block([
+      @
+      @expressions...
+    ]).compileToBabylon o, if o.level is LEVEL_TOP then o.level else LEVEL_LIST
+
   compileNode: (o) ->
     return super o unless @expressions?.length
 
@@ -2407,6 +2419,10 @@ exports.Class = class Class extends Base
     if executableBody# or @hasNameClash
       node = new ExecutableClassBody node, executableBody
 
+    if @boundMethods.length and @parent
+      @variable ?= new IdentifierLiteral o.scope.freeVariable '_class'
+      [@variable, @variableRef] = @variable.cache o unless @variableRef?
+
     if @variable
       node = new Assign @variable, node, { @moduleDeclaration }
 
@@ -2418,6 +2434,8 @@ exports.Class = class Class extends Base
       delete @_compileToBabylon
 
   compileClassDeclarationToBabylon: (o) ->
+    @prepareConstructor()
+    @proxyBoundMethods() if @boundMethods.length
     type:
       if o.level is LEVEL_TOP
         'ClassDeclaration'
@@ -3537,6 +3555,8 @@ exports.Code = class Code extends Base
     @body.expressions.unshift thisAssignments... unless @expandCtorSuper thisAssignments
     {params, exprs, haveSplatParam} = @processParams o
     @body.expressions.unshift exprs...
+    if @isMethod and @bound and not @isStatic and @classVariable
+      @body.expressions.unshift utilityBabylon 'boundMethodCheck', merge o, invokedWithArgs: [new Value(new ThisLiteral), @classVariable]
     @body.makeReturn() unless wasEmpty or @noReturn
 
     {
@@ -5385,6 +5405,23 @@ UTILITIES_BABYLON =
   splice : -> new Value new Arr, [new Access new PropertyName 'splice']
   slice  : -> new Value new Arr, [new Access new PropertyName 'slice']
   hasProp: -> new Value new Obj, [new Access new PropertyName 'hasOwnProperty']
+  boundMethodCheck: ->
+    instance = new IdentifierLiteral 'instance'
+    Constructor = new IdentifierLiteral 'Constructor'
+    new Code(
+      [
+        new Param instance
+        new Param Constructor
+      ]
+      Block.wrap [new If(
+        new Op 'instanceof', instance, Constructor
+        Block.wrap [new Throw new Op 'new', new Call(
+          new Value new IdentifierLiteral 'Error'
+          [new StringLiteral "'Bound instance method accessed before binding'"]
+        )]
+        type: 'unless'
+      )]
+    )
   modulo: ->
     a = new IdentifierLiteral 'a'
     b = new IdentifierLiteral 'b'
@@ -5439,6 +5476,7 @@ utility = (name, o) ->
 utilityBabylon = (name, o) ->
   calledWithArgs  = del o, 'calledWithArgs'
   appliedWithArgs = del o, 'appliedWithArgs'
+  invokedWithArgs = del o, 'invokedWithArgs'
   {root} = o.scope
   ref = new IdentifierLiteral(
     if name of root.utilities
@@ -5448,10 +5486,14 @@ utilityBabylon = (name, o) ->
       root.assign ref, UTILITIES_BABYLON[name] o
       root.utilities[name] = ref
   )
-  return ref unless calledWithArgs or appliedWithArgs
+  return ref unless calledWithArgs or appliedWithArgs or invokedWithArgs
   new Call(
-    new Value ref, [new Access new PropertyName if calledWithArgs then 'call' else 'apply']
-    calledWithArgs ? appliedWithArgs
+    new Value ref,
+      if invokedWithArgs
+        []
+      else
+        [new Access new PropertyName if calledWithArgs then 'call' else 'apply']
+    calledWithArgs ? appliedWithArgs ? invokedWithArgs
   )
 
 multident = (code, tab, includingFirstLine = yes) ->
