@@ -639,7 +639,6 @@ exports.Block = class Block extends Base
     # end up being declared on this block.
     o.scope.parameter name for name in o.locals or []
 
-  addDirective: (compiledDirective) ->
   compileRootToBabylon: (o) ->
     # @spaced   = yes
     @initializeScope o
@@ -986,8 +985,6 @@ exports.StringLiteral = class StringLiteral extends Literal
   compileNode: (o) ->
     res = if @csx then [@makeCode @unquote(yes, yes)] else super()
 
-  isDirective: -> @unquote() is 'use strict' # TODO: refine
-
   compileCSXTextToBabylon: (o) ->
     unquoted = @unquote yes, yes
     type: 'JSXText'
@@ -997,19 +994,10 @@ exports.StringLiteral = class StringLiteral extends Literal
 
   _compileToBabylon: (o) ->
     return @compileCSXTextToBabylon o if @csx
-    isDirective = @isDirective()
-    compiled =
-      type:
-        if isDirective
-          'DirectiveLiteral'
-        else
-          'StringLiteral'
-      value: @unquote()
-      extra:
-        raw: @value
-    return compiled unless isDirective
-    type: 'Directive'
-    value: compiled
+    type: 'StringLiteral'
+    value: @unquote()
+    extra:
+      raw: @value
 
   unquote: (doubleQuote = no, newLine = no) ->
     unquoted = @value[1...-1]
@@ -1038,10 +1026,14 @@ exports.PassthroughLiteral = class PassthroughLiteral extends Literal
   _compileToBabylon: (o) ->
     return null unless @value.length
     try
+      parsed = babylon.parse(@value, sourceType: 'module').program.body
+      return parsed if parsed?.length
+    catch
+    try
       return babylon.parseExpression @value
     catch
-    babylon.parse(@value, sourceType: 'module').program.body
-    # new IdentifierLiteral(@value).compileToBabylon o
+    babylon.parse("class A {#{@value}}", sourceType: 'module').program.body[0].body.body[0]
+    # TODO: wrap this last one in a try and if it fails throw a useful error about not being able to parse backticked JS as an expression
 
 exports.IdentifierLiteral = class IdentifierLiteral extends Literal
   isAssignable: YES
@@ -1102,11 +1094,16 @@ exports.ThisLiteral = class ThisLiteral extends Literal
     super 'this'
 
   _compileToBabylon: (o) ->
-    if @value is 'this'
+    value =
+      if o.scope.method?.bound
+        o.scope.method.context
+      else
+        @value
+    if value is 'this'
       type: 'ThisExpression'
     else
       type: 'Identifier' # TODO: refine/share code?
-      name: @value
+      name: value
 
   compileNode: (o) ->
     code = if o.scope.method?.bound then o.scope.method.context else @value
@@ -1142,6 +1139,17 @@ exports.DefaultLiteral = class DefaultLiteral extends Literal
     type: 'Identifier'
     name: 'default'
 
+exports.Directive = class Directive extends Base
+  constructor: (@value) ->
+    super()
+  
+  _compileToBabylon: (o) ->
+    type: 'Directive'
+    value: {
+      ...@value.compileToBabylon o
+      type: 'DirectiveLiteral'
+    }
+
 #### Return
 
 # A `return` is a *pureStatement*—wrapping it in a closure wouldn’t make sense.
@@ -1165,7 +1173,7 @@ exports.Return = class Return extends Base
 
   _compileToBabylon: (o) ->
     type: 'ReturnStatement'
-    argument: @expression?.compileToBabylon(o) ? null
+    argument: @expression?.compileToBabylon(o, LEVEL_PAREN) ? null
 
   compileNode: (o) ->
     answer = []
@@ -1241,7 +1249,6 @@ exports.Value = class Value extends Base
   isAssignable   : -> @hasProperties() or @base.isAssignable()
   isNumber       : -> @bareLiteral(NumberLiteral)
   isString       : -> @bareLiteral(StringLiteral)
-  isDirective    : -> @isString() and @base.isDirective()
   isRegex        : -> @bareLiteral(RegexLiteral)
   isUndefined    : -> @bareLiteral(UndefinedLiteral)
   isNull         : -> @bareLiteral(NullLiteral)
@@ -1333,7 +1340,7 @@ exports.Value = class Value extends Base
           type: 'MemberExpression'
           object: ret
           property: prop.compileToBabylon o
-          computed: prop instanceof Index
+          computed: prop instanceof Index or prop.name?.unwrap() not instanceof PropertyName
     ret
 
   # Unfold a soak into an `If`: `a?.b` -> `a.b if a?`
@@ -1361,10 +1368,6 @@ exports.Value = class Value extends Base
       @base.eachName iterator
     else
       @error 'tried to assign to unassignable value'
-
-  makeReturn: (res) ->
-    return super res unless @isDirective()
-    return this
 
 #### HereComment
 
@@ -1465,8 +1468,8 @@ exports.Call = class Call extends Base
   unfoldSoak: (o) ->
     if @soak
       if @variable instanceof Super
-        left = new Literal @variable.compile o
-        rite = new Value left
+        left = rite = @variable
+        @variable.setAccessor o
         @variable.error "Unsupported reference to 'super'" unless @variable.accessor?
       else
         return ifn if ifn = unfoldSoak o, this, 'variable'
@@ -1621,10 +1624,15 @@ exports.SuperCall = class SuperCall extends Call
     compilingExpressions = del o, 'compilingSuperCallExpressions'
     return super o unless @expressions?.length and not compilingExpressions
 
+    superCall = @
+    if o.level > LEVEL_TOP
+      [superCall, ref] = @cache o, shouldCache: YES
+
     o.compilingSuperCallExpressions = yes
-    new Block([
-      @
+    new Block(compact [
+      superCall
       @expressions...
+      ref
     ]).compileToBabylon o, if o.level is LEVEL_TOP then o.level else LEVEL_LIST
 
   compileNode: (o) ->
@@ -2116,7 +2124,7 @@ exports.Obj = class Obj extends Base
       if key instanceof Value and key.hasProperties()
         key.error 'invalid object key' unless prop.context isnt 'object' and key.this
         key  = key.properties[0].name
-        prop = new Assign key, prop, context: 'object'
+        prop = prop.withLocationData new Assign key, prop, context: 'object'
       return prop unless key is prop
       prop.withLocationData(
         if prop.shouldCache()
@@ -2418,13 +2426,15 @@ exports.Class = class Class extends Base
   _compileToBabylon: (o) ->
     @name = @determineName()
     executableBody = @walkBody()
-    @prepareConstructor()
+
+    parentName    = @parent.base.value if @parent instanceof Value and not @parent.hasProperties()
+    @hasNameClash = @name? and @name is parentName
 
     @body.isClassBody = yes
 
     node = @
 
-    if executableBody# or @hasNameClash
+    if executableBody or @hasNameClash
       node = new ExecutableClassBody node, executableBody
 
     if @boundMethods.length and @parent
@@ -2624,12 +2634,29 @@ exports.ExecutableClassBody = class ExecutableClassBody extends Base
     super()
 
   _compileToBabylon: (o) ->
+    if jumpNode = @body.jumps()
+      jumpNode.error 'Class bodies cannot contain pure statements'
+    if argumentsNode = @body.contains isLiteralArguments
+      argumentsNode.error "Class bodies shouldn't reference arguments"
+
     wrapper = new Code [], @body
     o.classScope = wrapper.makeScope o.scope
     @name = @class.name ? o.classScope.freeVariable @defaultClassVariableName
     ident = new IdentifierLiteral @name
-    @walkBody()
+    directives = @walkBody()
     @setContext()
+
+    args = [new ThisLiteral]
+    if @class.hasNameClash
+      parent = new IdentifierLiteral o.classScope.freeVariable 'superClass'
+      wrapper.params.push new Param parent
+      args.push @class.parent
+      @class.parent = parent
+
+    if @externalCtor
+      externalCtor = new IdentifierLiteral o.classScope.freeVariable 'ctor', reserve: no
+      @class.externalCtor = externalCtor
+      @externalCtor.variable.base = externalCtor
 
     @body.expressions.unshift(
       if @name isnt @class.name
@@ -2637,13 +2664,14 @@ exports.ExecutableClassBody = class ExecutableClassBody extends Base
       else
         @class
     )
+    @body.expressions.unshift (new Directive(directive) for directive in directives)...
     @body.expressions.push ident
 
     new Parens(new Call(
       new Value(
         wrapper
         [new Access new PropertyName 'call'])
-      [new ThisLiteral]
+      args
     )).compileToBabylon o
 
   compileNode: (o) ->
@@ -3551,6 +3579,9 @@ exports.Code = class Code extends Base
     {params, exprs, haveSplatParam}
 
   _compileToBabylon: (o) ->
+    if @bound
+      @context = o.scope.method.context if o.scope.method?.bound
+      @context = 'this' unless @context
     @updateOptions o
     wasEmpty = @body.isEmpty()
     {thisAssignments} = @expandThisParams o
@@ -3582,13 +3613,17 @@ exports.Code = class Code extends Base
   addtlMethodBabylonFields: (o) ->
     return {} unless @isMethod
 
+    [methodScope, o.scope] = [o.scope, o.scope.parent]
+    compiledName = @name.compileToBabylon o
+    o.scope = methodScope
+
     kind:
       if @ctor
         'constructor'
       else
         'method'
-    key: @name.compileToBabylon o
-    computed: @name instanceof Access and @name.name instanceof ComputedPropertyName
+    key: compiledName
+    computed: @name instanceof Index or @name instanceof Access and (@name.name instanceof ComputedPropertyName or @name.name instanceof NumberLiteral or @name.name instanceof StringLiteral)
 
   expandThisParams: (o) ->
     thisAssignments  = @thisAssignments?.slice() ? []
@@ -4169,8 +4204,8 @@ exports.Op = class Op extends Base
     if op is 'do'
       return Op::generateDo first
     if op is 'new'
-      if (firstCall = first.unwrap()) instanceof Call and not firstCall.do and not firstCall.isNew
-        return firstCall.newInstance()
+      if ((firstCall = unwrapped = first.unwrap()) instanceof Call or (firstCall = unwrapped.base) instanceof Call) and not firstCall.do and not firstCall.isNew
+        return new Value firstCall.newInstance(), if firstCall is unwrapped then [] else unwrapped.properties
       first = new Parens first   if first instanceof Code and first.bound or first.do
 
     @operator = CONVERSIONS[op] or op

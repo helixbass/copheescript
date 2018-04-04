@@ -484,7 +484,7 @@ task 'test', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript).catch -> process.exit 1
 task 'test:prettier', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript, justTestFile: [
-    'argument_parsing', 'arrays', 'async', 'booleans', 'comprehensions'
+    'argument_parsing', 'arrays', 'async', 'booleans', 'classes', 'comprehensions'
     'control_flow', 'csx', 'exception_handling', 'formatting'
     'function_invocation', 'functions', 'helpers', 'importing', 'interpolation'
     'javascript_literals', 'literate', 'literate_tabbed', 'modules', 'numbers'
