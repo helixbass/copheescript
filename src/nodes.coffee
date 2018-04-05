@@ -143,12 +143,14 @@ exports.Base = class Base
     func = new Code [], Block.wrap [this]
     if @contains ((node) -> node instanceof SuperCall)
       func.bound = yes
-    wrapInAwait =
-      if func.isAsync
+    wrapInYieldFromOrAwait = switch
+      when func.isGenerator
+        (node) -> new Op 'yieldfrom', node
+      when func.isAsync
         (node) -> new Op 'await', node
       else
         (node) -> node
-    @withLocationData(wrapInAwait(
+    @withLocationData(wrapInYieldFromOrAwait(
       if @contains isLiteralArguments
         new Call(
           new Value func, [new Access new PropertyName 'apply']
@@ -944,6 +946,9 @@ exports.Literal = class Literal extends Base
 
   assigns: (name) ->
     name is @value
+
+  _compileToBabylon: (o) ->
+    return null unless @value
 
   compileNode: (o) ->
     [@makeCode @value]
@@ -4355,7 +4360,7 @@ exports.Op = class Op extends Base
     if @operator in ['--', '++']
       message = isUnassignable @first.unwrapAll().value
       @first.error message if message
-    return @compileContinuationToBabylon o if @isAwait()
+    return @compileContinuationToBabylon o if @isYield() or @isAwait()
     return @compileUnaryToBabylon o if @isUnary()
     return @compileChainToBabylon o if isChain
 
@@ -4384,8 +4389,6 @@ exports.Op = class Op extends Base
         switch @operator
           when '++', '--'
             'UpdateExpression'
-          when 'yield'
-            'YieldExpression'
           else
             'UnaryExpression'
       @operator
@@ -4466,8 +4469,16 @@ exports.Op = class Op extends Base
     @joinFragmentArrays parts, ''
 
   compileContinuationToBabylon: (o) ->
-    type: 'AwaitExpression'
-    argument: @first.compileToBabylon o
+    unless o.scope.parent?
+      @error "#{@operator} can only occur inside functions"
+
+    type:
+      if @operator is 'await'
+        'AwaitExpression'
+      else
+        'YieldExpression'
+    argument: @first.compileToBabylon o, LEVEL_OP
+    delegate: @operator is 'yield*'
 
   compileContinuation: (o) ->
     parts = []

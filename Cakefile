@@ -484,11 +484,11 @@ task 'test', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript).catch -> process.exit 1
 task 'test:prettier', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript, justTestFile: [
-    'argument_parsing', 'arrays', 'assignment', 'async', 'booleans', 'classes'
-    'comprehensions', 'control_flow', 'csx', 'exception_handling', 'formatting'
-    'function_invocation', 'functions', 'helpers', 'importing', 'interpolation'
-    'javascript_literals', 'literate', 'literate_tabbed', 'modules', 'numbers'
-    'object_rest_spread', 'objects', 'operators', 'ranges', 'parser', 'regex'
+    'argument_parsing', 'arrays', 'assignment', 'async', 'booleans', 'classes', 'cluster'
+    'comprehensions', 'control_flow', 'csx', 'eval', 'exception_handling', 'exponentiation'
+    'formatting', 'function_invocation', 'functions', 'generators', 'helpers', 'importing'
+    'interpolation', 'javascript_literals', 'literate', 'literate_tabbed', 'modules'
+    'numbers', 'object_rest_spread', 'objects', 'operators', 'ranges', 'parser', 'regex'
     'regex_dotall', 'scope', 'slicing_and_splicing', 'soaks', 'strict', 'strings'
     'tagged_template_literals'
   ], usePrettier: yes).catch -> process.exit 1
