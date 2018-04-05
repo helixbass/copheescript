@@ -2124,6 +2124,7 @@ exports.Obj = class Obj extends Base
       if key instanceof Value and key.hasProperties()
         key.error 'invalid object key' unless prop.context isnt 'object' and key.this
         key  = key.properties[0].name
+        prop.nestedLhs = yes
         prop = prop.withLocationData new Assign key, prop, context: 'object'
       return prop unless key is prop
       prop.withLocationData(
@@ -3183,12 +3184,40 @@ exports.Assign = class Assign extends Base
     getSlice = slicer 'slice'
     getSplice = slicer 'splice'
 
-    processObjects = (objs, rhs = value) =>
-      assigns.push new Assign(
-        new Value new Arr(objs, lhs: yes)
-        rhs
-        {@param}
-      )
+    # Check if `objects` array contains any instance of `Assign`, e.g. {a:1}.
+    hasObjAssigns = (objs) ->
+      (i for obj, i in objs when obj instanceof Assign and obj.context is 'object')
+
+    # Check if `objects` array contains any unassignable object.
+    objIsUnassignable = (objs) ->
+      return yes for obj in objs when not obj.isAssignable()
+      no
+
+    # `objects` are complex when there is object assign ({a:1}),
+    # unassignable object, or just a single node.
+    complexObjects = (objs) ->
+      hasObjAssigns(objs).length or objIsUnassignable(objs) or objects.length is 1
+
+    pushAssign = (variable, value) =>
+      assigns.push new Assign variable, value, {@param}#, subpattern: yes
+
+    loopObjects = (objs, rhs) ->
+      for obj, i in objs when obj not instanceof Elision
+        [variable, val] =
+          if obj instanceof Splat
+            [new Value(obj.name), getSlice rhs, i]
+          else
+            [obj, new Value rhs, [new Index new NumberLiteral i]]
+        pushAssign variable, val
+
+    processObjects = (objs, rhs = value) ->
+      if complexObjects objs
+        loopObjects objs, rhs
+      else
+        pushAssign(
+          new Value new Arr(objs, lhs: yes)
+          rhs
+        )
 
     if splatsAndExpans.length
       expansIndex = splatsAndExpans[0]
@@ -3201,7 +3230,10 @@ exports.Assign = class Assign extends Base
         else
           getSlice value, rightObjs.length * -1
       ) if rightObjs.length isnt 0
+    else
+      processObjects objects
 
+    assigns.push value unless o.level is LEVEL_TOP# or @subpattern
     (new Sequence assigns).compileToBabylon o, LEVEL_LIST
 
   # Brief implementation of recursive pattern matching, when assigning array or
@@ -3283,9 +3315,7 @@ exports.Assign = class Assign extends Base
     # "Complex" `objects` are processed in a loop.
     # Examples: [a, b, {c, r...}, d], [a, ..., {b, r...}, c, d]
     loopObjects = (objs, vvar, vvarTxt) =>
-      for obj, i in objs
-        # `Elision` can be skipped.
-        continue if obj instanceof Elision
+      for obj, i in objs when obj not instanceof Elision
         # If `obj` is {a: 1}
         if obj instanceof Assign and obj.context is 'object'
           {variable: {base: idx}, value: vvar} = obj
