@@ -35,10 +35,10 @@ class MockOutputStream extends Stream
 historyFile = path.join os.tmpdir(), '.coffee_history_test'
 fs.writeFileSync historyFile, '1 + 2\n'
 
-testRepl = (desc, fn) ->
+testRepl = (desc, fn, replOpts = {}) ->
   input = new MockInputStream
   output = new MockOutputStream
-  repl = Repl.start {input, output, historyFile}
+  repl = Repl.start {input, output, historyFile, ...replOpts}
   test desc, -> fn input, output, repl
 
 ctrlV = { ctrl: true, name: 'v'}
@@ -133,6 +133,7 @@ testRepl "#4604: wraps an async function", (input, output) ->
 testRepl "transpile REPL", (input, output) ->
   input.emitLine 'require("./test/importing/transpile_import").getSep()'
   eq "'#{path.sep.replace '\\', '\\\\'}'", output.lastWrite()
+, transpile: presets: [['env', {targets: browsers: ['ie 6']}]]
 
 process.on 'exit', ->
   try

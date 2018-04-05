@@ -96,6 +96,7 @@ exports.run = ->
   opts.prelude = makePrelude opts.require       if opts.require
   replCliOpts.prelude = opts.prelude
   replCliOpts.transpile = opts.transpile
+  replCliOpts.usePrettier = opts.prettier
   return forkNode()                             if opts.nodejs
   return usage()                                if opts.help
   return version()                              if opts.version

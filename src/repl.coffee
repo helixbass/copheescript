@@ -8,8 +8,8 @@ CoffeeScript = require './'
 sawSIGINT = no
 transpile = no
 
-replDefaults =
-  prompt: 'coffee> ',
+replDefaults = (opts) ->
+  prompt: 'coffee> '
   historyFile: do ->
     historyPath = process.env.XDG_CACHE_HOME or process.env.HOME
     path.join historyPath, '.coffee_history' if historyPath
@@ -25,7 +25,7 @@ replDefaults =
     input = input.replace /^\s*try\s*{([\s\S]*)}\s*catch.*$/m, '$1'
 
     # Require AST nodes to do some AST manipulation.
-    {Block, Assign, Value, Literal, Call, Code} = require './nodes'
+    {Block, Assign, Value, IdentifierLiteral, Call, Code} = require './nodes'
 
     try
       # Tokenize the clean input.
@@ -43,13 +43,13 @@ replDefaults =
       # Generate the AST of the tokens.
       ast = CoffeeScript.nodes tokens
       # Add assignment to `__` variable to force the input to be an expression.
-      ast = new Block [new Assign (new Value new Literal '__'), ast, context: '=']
+      ast = ast.withLocationData new Block [new Assign (new Value new IdentifierLiteral '__'), ast, context: '=']
       # Wrap the expression in a closure to support top-level `await`.
       ast     = new Code [], ast
       isAsync = ast.isAsync
       # Invoke the wrapping closure.
       ast    = new Block [new Call ast]
-      js     = ast.compile {bare: yes, locals: Object.keys(context), referencedVars, sharedScope: yes}
+      js     = ast.compile {bare: yes, locals: Object.keys(context), referencedVars, sharedScope: yes, usePrettier: opts.usePrettier, code: input}
       if transpile
         js = transpile.transpile(js, transpile.options).code
         # Strip `"use strict"`, to avoid an exception on assigning to
@@ -206,7 +206,7 @@ module.exports =
       Module::load = (filename) ->
         @options = transpile: transpile.options
         originalModuleLoad.call @, filename
-    opts = merge replDefaults, opts
+    opts = merge replDefaults(opts), opts
     repl = nodeREPL.start opts
     runInContext opts.prelude, repl.context, 'prelude' if opts.prelude
     repl.on 'exit', -> repl.outputStream.write '\n' if not repl.rli.closed

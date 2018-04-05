@@ -631,6 +631,10 @@ exports.Block = class Block extends Base
     ast = @compileToBabylon o
     prettier.__debug.formatAST(ast, merge opts, originalText: code).formatted
 
+  compile: (o, lvl) ->
+    return @prettier o if o.usePrettier and not o.scope
+    super o, lvl
+
   compileToBabylon: (o, level) ->
     return @compileRootToBabylon(o) unless o.scope
     super o, level
