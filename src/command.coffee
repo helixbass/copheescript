@@ -229,7 +229,7 @@ compileScript = (file, input, base = null) ->
         task.sourceMap = compiled.v3SourceMap
 
       CoffeeScript.emit 'success', task
-      if opts.print or opts.prettier
+      if opts.print
         printLine task.output.trim()
       else if opts.compile or opts.map
         saveTo = if opts.outputFilename and sources.length is 1
@@ -447,7 +447,7 @@ printTokens = (tokens) ->
 parseOptions = ->
   o = opts      = optionParser.parse process.argv[2..]
   o.compile     or=  !!o.output
-  o.run         = not (o.compile or o.print or o.map or o.prettier)
+  o.run         = not (o.compile or o.print or o.map)
   o.print       = !!  (o.print or (o.eval or o.stdio and o.compile))
 
 # The compile-time options to pass to the CoffeeScript compiler.
