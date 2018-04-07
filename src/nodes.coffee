@@ -627,9 +627,12 @@ exports.Block = class Block extends Base
 
   prettier: (o) ->
     code = del o, 'code'
+    returnWithAst = del o, 'returnWithAst'
     { opts } = prettier.__debug.parseAndAttachComments ''
     ast = @compileToBabylon o
-    prettier.__debug.formatAST(ast, merge opts, originalText: code).formatted
+    formatted = prettier.__debug.formatAST(ast, merge opts, originalText: code).formatted
+    return formatted unless returnWithAst
+    {ast, formatted}
 
   compile: (o, lvl) ->
     return @prettier o if o.usePrettier and not o.scope
@@ -736,7 +739,7 @@ exports.Block = class Block extends Base
     ]
 
   asExpressionStatement: (compiled) ->
-    return compiled if compiled.type is 'VariableDeclaration'
+    return compiled if compiled.type in ['VariableDeclaration', 'ImportDeclaration']
     type: 'ExpressionStatement'
     expression: compiled
     loc: compiled.loc
@@ -3568,7 +3571,7 @@ exports.Code = class Code extends Base
           haveSplatParam = yes
           if param instanceof Expansion
             splatParamName = new Value new IdentifierLiteral o.scope.freeVariable 'args'
-          else if name instanceof Arr
+          else if name instanceof Arr or name instanceof Obj
             splatParamName = new Value new IdentifierLiteral o.scope.freeVariable 'arg'
             exprs.push new Assign new Value(name), splatParamName
           else
@@ -3753,7 +3756,7 @@ exports.Code = class Code extends Base
           param.error 'an expansion parameter cannot be the only parameter in a function definition'
         haveSplatParam = yes
         if param.splat
-          if param.name instanceof Arr
+          if param.name instanceof Arr or param.name instanceof Obj
             # Splat arrays are treated oddly by ES; deal with them the legacy
             # way in the function body. TODO: Should this be handled in the
             # function parameter list, and if so, how?

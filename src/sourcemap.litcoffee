@@ -23,7 +23,7 @@ positions for a single line of output JavaScript code.
 
       add: (column, [sourceLine, sourceColumn], options={}) ->
         return if @columns[column] and options.noReplace
-        @columns[column] = {line: @line, column, sourceLine, sourceColumn}
+        @columns[column] = {@line, column, sourceLine, sourceColumn}
 
       sourceLocation: (column) ->
         column-- until (mapping = @columns[column]) or (column <= 0)

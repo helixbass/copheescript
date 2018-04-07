@@ -16,6 +16,7 @@ packageJson   = require '../../package.json'
 babylonToEspree = require '../../node_modules/babel-eslint/babylon-to-espree'
 babelTraverse = require('babel-traverse').default
 babylonTokenTypes = require('babylon').tokTypes
+prettier = require 'prettier'
 
 # The current CoffeeScript version number.
 exports.VERSION = packageJson.version
@@ -104,8 +105,23 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
   parsed = parser.parse(tokens)
   # dump {parsed}
   js = do =>
-    return parsed.prettier merge options, {code} if options.usePrettier
+    if options.usePrettier
+      {formatted, ast} = parsed.prettier merge options, {code, returnWithAst: yes}
+      return formatted unless generateSourceMap
 
+      {ast: prettierAst} = prettier.__debug.parseAndAttachComments formatted
+      # dump {ast, prettierAst}
+      traverseBabylonAsts ast.program.body, prettierAst.program.body, (node, prettierNode) ->
+        return unless node?.loc
+        # dump {node, prettierNode} unless prettierNode?.loc
+        return unless prettierNode?.loc
+        {start: {line: sourceLine, column: sourceColumn}} = node.loc
+        {start: {line: prettierLine, column: prettierColumn}} = prettierNode.loc
+        map.add(
+          [sourceLine   - 1, sourceColumn]
+          [prettierLine - 1, prettierColumn]
+          noReplace: yes)
+      return formatted
     fragments = parsed.compileToFragments options
 
     currentLine = 0
@@ -213,12 +229,21 @@ espreeTokenTypes =
 getEspreeTokenType = (type) ->
   espreeTokenTypes[type] ? type
 
+locationFields = ['loc', 'range', 'start', 'end']
 traverseBabylonAst = (node, func) ->
   if Array.isArray node
     return (traverseBabylonAst(item, func) for item in node)
   func node
   if isPlainObject node
     traverseBabylonAst(child, func) for own _, child of node
+traverseBabylonAsts = (node, correspondingNode, func) ->
+  if Array.isArray node
+    return unless Array.isArray correspondingNode
+    return (traverseBabylonAsts(item, correspondingNode[index], func) for item, index in node)
+  func node, correspondingNode
+  if isPlainObject node
+    return unless isPlainObject correspondingNode
+    traverseBabylonAsts(child, correspondingNode[key], func) for own key, child of node when key not in locationFields
 
 extraTokensForESLint = (ast) ->
   extraTokens = []

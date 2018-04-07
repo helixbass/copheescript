@@ -109,7 +109,6 @@ if require?
     catch error
     fs.unlinkSync filePath
 
-    console.log {error}
     # Make sure the line number reported is line 3 (the original Coffee source)
     # and not line 6 (the generated JavaScript).
     eq /StackTraceLineNumberTestFile.coffee:(\d)/.exec(error.stack.toString())[1], '3'
