@@ -143,15 +143,33 @@ exports.addDataToNode = (parserState, first, last, {forceUpdateLocation} = {}) -
 
     obj
 
+isToken = (obj) ->
+  ("2" of obj) and ("first_line" of obj[2])
+
+expandLocationDataToInclude = (existing, addtl) ->
+  return unless existing and addtl
+  {range: [start, end], first_line, first_column, last_line, last_column} = existing
+  if addtl.range[0] < start
+    existing.range[0] = addtl.range[0]
+    existing.first_line = addtl.first_line
+    existing.first_column = addtl.first_column
+  if addtl.range[1] > end
+    existing.range[1] = addtl.range[1]
+    existing.last_line = addtl.last_line
+    existing.last_column = addtl.last_column
+
 exports.attachCommentsToNode = attachCommentsToNode = (comments, node) ->
   return if not comments? or comments.length is 0
   node.comments ?= []
-  node.comments.push comments...
+  _isToken = isToken(node)
+  for comment in comments
+    # expandLocationDataToInclude node[2], comment.locationData if _isToken
+    node.comments.push comment
 
 # Convert jison location data to a string.
 # `obj` can be a token, or a locationData.
 exports.locationDataToString = (obj) ->
-  if ("2" of obj) and ("first_line" of obj[2]) then locationData = obj[2]
+  if isToken(obj) then locationData = obj[2]
   else if "first_line" of obj then locationData = obj
 
   if locationData
@@ -272,7 +290,14 @@ exports.locationDataToBabylon = ({first_line, first_column, last_line, last_colu
     end:
       line: last_line + 1
       column: last_column
-  range
+  # range: range[..]
+  range: [
+    range[0]
+    if range[1] is -1
+      range[1]
+    else
+      range[1] + 1
+  ]
   start: range[0]
   end: range[1] + 1
 }
@@ -289,11 +314,11 @@ exports.mapValues = (obj, fn) ->
     result
   , {}
 
-locationFields = ['loc', 'range', 'start', 'end']
+exports.babylonLocationFields = locationFields = ['loc', 'range', 'start', 'end']
 exports.traverseBabylonAst = traverseBabylonAst = (node, func) ->
   if isArray node
     return (traverseBabylonAst(item, func) for item in node)
-  func node
+  func node if node?
   if isPlainObject node
     traverseBabylonAst(child, func) for own _, child of node
 exports.traverseBabylonAsts = traverseBabylonAsts = (node, correspondingNode, func) ->

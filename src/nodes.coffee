@@ -11,10 +11,11 @@ prettier = require 'prettier'
 babylon = require 'babylon'
 
 # Import the helpers we plan to use.
-{compact, flatten, extend, merge, del, starts, ends, some,
-addDataToNode, attachCommentsToNode, locationDataToString,
+{compact, flatten, extend, merge, del, starts, ends, some
+addDataToNode, attachCommentsToNode, locationDataToString
 throwSyntaxError, getNumberValue, dump, locationDataToBabylon
-isArray, isBoolean, isPlainObject, mapValues, traverseBabylonAst} = require './helpers'
+isArray, isBoolean, isPlainObject, mapValues, traverseBabylonAst
+babylonLocationFields} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -145,6 +146,10 @@ exports.Base = class Base
     {locationData} = node or @
     return compiled unless locationData and compiled
     merge compiled, locationDataToBabylon locationData
+
+  withCopiedBabylonLocationData: (compiled, other) ->
+    compiled[field] = other[field] for field in babylonLocationFields
+    compiled
 
   withLocationData: (node, {force} = {}) ->
     node.forceUpdateLocation = yes if force
@@ -449,10 +454,6 @@ exports.Base = class Base
   # For this node and all descendents, set the location data to `locationData`
   # if the location data is not already set.
   updateLocationDataIfMissing: (locationData, {force} = {}) ->
-    # dump {th: @, locationData}
-    # if locationData.last_column is 2 and locationData.first_line is 0 and @ instanceof Block
-    #   dump {th: @, locationData}
-    #   throw new SyntaxError
     @forceUpdateLocation = yes if force
     return this if @locationData and not @forceUpdateLocation
     delete @forceUpdateLocation
@@ -677,8 +678,10 @@ exports.Block = class Block extends Base
   extractComments: (compiled) ->
     comments = []
     traverseBabylonAst compiled, (node) ->
-      return unless node?.trailingComments
-      comments.push node.trailingComments...
+      {trailingComments} = node
+      return unless trailingComments
+      comments.push trailingComments...
+      node.trailingComments = null
     comments
 
   compileRootToBabylon: (o) ->
@@ -686,15 +689,18 @@ exports.Block = class Block extends Base
     @initializeScope o
 
     compiledBody = HoistTarget.expandBabylon @compileWithDeclarationsToBabylon merge o, root: yes
-    @withBabylonLocationData
+    program = @includeCommentsInLocationData @withBabylonLocationData {
+      type: 'Program'
+      sourceType: 'module'
+      body: compiledBody
+      @directives
+    }
+
+    @withCopiedBabylonLocationData {
       type: 'File'
-      program: @withBabylonLocationData {
-        type: 'Program'
-        sourceType: 'module'
-        body: compiledBody
-        @directives
-      }
+      program
       comments: @extractComments compiledBody
+    }, program
 
   _compileToBabylon: (o) ->
     root = del o, 'root'
@@ -773,13 +779,29 @@ exports.Block = class Block extends Base
     ]
 
   asExpressionStatement: (compiled) ->
-    return compiled if compiled.type in ['VariableDeclaration', 'ImportDeclaration']
-    type: 'ExpressionStatement'
-    expression: compiled
-    loc: compiled.loc
-    range: compiled.range
-    start: compiled.start
-    end: compiled.end
+    @includeCommentsInLocationData do ->
+      return compiled if compiled.type in ['VariableDeclaration', 'ImportDeclaration']
+      type: 'ExpressionStatement'
+      expression: compiled
+      loc: compiled.loc
+      range: compiled.range
+      start: compiled.start
+      end: compiled.end
+
+  includeCommentsInLocationData: (node) ->
+    {start, end} = node
+    traverseBabylonAst node, ({trailingComments}) ->
+      return unless trailingComments
+      for comment in trailingComments
+        if comment.start < start
+          node.start = comment.start
+          node.range = [comment.range[0], node.range[1]]
+          node.loc = {...node.loc, start: comment.loc.start}
+        if comment.end > end
+          node.end = comment.end
+          node.range = [node.range[0], comment.range[1]]
+          node.loc = {...node.loc, end: comment.loc.end}
+    node
 
   compileBodyToBabylon: (o) ->
     expressions = del o, 'expressions'
@@ -792,7 +814,7 @@ exports.Block = class Block extends Base
         return [] unless compiled
         return [] if node.hoisted
         return @extractDirectives compiled.body, o if node instanceof Block or compiled.type is 'BlockStatement'
-        return compiled if node.isStatement o
+        return @includeCommentsInLocationData compiled if node.isStatement o
         compiled = @extractDirectives compiled, o
         return [] unless compiled
         return @asExpressionStatement compiled unless isArray compiled
