@@ -220,7 +220,7 @@ exports.babylon = compileToBabylon = withPrettyErrors (source, options) ->
   return ast unless options.withTokens
   {ast, tokens}
 
-{dump, flatten, isPlainObject, merge} = helpers
+{dump, flatten, isPlainObject, merge, traverseBabylonAst, traverseBabylonAsts} = helpers
 espreeTokenTypes =
   '{': 'Punctuator'
   '}': 'Punctuator'
@@ -228,22 +228,6 @@ espreeTokenTypes =
   ']': 'Punctuator'
 getEspreeTokenType = (type) ->
   espreeTokenTypes[type] ? type
-
-locationFields = ['loc', 'range', 'start', 'end']
-traverseBabylonAst = (node, func) ->
-  if Array.isArray node
-    return (traverseBabylonAst(item, func) for item in node)
-  func node
-  if isPlainObject node
-    traverseBabylonAst(child, func) for own _, child of node
-traverseBabylonAsts = (node, correspondingNode, func) ->
-  if Array.isArray node
-    return unless Array.isArray correspondingNode
-    return (traverseBabylonAsts(item, correspondingNode[index], func) for item, index in node)
-  func node, correspondingNode
-  if isPlainObject node
-    return unless isPlainObject correspondingNode
-    traverseBabylonAsts(child, correspondingNode[key], func) for own key, child of node when key not in locationFields
 
 extraTokensForESLint = (ast) ->
   extraTokens = []

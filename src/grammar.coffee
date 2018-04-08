@@ -44,8 +44,8 @@ o = (patternString, action, options) ->
     # that nodes may have, such as comments or location data. Location data
     # is added to the first parameter passed in, and the parameter is returned.
     # If the parameter is not a node, it will just be passed through unaffected.
-    getAddDataToNodeFunctionString = (first, last) ->
-      "yy.addDataToNode(yy, @#{first}#{if last then ", @#{last}" else ''})"
+    getAddDataToNodeFunctionString = (first, last, {forceUpdateLocation} = {}) ->
+      "yy.addDataToNode(yy, @#{first}, #{if last then "@#{last}" else 'null'}, {forceUpdateLocation: true})"
 
     action = action.replace /LOC\(([0-9]*)\)/g, getAddDataToNodeFunctionString('$1')
     action = action.replace /LOC\(([0-9]*),\s*([0-9]*)\)/g, getAddDataToNodeFunctionString('$1', '$2')

@@ -486,15 +486,16 @@ task 'test', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript).catch -> process.exit 1
 task 'test:prettier', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript, justTestFile: [
-    'argument_parsing', 'arrays', 'assignment', 'async', 'booleans', 'classes'
-    'cluster', 'comprehensions', 'control_flow', 'csx', 'error_messages', 'eval'
-    'exception_handling', 'exponentiation', 'formatting', 'function_invocation'
-    'functions', 'generators', 'helpers', 'importing', 'interpolation'
-    'javascript_literals', 'literate', 'literate_tabbed', 'location', 'modules'
-    'numbers', 'object_rest_spread', 'objects', 'operators', 'option_parser'
-    'parser', 'ranges', 'regex', 'regex_dotall', 'repl', 'scope'
-    'slicing_and_splicing', 'soaks', 'sourcemap', 'strict', 'strings'
-    'tagged_template_literals'
+    'arrays'
+    # 'argument_parsing', 'arrays', 'assignment', 'async', 'booleans', 'classes'
+    # 'cluster', 'comprehensions', 'control_flow', 'csx', 'error_messages', 'eval'
+    # 'exception_handling', 'exponentiation', 'formatting', 'function_invocation'
+    # 'functions', 'generators', 'helpers', 'importing', 'interpolation'
+    # 'javascript_literals', 'literate', 'literate_tabbed', 'location', 'modules'
+    # 'numbers', 'object_rest_spread', 'objects', 'operators', 'option_parser'
+    # 'parser', 'ranges', 'regex', 'regex_dotall', 'repl', 'scope'
+    # 'slicing_and_splicing', 'soaks', 'sourcemap', 'strict', 'strings'
+    # 'tagged_template_literals'
   ], usePrettier: yes).catch -> process.exit 1
 
 task 'test:browser', 'run the test suite against the merged browser script', ->

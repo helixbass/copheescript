@@ -120,11 +120,12 @@ buildLocationHash = (loc) ->
 # This returns a function which takes an object as a parameter, and if that
 # object is an AST node, updates that object's locationData.
 # The object is returned either way.
-exports.addDataToNode = (parserState, first, last) ->
+exports.addDataToNode = (parserState, first, last, {forceUpdateLocation} = {}) ->
   (obj) ->
+    # dump {obj, locationData: obj?.locationData, first, last}
     # Add location data
     if obj?.updateLocationDataIfMissing? and first?
-      obj.updateLocationDataIfMissing buildLocationData(first, last)
+      obj.updateLocationDataIfMissing buildLocationData(first, last), force: forceUpdateLocation
 
     # Add comments data
     unless parserState.tokenComments
@@ -262,7 +263,7 @@ exports.getNumberValue = (number) ->
   return val unless invert
   val * -1
 
-exports.dump = (...args, obj) -> console.log ...args, util.inspect obj, no, null
+exports.dump = dump = (...args, obj) -> console.log ...args, util.inspect obj, no, null
 
 exports.locationDataToBabylon = ({first_line, first_column, last_line, last_column, range}) -> {
   loc:
@@ -281,10 +282,26 @@ exports.isArray = isArray = (obj) -> Array.isArray obj
 exports.isNumber = isNumber = (obj) -> Object::toString.call(obj) is '[object Number]'
 exports.isString = isString = (obj) -> Object::toString.call(obj) is '[object String]'
 exports.isBoolean = isBoolean = (obj) -> obj is yes or obj is no or Object::toString.call(obj) is '[object Boolean]'
-exports.isPlainObject = (obj) -> typeof obj is 'object' and !!obj and not isArray(obj) and not isNumber(obj) and not isString(obj) and not isBoolean(obj)
+exports.isPlainObject = isPlainObject = (obj) -> typeof obj is 'object' and !!obj and not isArray(obj) and not isNumber(obj) and not isString(obj) and not isBoolean(obj)
 
 exports.mapValues = (obj, fn) ->
   Object.keys(obj).reduce (result, key) ->
     result[key] = fn obj[key], key
     result
   , {}
+
+locationFields = ['loc', 'range', 'start', 'end']
+exports.traverseBabylonAst = traverseBabylonAst = (node, func) ->
+  if isArray node
+    return (traverseBabylonAst(item, func) for item in node)
+  func node
+  if isPlainObject node
+    traverseBabylonAst(child, func) for own _, child of node
+exports.traverseBabylonAsts = traverseBabylonAsts = (node, correspondingNode, func) ->
+  if isArray node
+    return unless isArray correspondingNode
+    return (traverseBabylonAsts(item, correspondingNode[index], func) for item, index in node)
+  func node, correspondingNode
+  if isPlainObject node
+    return unless isPlainObject correspondingNode
+    traverseBabylonAsts(child, correspondingNode[key], func) for own key, child of node when key not in locationFields

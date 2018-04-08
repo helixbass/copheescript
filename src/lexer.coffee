@@ -349,10 +349,16 @@ exports.Lexer = class Lexer
       content = content.replace /^([ |\t]*)#/gm, ''
       contents = content.split '\n'
 
+    offsetInChunk = 0
     commentAttachments = for content, i in contents
-      content: content
-      here: here?
-      newLine: newLine or i isnt 0 # Line comments after the first one start new lines, by definition.
+      {length} = content
+      commentAttachment =
+        content: content
+        here: here?
+        newLine: newLine or i isnt 0 # Line comments after the first one start new lines, by definition.
+        locationData: @makeLocationData {offsetInChunk, length}
+      offsetInChunk += length
+      commentAttachment
 
     prev = @prev()
     unless prev
@@ -944,9 +950,7 @@ exports.Lexer = class Lexer
 
     [@chunkLine + lineCount, column, @chunkOffset + offset]
 
-  # Same as `token`, except this just returns the token without adding it
-  # to the results.
-  makeToken: (tag, value, offsetInChunk = 0, length = value.length) ->
+  makeLocationData: ({ offsetInChunk, length }) ->
     locationData = range: []
     [locationData.first_line, locationData.first_column, locationData.range[0]] =
       @getLineAndColumnFromChunk offsetInChunk
@@ -957,9 +961,12 @@ exports.Lexer = class Lexer
     [locationData.last_line, locationData.last_column, locationData.range[1]] =
       @getLineAndColumnFromChunk offsetInChunk + lastCharacter
 
-    token = [tag, value, locationData]
+    locationData
 
-    token
+  # Same as `token`, except this just returns the token without adding it
+  # to the results.
+  makeToken: (tag, value, offsetInChunk = 0, length = value.length) ->
+    [tag, value, @makeLocationData {offsetInChunk, length}]
 
   # Add a token to the results.
   # `offset` is the offset into the current `@chunk` where the token starts.

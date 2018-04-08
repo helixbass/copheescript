@@ -14,7 +14,7 @@ babylon = require 'babylon'
 {compact, flatten, extend, merge, del, starts, ends, some,
 addDataToNode, attachCommentsToNode, locationDataToString,
 throwSyntaxError, getNumberValue, dump, locationDataToBabylon
-isArray, isBoolean, isPlainObject, mapValues} = require './helpers'
+isArray, isBoolean, isPlainObject, mapValues, traverseBabylonAst} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -115,8 +115,21 @@ exports.Base = class Base
     o.level = level if level
     node = @unfoldSoak(o) or this
 
-    return node.compileClosureToBabylon o unless o.level is LEVEL_TOP or not node.isStatement o
-    @withBabylonLocationData node._compileToBabylon o
+    @withBabylonComments o, do =>
+      return node.compileClosureToBabylon o unless o.level is LEVEL_TOP or not node.isStatement o
+      @withBabylonLocationData node._compileToBabylon o
+
+  withBabylonComments: (o, compiled) ->
+    return compiled unless @comments and compiled
+    trailingComments =
+      for comment in @comments
+        @compiledBabylonComments.push comment
+        new LineComment(comment).compileToBabylon o
+    if isArray compiled
+      [...rest, last] = compiled
+      [...rest, {...last, trailingComments}]
+    else
+      {...compiled, trailingComments}
 
   withEmptyBabylonLocationData: (compiled) ->
     @withBabylonLocationData compiled,
@@ -128,7 +141,7 @@ exports.Base = class Base
         range: [-1, -1]
 
   withBabylonLocationData: (compiled, node) ->
-    return (@withBabylonLocationData(item, node) for item in compiled) if Array.isArray compiled
+    return (@withBabylonLocationData(item, node) for item in compiled) if isArray compiled
     {locationData} = node or @
     return compiled unless locationData and compiled
     merge compiled, locationDataToBabylon locationData
@@ -356,7 +369,7 @@ exports.Base = class Base
   replaceInContext: (match, replacement) ->
     return false unless @children
     for attr in @children when children = @[attr]
-      if Array.isArray children
+      if isArray children
         for child, i in children
           if match child
             children[i..i] = replacement child, @
@@ -395,6 +408,7 @@ exports.Base = class Base
   # Track comments that have been compiled into fragments, to avoid outputting
   # them twice.
   compiledComments: []
+  compiledBabylonComments: []
 
   # `includeCommentFragments` lets `compileCommentFragments` know whether this node
   # has special awareness of how to handle comments within its output.
@@ -430,7 +444,12 @@ exports.Base = class Base
 
   # For this node and all descendents, set the location data to `locationData`
   # if the location data is not already set.
-  updateLocationDataIfMissing: (locationData) ->
+  updateLocationDataIfMissing: (locationData, {force} = {}) ->
+    # dump {th: @, locationData}
+    # if locationData.last_column is 2 and locationData.first_line is 0 and @ instanceof Block
+    #   dump {th: @, locationData}
+    #   throw new SyntaxError
+    @forceUpdateLocation = yes if force
     return this if @locationData and not @forceUpdateLocation
     delete @forceUpdateLocation
     @locationData = locationData
@@ -630,8 +649,9 @@ exports.Block = class Block extends Base
   prettier: (o) ->
     code = del o, 'code'
     returnWithAst = del o, 'returnWithAst'
-    { opts } = prettier.__debug.parseAndAttachComments ''
+    { opts } = prettier.__debug.parse ''
     ast = @compileToBabylon o
+    prettier.__debug.attachComments code, ast, opts
     formatted = prettier.__debug.formatAST(ast, merge opts, originalText: code).formatted
     return formatted unless returnWithAst
     {ast, formatted}
@@ -650,19 +670,27 @@ exports.Block = class Block extends Base
     # end up being declared on this block.
     o.scope.parameter name for name in o.locals or []
 
+  extractComments: (compiled) ->
+    comments = []
+    traverseBabylonAst compiled, (node) ->
+      return unless node?.trailingComments
+      comments.push node.trailingComments...
+    comments
+
   compileRootToBabylon: (o) ->
     # @spaced   = yes
     @initializeScope o
 
+    compiledBody = HoistTarget.expandBabylon @compileWithDeclarationsToBabylon merge o, root: yes
     @withBabylonLocationData
       type: 'File'
-      program: {
+      program: @withBabylonLocationData {
         type: 'Program'
         sourceType: 'module'
-        body: HoistTarget.expandBabylon @compileWithDeclarationsToBabylon merge o, root: yes
-        directives: @directives
+        body: compiledBody
+        @directives
       }
-      comments: []
+      comments: @extractComments compiledBody
 
   _compileToBabylon: (o) ->
     root = del o, 'root'
@@ -1424,8 +1452,12 @@ exports.HereComment = class HereComment extends Base
 
 # Comment running from `#` to the end of a line (becoming `//`).
 exports.LineComment = class LineComment extends Base
-  constructor: ({ @content, @newLine, @unshift }) ->
+  constructor: ({ @content, @newLine, @unshift, @locationData }) ->
     super()
+
+  _compileToBabylon: (o) ->
+    type: 'CommentLine'
+    value: @content
 
   compileNode: (o) ->
     fragment = @makeCode(if /^\s*$/.test @content then '' else "//#{@content}")
@@ -3325,8 +3357,6 @@ exports.Assign = class Assign extends Base
 
     isSplat = splats.length > 0
     isExpans = expans.length > 0
-    isObject = @variable.isObject()
-    isArray = @variable.isArray()
 
     vvar     = value.compileToFragments o, LEVEL_LIST
     vvarText = fragmentsToText vvar
@@ -4851,7 +4881,7 @@ exports.Parens = class Parens extends Base
     shouldntWrap =
       expr instanceof Op or expr.unwrap() instanceof Call or
       (expr instanceof For and expr.returns)
-    return compiled if shouldntWrap or not compiled or Array.isArray compiled
+    return compiled if shouldntWrap or not compiled or isArray compiled
     {
       ...compiled
       extra: {
