@@ -138,6 +138,8 @@ exports.Base = class Base
     node.updateLocationDataIfMissing @locationData
 
   compileClosureToBabylon: (o) ->
+    if jumpNode = @jumps()
+      jumpNode.error 'cannot use a pure statement in an expression'
     o.sharedScope = yes
 
     func = new Code [], Block.wrap [this]
@@ -675,7 +677,7 @@ exports.Block = class Block extends Base
     if root and not o.bare
       code = new Code [], this
       code.noReturn = true
-      return @compileBodyToBabylon merge o, expressions: [
+      return @compileBodyToBabylon merge o, {expressions: [
         new Call(
           new Value(
             code
@@ -683,8 +685,8 @@ exports.Block = class Block extends Base
           )
           [new ThisLiteral]
         )
-      ], classScope: o.scope
-    body = @compileBodyToBabylon(o)
+      ], classScope: o.scope, root}
+    body = @compileBodyToBabylon merge o, {root}
     body = [...@compileDeclarationsToBabylon(o), ...body] if withDeclarations
     return body if root
     @withBabylonLocationData {
@@ -749,9 +751,11 @@ exports.Block = class Block extends Base
 
   compileBodyToBabylon: (o) ->
     expressions = del o, 'expressions'
+    root = del o, 'root'
     expressions ?= @expressions
     flatten(
       for node in expressions then do =>
+        node.topLevel = root
         compiled = node.compileToBabylon o
         return [] unless compiled
         return [] if node.hoisted
@@ -1211,6 +1215,11 @@ exports.Return = class Return extends Base
 # `yield return` works exactly like `return`, except that it turns the function
 # into a generator.
 exports.YieldReturn = class YieldReturn extends Return
+  _compileToBabylon: (o) ->
+    unless o.scope.parent?
+      @error 'yield can only occur inside functions'
+    super o
+
   compileNode: (o) ->
     unless o.scope.parent?
       @error 'yield can only occur inside functions'
@@ -1515,6 +1524,7 @@ exports.Call = class Call extends Base
     return @compileCSXToBabylon o if @csx
     type:
       if @isNew
+        @variable.error "Unsupported reference to 'super'" if @variable instanceof Super
         'NewExpression'
       else
         'CallExpression'
@@ -1569,7 +1579,13 @@ exports.Call = class Call extends Base
             name: tagName.compileToBabylon o#, LEVEL_ACCESS
             attributes: flatten(
               if attributes.base instanceof Arr
-                for {base: attr} in attributes.base.objects
+                for obj in attributes.base.objects
+                  {base: attr} = obj
+                  attrProps = attr?.properties or []
+                  if not (attr instanceof Obj or attr instanceof IdentifierLiteral) or (attr instanceof Obj and not attr.generated and (attrProps.length > 1 or not (attrProps[0] instanceof Splat)))
+                    obj.error """
+                      Unexpected token. Allowed CSX attributes are: id="val", src={source}, {props...} or attribute.
+                    """
                   attr.csx = yes
                   compiled = attr.compileToBabylon o#, LEVEL_PAREN
                   if attr instanceof IdentifierLiteral
@@ -2809,11 +2825,14 @@ exports.ModuleDeclaration = class ModuleDeclaration extends Base
       @source.error 'the name of the module to be imported from must be an uninterpolated string'
 
   checkScope: (o, moduleDeclarationType) ->
-    if o.indent.length isnt 0
+    return if @topLevel
+    if o.indent?.length isnt 0
       @error "#{moduleDeclarationType} statements must be at top-level scope"
 
 exports.ImportDeclaration = class ImportDeclaration extends ModuleDeclaration
   _compileToBabylon: (o) ->
+    @checkScope o, 'import'
+    o.importedSymbols = []
     type: 'ImportDeclaration'
     specifiers: @clause?.compileToBabylon(o) ? []
     source: @source.compileToBabylon o
@@ -2886,6 +2905,10 @@ exports.ExportDeclaration = class ExportDeclaration extends ModuleDeclaration
 
 exports.ExportNamedDeclaration = class ExportNamedDeclaration extends ExportDeclaration
   _compileToBabylon: (o) ->
+    @checkScope o, 'export'
+    if @clause instanceof Class and not @clause.variable
+      @clause.error 'anonymous classes cannot be exported'
+
     @clause.moduleDeclaration = 'export'
 
     {
@@ -2903,12 +2926,14 @@ exports.ExportNamedDeclaration = class ExportNamedDeclaration extends ExportDecl
 
 exports.ExportDefaultDeclaration = class ExportDefaultDeclaration extends ExportDeclaration
   _compileToBabylon: (o) ->
+    @checkScope o, 'export'
     @clause.isExport = yes
     type: 'ExportDefaultDeclaration'
     declaration: @clause.compileToBabylon o
 
 exports.ExportAllDeclaration = class ExportAllDeclaration extends ExportDeclaration
   _compileToBabylon: (o) ->
+    @checkScope o, 'export'
     type: 'ExportAllDeclaration'
     source: @source.compileToBabylon o
     exportKind: 'value'
@@ -2955,8 +2980,11 @@ exports.ModuleSpecifier = class ModuleSpecifier extends Base
 
   children: ['original', 'alias']
 
-  compileNode: (o) ->
+  addIdentifierToScope: (o) ->
     o.scope.find @identifier, @moduleDeclarationType
+
+  compileNode: (o) ->
+    @addIdentifierToScope o
     code = []
     code.push @makeCode @original.value
     code.push @makeCode " as #{@alias.value}" if @alias?
@@ -2966,28 +2994,31 @@ exports.ImportSpecifier = class ImportSpecifier extends ModuleSpecifier
   constructor: (imported, local) ->
     super imported, local, 'import'
 
-  _compileToBabylon: (o) ->
-    compiledOriginal = @original.compileToBabylon o
-    type: 'ImportSpecifier'
-    imported: compiledOriginal
-    local: @alias?.compileToBabylon(o) ? compiledOriginal
-
-  compileNode: (o) ->
+  addIdentifierToScope: (o) ->
     # Per the spec, symbols can’t be imported multiple times
     # (e.g. `import { foo, foo } from 'lib'` is invalid)
-    if @identifier in o.importedSymbols or o.scope.check(@identifier)
+    if @identifier in o.importedSymbols or o.scope.check @identifier
       @error "'#{@identifier}' has already been declared"
     else
       o.importedSymbols.push @identifier
     super o
 
+  _compileToBabylon: (o) ->
+    @addIdentifierToScope o
+    compiledOriginal = @original.compileToBabylon o
+    type: 'ImportSpecifier'
+    imported: compiledOriginal
+    local: @alias?.compileToBabylon(o) ? compiledOriginal
+
 exports.ImportDefaultSpecifier = class ImportDefaultSpecifier extends ImportSpecifier
   _compileToBabylon: (o) ->
+    @addIdentifierToScope o
     type: 'ImportDefaultSpecifier'
     local: @original.compileToBabylon o
 
 exports.ImportNamespaceSpecifier = class ImportNamespaceSpecifier extends ImportSpecifier
   _compileToBabylon: (o) ->
+    @addIdentifierToScope o
     type: 'ImportNamespaceSpecifier'
     local: do =>
       return @alias.compileToBabylon o if @alias
@@ -2998,6 +3029,7 @@ exports.ExportSpecifier = class ExportSpecifier extends ModuleSpecifier
     super local, exported, 'export'
 
   _compileToBabylon: (o) ->
+    @addIdentifierToScope o
     compiledOriginal = @original.compileToBabylon o
     type: 'ExportSpecifier'
     local: compiledOriginal
@@ -3019,8 +3051,7 @@ exports.Assign = class Assign extends Base
     o?.level is LEVEL_TOP and @context? and (@moduleDeclaration or "?" in @context)
 
   checkAssignability: (o, varBase) ->
-    if Object::hasOwnProperty.call(o.scope.positions, varBase.value) and
-       o.scope.variables[o.scope.positions[varBase.value]].type is 'import'
+    if o.scope.type(varBase.value) is 'import'
       varBase.error "'#{varBase.value}' is read-only"
 
   assigns: (name) ->
@@ -3175,8 +3206,8 @@ exports.Assign = class Assign extends Base
 
     return @wrapInParensIf(o.level >= LEVEL_OP)(value).compileToBabylon o unless objects.length
 
-    # if objects.length is 1 and objects[0] instanceof Expansion
-    #   objects[0].error 'Destructuring assignment has no target'
+    if objects.length is 1 and objects[0] instanceof Expansion
+      objects[0].error 'Destructuring assignment has no target'
 
     if value.unwrap() not instanceof IdentifierLiteral or @variable.assigns(value.unwrap().value)
       [cachedValueAssign, value] = value.cache o, shouldCache: YES
@@ -3215,11 +3246,24 @@ exports.Assign = class Assign extends Base
 
     loopObjects = (objs, rhs) ->
       for obj, i in objs when obj not instanceof Elision
-        [variable, val] =
-          if obj instanceof Splat
-            [new Value(obj.name), getSlice rhs, i]
-          else
-            [obj, new Value rhs, [new Index new NumberLiteral i]]
+        if obj instanceof Assign and obj.context is 'object'
+          {value: variable} = obj
+          {variable} = variable if variable instanceof Assign
+          idx =
+            if variable.this
+              variable.properties[0].name
+            else
+              new PropertyName variable.unwrap().value
+          acc = idx.unwrap() instanceof PropertyName
+          val = new Value value, [new (if acc then Access else Index) idx]
+        else
+          [variable, val] =
+            if obj instanceof Splat
+              [new Value(obj.name), getSlice rhs, i]
+            else
+              [obj, new Value rhs, [new Index new NumberLiteral i]]
+        message = isUnassignable variable.unwrap().value
+        variable.error message if message
         pushAssign variable, val
 
     processObjects = (objs, rhs = value) ->
@@ -3330,7 +3374,7 @@ exports.Assign = class Assign extends Base
       for obj, i in objs when obj not instanceof Elision
         # If `obj` is {a: 1}
         if obj instanceof Assign and obj.context is 'object'
-          {variable: {base: idx}, value: vvar} = obj
+          {value: vvar} = obj
           {variable: vvar} = vvar if vvar instanceof Assign
           idx =
             if vvar.this
@@ -3621,6 +3665,10 @@ exports.Code = class Code extends Base
     {params, exprs, haveSplatParam}
 
   _compileToBabylon: (o) ->
+    if @ctor
+      @name.error 'Class constructor may not be async'       if @isAsync
+      @name.error 'Class constructor may not be a generator' if @isGenerator
+
     if @bound
       @context = o.scope.method.context if o.scope.method?.bound
       @context = 'this' unless @context
@@ -3633,6 +3681,10 @@ exports.Code = class Code extends Base
     if @isMethod and @bound and not @isStatic and @classVariable
       @body.expressions.unshift utilityBabylon 'boundMethodCheck', merge o, invokedWithArgs: [new Value(new ThisLiteral), @classVariable]
     @body.makeReturn() unless wasEmpty or @noReturn
+
+    if @bound and @isGenerator
+      yieldNode = @body.contains (node) -> node instanceof Op and node.operator is 'yield'
+      (yieldNode or @).error 'yield cannot occur inside bound (fat arrow) functions'
 
     {
       type:
@@ -4478,6 +4530,8 @@ exports.Op = class Op extends Base
   compileContinuationToBabylon: (o) ->
     unless o.scope.parent?
       @error "#{@operator} can only occur inside functions"
+    if o.scope.method?.bound and o.scope.method.isGenerator
+      @error 'yield cannot occur inside bound (fat arrow) functions'
 
     type:
       if @operator is 'await'

@@ -15,10 +15,11 @@ and therefore should be avoided when generating variables. Also track comments
 that should be output as part of variable declarations.
 
       constructor: (@parent, @expressions, @method, @referencedVars) ->
-        @variables = [{name: 'arguments', type: 'arguments'}]
+        @variables = []
         @comments  = {}
-        @positions = {}
+        @lookup = {}
         @utilities = {} unless @parent
+        @add 'arguments', 'arguments', yes
 
 The `@root` is the top-level **Scope** object for a given file.
 
@@ -28,10 +29,12 @@ Adds a new variable or overrides an existing one.
 
       add: (name, type, immediate) ->
         return @parent.add name, type, immediate if @shared and not immediate
-        if Object::hasOwnProperty.call @positions, name
-          @variables[@positions[name]].type = type
+        if Object::hasOwnProperty.call @lookup, name
+          @lookup[name].type = type
         else
-          @positions[name] = @variables.push({name, type}) - 1
+          variable = {name, type}
+          @variables.push variable
+          @lookup[name] = variable
 
 When `super` is called, we need to find the name of the current method we're
 in, so that we know how to invoke the same method of the parent class. This
@@ -81,8 +84,7 @@ Generate a temporary variable name at the given index.
 Gets the type of a variable.
 
       type: (name) ->
-        return v.type for v in @variables when v.name is name
-        null
+        @lookup[name]?.type
 
 If we need to store an intermediate result, find an available name for a
 compiler-generated variable. `_var`, `_var2`, and so on...

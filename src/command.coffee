@@ -222,7 +222,7 @@ compileScript = (file, input, base = null) ->
       sourceCode[sources.indexOf(task.file)] = task.input
       compileJoin()
     else
-      compiled = CoffeeScript.compile task.input, merge task.options, usePrettier: opts.prettier
+      compiled = CoffeeScript.compile task.input, task.options
       task.output = compiled
       if opts.map
         task.output = compiled.js
@@ -505,6 +505,7 @@ compileOptions = (filename, base) ->
     transpile: opts.transpile
     sourceMap: opts.map
     inlineMap: opts['inline-map']
+    usePrettier: opts.prettier
 
   if filename
     if base
