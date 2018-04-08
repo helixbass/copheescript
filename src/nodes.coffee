@@ -150,6 +150,10 @@ exports.Base = class Base
     node.forceUpdateLocation = yes if force
     node.updateLocationDataIfMissing @locationData
 
+  withLocationDataFrom: ({locationData}, {force} = {}) ->
+    @forceUpdateLocation = yes if force
+    @updateLocationDataIfMissing locationData
+
   compileClosureToBabylon: (o) ->
     if jumpNode = @jumps()
       jumpNode.error 'cannot use a pure statement in an expression'
@@ -712,7 +716,7 @@ exports.Block = class Block extends Base
             [new Access new PropertyName 'call']
           )
           [new ThisLiteral]
-        )
+        ).withLocationDataFrom @
       ], classScope: o.scope, root}
     body = @compileBodyToBabylon merge o, {root}
     body = [...@compileDeclarationsToBabylon(o), ...body] if withDeclarations
@@ -2700,14 +2704,14 @@ exports.ExecutableClassBody = class ExecutableClassBody extends Base
     if argumentsNode = @body.contains isLiteralArguments
       argumentsNode.error "Class bodies shouldn't reference arguments"
 
-    wrapper = new Code [], @body
+    wrapper = @class.withLocationData new Code [], @body
     o.classScope = wrapper.makeScope o.scope
     @name = @class.name ? o.classScope.freeVariable @defaultClassVariableName
     ident = new IdentifierLiteral @name
     directives = @walkBody()
     @setContext()
 
-    args = [new ThisLiteral]
+    args = [@class.withLocationData new ThisLiteral]
     if @class.hasNameClash
       parent = new IdentifierLiteral o.classScope.freeVariable 'superClass'
       wrapper.params.push new Param parent
@@ -2733,7 +2737,7 @@ exports.ExecutableClassBody = class ExecutableClassBody extends Base
         wrapper
         [new Access new PropertyName 'call'])
       args
-    )).compileToBabylon o
+    )).withLocationDataFrom(@class).compileToBabylon o
 
   compileNode: (o) ->
     if jumpNode = @body.jumps()

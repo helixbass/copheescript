@@ -122,7 +122,6 @@ buildLocationHash = (loc) ->
 # The object is returned either way.
 exports.addDataToNode = (parserState, first, last, {forceUpdateLocation} = {}) ->
   (obj) ->
-    # dump {obj, locationData: obj?.locationData, first, last}
     # Add location data
     if obj?.updateLocationDataIfMissing? and first?
       obj.updateLocationDataIfMissing buildLocationData(first, last), force: forceUpdateLocation

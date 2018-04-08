@@ -45,10 +45,10 @@ replDefaults = (opts) ->
       # Add assignment to `__` variable to force the input to be an expression.
       ast = ast.withLocationData new Block [new Assign (new Value new IdentifierLiteral '__'), ast, context: '=']
       # Wrap the expression in a closure to support top-level `await`.
-      ast     = new Code [], ast
+      ast     = ast.withLocationData new Code [], ast
       isAsync = ast.isAsync
       # Invoke the wrapping closure.
-      ast    = new Block [new Call ast]
+      ast    = ast.withLocationData new Block [new Call ast]
       js     = ast.compile {bare: yes, locals: Object.keys(context), referencedVars, sharedScope: yes, usePrettier: opts.usePrettier, code: input}
       if transpile
         js = transpile.transpile(js, transpile.options).code
