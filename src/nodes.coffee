@@ -699,10 +699,17 @@ exports.Block = class Block extends Base
       @directives
     }
 
+    comments = @extractComments compiledBody
+    if program.body.length
+      for comment in comments when comment.start is 0
+        comment.__prettierNodes =
+          enclosingNode: program
+          followingNode: program.body[0]
+          __prettierHasFollowingNewline: yes
+        break
     @withCopiedBabylonLocationData {
       type: 'File'
-      program
-      comments: @extractComments compiledBody
+      program, comments
     }, program
 
   _compileToBabylon: (o) ->
