@@ -121,16 +121,18 @@ exports.Base = class Base
       @withBabylonLocationData node._compileToBabylon o
 
   withBabylonComments: (o, compiled) ->
-    return compiled unless @comments and compiled
+    return compiled unless @comments
     trailingComments =
       for comment in @comments
         @compiledBabylonComments.push comment
-        new LineComment(comment).compileToBabylon o
+        new (if comment.here then HereComment else LineComment)(comment).compileToBabylon o
     if isArray compiled
       [...rest, last] = compiled
       [...rest, {...last, trailingComments}]
-    else
+    else if compiled
       {...compiled, trailingComments}
+    else
+      {trailingComments}
 
   withEmptyBabylonLocationData: (compiled) ->
     @withBabylonLocationData compiled,
@@ -681,6 +683,7 @@ exports.Block = class Block extends Base
       {trailingComments} = node
       return unless trailingComments
       comments.push trailingComments...
+      return 'REMOVE' unless node.type
       node.trailingComments = null
     comments
 
@@ -727,7 +730,7 @@ exports.Block = class Block extends Base
     body = @compileBodyToBabylon merge o, {root}
     body = [...@compileDeclarationsToBabylon(o), ...body] if withDeclarations
     return body if root
-    @withBabylonLocationData {
+    @includeCommentsInLocationData @withBabylonLocationData {
       type:
         if @isClassBody
           'ClassBody'
@@ -780,6 +783,7 @@ exports.Block = class Block extends Base
 
   asExpressionStatement: (compiled) ->
     @includeCommentsInLocationData do ->
+      return compiled unless compiled.type
       return compiled if compiled.type in ['VariableDeclaration', 'ImportDeclaration']
       type: 'ExpressionStatement'
       expression: compiled
@@ -814,7 +818,8 @@ exports.Block = class Block extends Base
         return [] unless compiled
         return [] if node.hoisted
         return @extractDirectives compiled.body, o if node instanceof Block or compiled.type is 'BlockStatement'
-        return @includeCommentsInLocationData compiled if node.isStatement o
+        # return @includeCommentsInLocationData compiled if node.isStatement o
+        return compiled if node.isStatement o
         compiled = @extractDirectives compiled, o
         return [] unless compiled
         return @asExpressionStatement compiled unless isArray compiled
@@ -1448,8 +1453,15 @@ exports.Value = class Value extends Base
 
 # Comment delimited by `###` (becoming `/* */`).
 exports.HereComment = class HereComment extends Base
-  constructor: ({ @content, @newLine, @unshift }) ->
+  constructor: ({ @content, @newLine, @unshift, @locationData }) ->
     super()
+
+  _compileToBabylon: (o) ->
+    hasLeadingMarks = /\n\s*[#|\*]/.test @content
+    @content = @content.replace /^([ \t]*)#(?=\s)/gm, '$1 *' if hasLeadingMarks
+    @content += ' ' if hasLeadingMarks
+    type: 'CommentBlock'
+    value: @content
 
   compileNode: (o) ->
     multiline = '\n' in @content

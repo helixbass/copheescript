@@ -319,10 +319,10 @@ exports.Lexer = class Lexer
   # everything has been parsed and the JavaScript code generated.
   commentToken: (chunk = @chunk) ->
     return 0 unless match = chunk.match COMMENT
-    [comment, here] = match
+    [withLeadingWhitespace, leadingWhitespace, comment, here] = match
     contents = null
     # Does this comment follow code on the same line?
-    newLine = /^\s*\n+\s*#/.test comment
+    newLine = /^\s*\n+\s*#/.test withLeadingWhitespace
     if here
       matchIllegal = HERECOMMENT_ILLEGAL.exec comment
       if matchIllegal
@@ -349,7 +349,7 @@ exports.Lexer = class Lexer
       content = content.replace /^([ |\t]*)#/gm, ''
       contents = content.split '\n'
 
-    offsetInChunk = 0
+    offsetInChunk = leadingWhitespace.length
     commentAttachments = for content, i in contents
       {length} = content
       commentAttachment =
@@ -365,7 +365,7 @@ exports.Lexer = class Lexer
       # If there’s no previous token, create a placeholder token to attach
       # this comment to; and follow with a newline.
       commentAttachments[0].newLine = yes
-      @lineToken @chunk[comment.length..] # Set the indent.
+      @lineToken @chunk[withLeadingWhitespace.length..] # Set the indent.
       placeholderToken = @makeToken 'JS', ''
       placeholderToken.generated = yes
       placeholderToken.comments = commentAttachments
@@ -374,7 +374,7 @@ exports.Lexer = class Lexer
     else
       attachCommentsToNode commentAttachments, prev
 
-    comment.length
+    withLeadingWhitespace.length
 
   # Matches JavaScript interpolated directly into the source via backticks.
   jsToken: ->
@@ -1223,7 +1223,7 @@ OPERATOR   = /// ^ (
 
 WHITESPACE = /^[^\n\S]+/
 
-COMMENT    = /^\s*###([^#][\s\S]*?)(?:###[^\n\S]*|###$)|^(?:\s*#(?!##[^#]).*)+/
+COMMENT    = /^(\s*)(###([^#][\s\S]*?)(?:###[^\n\S]*|###$)|^(?:\s*#(?!##[^#]).*)+)/
 
 CODE       = /^[-=]>/
 

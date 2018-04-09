@@ -317,10 +317,16 @@ exports.mapValues = (obj, fn) ->
 exports.babylonLocationFields = locationFields = ['loc', 'range', 'start', 'end']
 exports.traverseBabylonAst = traverseBabylonAst = (node, func) ->
   if isArray node
-    return (traverseBabylonAst(item, func) for item in node)
-  func node if node?
+    for item, index in node
+      ret = traverseBabylonAst item, func
+      node.splice index, 1 if ret is 'REMOVE'
+    return
+  ret = func node if node?
   if isPlainObject node
-    traverseBabylonAst(child, func) for own _, child of node
+    for own key, child of node when key not in locationFields
+      childRet = traverseBabylonAst child, func
+      node[key] = null if childRet is 'REMOVE'
+  ret
 exports.traverseBabylonAsts = traverseBabylonAsts = (node, correspondingNode, func) ->
   if isArray node
     return unless isArray correspondingNode
