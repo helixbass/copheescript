@@ -12,7 +12,7 @@
 {Rewriter, INVERSES} = require './rewriter'
 
 # Import the helpers we need.
-{count, starts, compact, repeat, invertLiterate, merge,
+{count, starts, compact, repeat, invertLiterate, merge, dump
 attachCommentsToNode, locationDataToString, throwSyntaxError, getNumberValue} = require './helpers'
 
 # The Lexer Class
@@ -346,15 +346,16 @@ exports.Lexer = class Lexer
       # Remove any leading newlines before the first comment, but preserve
       # blank lines between line comments.
       leadingNewlinesLength = 0
-      content = comment.replace /^(\n*)/, ({length: leadingNewlinesLength}) -> ''
+      content = comment.replace /^(\n*)/, ({length}) ->
+        leadingNewlinesLength = length
+        ''
       contents =
         content.split '\n'
         .map (line, index) ->
           {length} = line
-          length += leadingNewlinesLength if index is 0
           {length, content: line.replace /^([ |\t]*)#/gm, ''}
 
-    offsetInChunk = leadingWhitespace.length
+    offsetInChunk = leadingWhitespace.length + (leadingNewlinesLength ? 0)
     commentAttachments = for {content, length}, i in contents
       commentAttachment =
         content: content

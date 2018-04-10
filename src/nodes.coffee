@@ -123,9 +123,12 @@ exports.Base = class Base
   withBabylonComments: (o, compiled) ->
     return compiled unless @comments
     comments =
-      for comment in @comments
-        @compiledBabylonComments.push comment
-        new (if comment.here then HereComment else LineComment)(comment).compileToBabylon o
+      compact(
+        for comment in @comments when comment not in @compiledBabylonComments
+          @compiledBabylonComments.push comment
+          new (if comment.here then HereComment else LineComment)(comment).compileToBabylon o
+      )
+    return compiled unless comments.length
     if isArray compiled
       [...rest, last] = compiled
       [...rest, {...last, comments}]
@@ -799,15 +802,22 @@ exports.Block = class Block extends Base
         (do -> return item for item in compiled when item.type) ? compiled[0]
       else compiled
     comments = targetNode.comments ? []
-    traverseBabylonAst compiled, (node) ->
-      return 'STOP' if node.type in BABYLON_STATEMENT_TYPES
-      return unless node.comments?.length
+    traverseBabylonAst compiled, (node) =>
+      if node.type in BABYLON_STATEMENT_TYPES
+        @hoistBabylonComments node
+        return 'STOP'
+      return (if node.start? and not node.type? then 'REMOVE') unless node.comments?.length
       # dump 'hoisting comments', {compiled, targetNode, node, comments}
       comments.push node.comments...
       return 'REMOVE' unless node.type
       node.comments = null
     , skip: [compiled, targetNode]
-    targetNode.comments = comments
+    targetNode.comments =
+      for comment in comments
+        trailing = comment.start >= targetNode.end
+        comment.leading = not trailing
+        comment.trailing = trailing
+        comment
     compiled
     # {...compiled, comments}
 
@@ -1534,8 +1544,10 @@ exports.LineComment = class LineComment extends Base
     super()
 
   _compileToBabylon: (o) ->
+    return unless @content
     type: 'CommentLine'
     value: @content
+    leading: yes
 
   compileNode: (o) ->
     fragment = @makeCode(if /^\s*$/.test @content then '' else "//#{@content}")
@@ -5709,7 +5721,7 @@ TAB = '  '
 
 SIMPLENUM = /^[+-]?\d+$/
 
-BABYLON_STATEMENT_TYPES = ['ExpressionStatement', 'ClassMethod']
+BABYLON_STATEMENT_TYPES = ['ExpressionStatement', 'ClassMethod', 'ArrayExpression', 'ObjectProperty', 'ReturnStatement']
 
 # Helper Functions
 # ----------------
