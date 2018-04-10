@@ -122,17 +122,17 @@ exports.Base = class Base
 
   withBabylonComments: (o, compiled) ->
     return compiled unless @comments
-    trailingComments =
+    comments =
       for comment in @comments
         @compiledBabylonComments.push comment
         new (if comment.here then HereComment else LineComment)(comment).compileToBabylon o
     if isArray compiled
       [...rest, last] = compiled
-      [...rest, {...last, trailingComments}]
+      [...rest, {...last, comments}]
     else if compiled
-      {...compiled, trailingComments}
+      {...compiled, comments}
     else
-      {trailingComments}
+      {comments}
 
   withEmptyBabylonLocationData: (compiled) ->
     @withBabylonLocationData compiled,
@@ -680,33 +680,38 @@ exports.Block = class Block extends Base
   extractComments: (compiled) ->
     comments = []
     traverseBabylonAst compiled, (node) ->
-      {trailingComments} = node
-      return unless trailingComments
-      comments.push trailingComments...
+      {comments} = node
+      return unless comments
+      comments.push comments...
       return 'REMOVE' unless node.type
-      node.trailingComments = null
+      node.comments = null
     comments
 
   compileRootToBabylon: (o) ->
     # @spaced   = yes
     @initializeScope o
 
-    compiledBody = HoistTarget.expandBabylon @compileWithDeclarationsToBabylon merge o, root: yes
+    compiledBody = @hoistBabylonComments HoistTarget.expandBabylon @compileWithDeclarationsToBabylon merge o, root: yes
+    if compiledBody.length is 1 and not compiledBody[0].type
+      programComments = compiledBody[0].comments
+      compiledBody = []
     program = @includeCommentsInLocationData @withBabylonLocationData {
       type: 'Program'
       sourceType: 'module'
       body: compiledBody
       @directives
+      comments: programComments
     }
 
-    comments = @extractComments compiledBody
-    if program.body.length
-      for comment in comments when comment.start is 0
-        comment.__prettierNodes =
-          enclosingNode: program
-          followingNode: program.body[0]
-          __prettierHasFollowingNewline: yes
-        break
+    comments = []
+    # comments = @extractComments compiledBody
+    # if program.body.length
+    #   for comment in comments when comment.start is 0
+    #     comment.__prettierNodes =
+    #       enclosingNode: program
+    #       followingNode: program.body[0]
+    #       __prettierHasFollowingNewline: yes
+    #     break
     @withCopiedBabylonLocationData {
       type: 'File'
       program, comments
@@ -788,8 +793,26 @@ exports.Block = class Block extends Base
         kind: 'var'
     ]
 
+  hoistBabylonComments: (compiled) ->
+    targetNode =
+      if isArray compiled
+        (do -> return item for item in compiled when item.type) ? compiled[0]
+      else compiled
+    comments = targetNode.comments ? []
+    traverseBabylonAst compiled, (node) ->
+      return 'STOP' if node.type in BABYLON_STATEMENT_TYPES
+      return unless node.comments?.length
+      # dump 'hoisting comments', {compiled, targetNode, node, comments}
+      comments.push node.comments...
+      return 'REMOVE' unless node.type
+      node.comments = null
+    , skip: [compiled, targetNode]
+    targetNode.comments = comments
+    compiled
+    # {...compiled, comments}
+
   asExpressionStatement: (compiled) ->
-    @includeCommentsInLocationData do ->
+    @includeCommentsInLocationData @hoistBabylonComments do ->
       return compiled unless compiled.type
       return compiled if compiled.type in ['VariableDeclaration', 'ImportDeclaration']
       type: 'ExpressionStatement'
@@ -801,9 +824,9 @@ exports.Block = class Block extends Base
 
   includeCommentsInLocationData: (node) ->
     {start, end} = node
-    traverseBabylonAst node, ({trailingComments}) ->
-      return unless trailingComments
-      for comment in trailingComments
+    traverseBabylonAst node, ({comments}) ->
+      return unless comments
+      for comment in comments
         if comment.start < start
           node.start = comment.start
           node.range = [comment.range[0], node.range[1]]
@@ -826,9 +849,10 @@ exports.Block = class Block extends Base
         return [] if node.hoisted
         return @extractDirectives compiled.body, o if node instanceof Block or compiled.type is 'BlockStatement'
         # return @includeCommentsInLocationData compiled if node.isStatement o
-        return compiled if node.isStatement o
+        return @hoistBabylonComments compiled if node.isStatement o
         compiled = @extractDirectives compiled, o
         return [] unless compiled
+        # dump {compiled, node}
         return @asExpressionStatement compiled unless isArray compiled
         @asExpressionStatement item for item in compiled
     )
@@ -1105,17 +1129,25 @@ exports.RegexLiteral = class RegexLiteral extends Literal
     }
 
 exports.PassthroughLiteral = class PassthroughLiteral extends Literal
+  withEnhancedComments: (compiled) ->
+    traverseBabylonAst compiled, (node) ->
+      return unless node.start and not node.range
+      node.range = [node.start, node.end]
+      node.leading = yes
+    compiled
+
   _compileToBabylon: (o) ->
     return null unless @value.length
-    try
-      parsed = babylon.parse(@value, sourceType: 'module').program.body
-      return parsed if parsed?.length
-    catch
-    try
-      return babylon.parseExpression @value
-    catch
-    babylon.parse("class A {#{@value}}", sourceType: 'module').program.body[0].body.body[0]
-    # TODO: wrap this last one in a try and if it fails throw a useful error about not being able to parse backticked JS as an expression
+    @withEnhancedComments do =>
+      try
+        parsed = babylon.parse(@value, sourceType: 'module', ranges: yes).program.body
+        return parsed if parsed?.length
+      catch
+      try
+        return babylon.parseExpression @value, ranges: yes
+      catch
+      babylon.parse("class A {#{@value}}", sourceType: 'module', ranges: yes).program.body[0].body.body[0]
+      # TODO: wrap this last one in a try and if it fails throw a useful error about not being able to parse backticked JS as an expression
 
 exports.IdentifierLiteral = class IdentifierLiteral extends Literal
   isAssignable: YES
@@ -1469,6 +1501,7 @@ exports.HereComment = class HereComment extends Base
     @content += ' ' if hasLeadingMarks
     type: 'CommentBlock'
     value: @content
+    leading: yes
 
   compileNode: (o) ->
     multiline = '\n' in @content
@@ -5675,6 +5708,8 @@ LEVEL_ACCESS = 6  # ...[0]
 TAB = '  '
 
 SIMPLENUM = /^[+-]?\d+$/
+
+BABYLON_STATEMENT_TYPES = ['ExpressionStatement', 'ClassMethod']
 
 # Helper Functions
 # ----------------

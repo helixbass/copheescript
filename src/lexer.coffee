@@ -340,18 +340,22 @@ exports.Lexer = class Lexer
       content = here
       if '\n' in content
         content = content.replace /// \n #{repeat ' ', @indent} ///g, '\n'
-      contents = [content]
+      contents = [{content, length: comment.length}]
     else
       # The `COMMENT` regex captures successive line comments as one token.
       # Remove any leading newlines before the first comment, but preserve
       # blank lines between line comments.
-      content = comment.replace /^(\n*)/, ''
-      content = content.replace /^([ |\t]*)#/gm, ''
-      contents = content.split '\n'
+      leadingNewlinesLength = 0
+      content = comment.replace /^(\n*)/, ({length: leadingNewlinesLength}) -> ''
+      contents =
+        content.split '\n'
+        .map (line, index) ->
+          {length} = line
+          length += leadingNewlinesLength if index is 0
+          {length, content: line.replace /^([ |\t]*)#/gm, ''}
 
     offsetInChunk = leadingWhitespace.length
-    commentAttachments = for content, i in contents
-      {length} = content
+    commentAttachments = for {content, length}, i in contents
       commentAttachment =
         content: content
         here: here?

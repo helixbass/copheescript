@@ -315,16 +315,23 @@ exports.mapValues = (obj, fn) ->
   , {}
 
 exports.babylonLocationFields = locationFields = ['loc', 'range', 'start', 'end']
-exports.traverseBabylonAst = traverseBabylonAst = (node, func) ->
+exports.traverseBabylonAst = traverseBabylonAst = (node, func, {skipSelf, skip} = {}) ->
+  # if skipSelf
+  #   skip = [node]
+  #   if skipSelf.and
+  #     skip.push skipSelf.and...
   if isArray node
+    indexesToRemove = []
     for item, index in node
-      ret = traverseBabylonAst item, func
-      node.splice index, 1 if ret is 'REMOVE'
+      ret = traverseBabylonAst item, func, {skip}
+      indexesToRemove.unshift index if ret is 'REMOVE'
+    node.splice index, 1 for index in indexesToRemove
     return
-  ret = func node if node?
+  ret = func node if node? and not (skip and node in skip)
+  return if ret is 'STOP'
   if isPlainObject node
     for own key, child of node when key not in locationFields
-      childRet = traverseBabylonAst child, func
+      childRet = traverseBabylonAst child, func, {skip}
       node[key] = null if childRet is 'REMOVE'
   ret
 exports.traverseBabylonAsts = traverseBabylonAsts = (node, correspondingNode, func) ->
