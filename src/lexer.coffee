@@ -317,12 +317,12 @@ exports.Lexer = class Lexer
   # Matches and consumes comments. The comments are taken out of the token
   # stream and saved for later, to be reinserted into the output after
   # everything has been parsed and the JavaScript code generated.
-  commentToken: (chunk = @chunk, {offsetInChunk = 0} = {}) ->
+  commentToken: (chunk = @chunk, {offsetInChunk = 0, nonInitial, dontShift} = {}) ->
     return 0 unless match = chunk.match COMMENT
     [withLeadingWhitespace, leadingWhitespace, comment, here] = match
     contents = null
     # Does this comment follow code on the same line?
-    newLine = /^\s*\n+\s*#/.test withLeadingWhitespace
+    leadingNewLine = /^\s*\n+\s*#/.test withLeadingWhitespace
     if here
       matchIllegal = HERECOMMENT_ILLEGAL.exec comment
       if matchIllegal
@@ -356,13 +356,17 @@ exports.Lexer = class Lexer
           {length, content: line.replace /^([ |\t]*)#/gm, ''}
 
     offsetInChunk += leadingWhitespace.length + (leadingNewlinesLength ? 0)
+    nonInitial ?= no
     commentAttachments = for {content, length}, i in contents
+      nonInitial = yes if i isnt 0
+      leadingNewlineOffset = if nonInitial then 1 else 0
       commentAttachment =
         content: content
         here: here?
-        newLine: newLine or i isnt 0 # Line comments after the first one start new lines, by definition.
-        locationData: @makeLocationData {offsetInChunk, length}
-      offsetInChunk += length
+        newLine: leadingNewLine or nonInitial # Line comments after the first one start new lines, by definition.
+        locationData: @makeLocationData {offsetInChunk: offsetInChunk + leadingNewlineOffset, length}
+      commentAttachment.dontShift = yes if dontShift
+      offsetInChunk += length + leadingNewlineOffset
       commentAttachment
 
     prev = @prev()
@@ -404,10 +408,15 @@ exports.Lexer = class Lexer
           offset: match.index + match[1].length
       when match = @matchWithInterpolations HEREGEX, '///'
         {tokens, index} = match
-        while matchedComment = HEREGEX_COMMENT.exec @chunk[0...index]
-          {index: commentIndex} = matchedComment
-          [withLeadingWhitespace, leadingWhitespace, comment] = matchedComment
-          @commentToken comment, offsetInChunk: commentIndex + leadingWhitespace.length
+        comments = do =>
+          nonInitial = no
+          comments = []
+          while matchedComment = HEREGEX_COMMENT.exec @chunk[0...index]
+            {index: commentIndex} = matchedComment
+            [withLeadingWhitespace, leadingWhitespace, comment] = matchedComment
+            comments.push {comment, offsetInChunk: commentIndex + leadingWhitespace.length, nonInitial, dontShift: yes}
+            nonInitial = yes
+          comments
       when match = REGEX.exec @chunk
         [regex, body, closed] = match
         @validateEscapes body, isRegex: yes, offsetInChunk: 1
@@ -446,6 +455,8 @@ exports.Lexer = class Lexer
         @token ')', ')', end - 1, 0
         @token 'REGEX_END', ')', end - 1, 0
 
+    if comments?.length
+      @commentToken comment, opts for {comment, ...opts} in comments
     end
 
   # Matches newlines, indents, and outdents, and determines which is which.
@@ -1300,7 +1311,7 @@ HEREGEX_OMIT = ///
   | \s+(?:#.*)?     # Remove whitespace and comments.
 ///g
 
-HEREGEX_COMMENT = /(\s+)(#(?!{).*)/g
+HEREGEX_COMMENT = /(\s+)(#(?!{).*)/gm
 
 REGEX_ILLEGAL = /// ^ ( / | /{3}\s*) (\*) ///
 

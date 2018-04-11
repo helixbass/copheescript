@@ -322,7 +322,6 @@ test "#4811, heregex comments with ///", ->
     ///
   """,
   """
-   // comment with ///
+   /a|b/; // comment with ///
    // /// 'heregex' in comment will be consumed
-   /a|b/;
   """

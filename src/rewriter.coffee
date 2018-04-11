@@ -5,7 +5,7 @@
 # shorthand into the unambiguous long form, add implicit indentation and
 # parentheses, and generally clean things up.
 
-{throwSyntaxError} = require './helpers'
+{throwSyntaxError, dump} = require './helpers'
 
 # Move attached comments from one token to another.
 moveComments = (fromToken, toToken) ->
@@ -472,7 +472,7 @@ exports.Rewriter = class Rewriter
           ret = shiftCommentsBackward dummyToken, i - 1, tokens
         if token.comments.length isnt 0
           shiftCommentsForward token, i, tokens
-      else
+      else unless token[0] is 'JS' and token.generated
         # If any of this token’s comments start a line—there’s only
         # whitespace between the preceding newline and the start of the
         # comment—and this isn’t one of the special `JS` tokens, then
@@ -487,9 +487,9 @@ exports.Rewriter = class Rewriter
         dummyToken = comments: []
         j = token.comments.length - 1
         until j is -1
-          if token.comments[j].newLine and not token.comments[j].unshift and
-             not (token[0] is 'JS' and token.generated)
-            dummyToken.comments.unshift token.comments[j]
+          comment = token.comments[j]
+          if comment.newLine and not comment.unshift and not comment.dontShift
+            dummyToken.comments.unshift comment
             token.comments.splice j, 1
           j--
         if dummyToken.comments.length isnt 0

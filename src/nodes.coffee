@@ -703,7 +703,10 @@ exports.Block = class Block extends Base
 
     compiledBody = @hoistBabylonComments HoistTarget.expandBabylon @compileWithDeclarationsToBabylon merge o, root: yes
     if compiledBody.length is 1 and not compiledBody[0].type
-      programComments = compiledBody[0].comments
+      programComments =
+        for comment in compiledBody[0].comments
+          comment.leading = comment.trailing = no
+          comment
       compiledBody = []
     program = @includeCommentsInLocationData @withBabylonLocationData {
       type: 'Program'
@@ -720,7 +723,7 @@ exports.Block = class Block extends Base
     #     comment.__prettierNodes =
     #       enclosingNode: program
     #       followingNode: program.body[0]
-    #       __prettierHasFollowingNewline: yes
+    #       __hasFollowingNewline: yes
     #     break
     @withCopiedBabylonLocationData {
       type: 'File'
@@ -1573,6 +1576,7 @@ exports.LineComment = class LineComment extends Base
     type: 'CommentLine'
     value: @content
     leading: yes
+    __hasPrecedingNewline: @newLine
 
   compileNode: (o) ->
     fragment = @makeCode(if /^\s*$/.test @content then '' else "//#{@content}")
