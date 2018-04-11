@@ -269,13 +269,13 @@ test 'multiline tag with nested CSX within an attribute', ->
 test 'escaped CoffeeScript with nested object literals', ->
   eqJS '''
     <Person>
-      blah blah blah {
+      blah blah blah blah blah blah blah blah blah blah blah blah blah {
         {'a' : {}, 'asd': 'asd'}
       }
     </Person>
   ''', '''
     <Person>
-      blah blah blah {{
+      blah blah blah blah blah blah blah blah blah blah blah blah blah {{
       'a': {},
       'asd': 'asd'
     }}

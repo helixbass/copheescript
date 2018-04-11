@@ -317,7 +317,7 @@ exports.Lexer = class Lexer
   # Matches and consumes comments. The comments are taken out of the token
   # stream and saved for later, to be reinserted into the output after
   # everything has been parsed and the JavaScript code generated.
-  commentToken: (chunk = @chunk) ->
+  commentToken: (chunk = @chunk, {offsetInChunk = 0} = {}) ->
     return 0 unless match = chunk.match COMMENT
     [withLeadingWhitespace, leadingWhitespace, comment, here] = match
     contents = null
@@ -355,7 +355,7 @@ exports.Lexer = class Lexer
           {length} = line
           {length, content: line.replace /^([ |\t]*)#/gm, ''}
 
-    offsetInChunk = leadingWhitespace.length + (leadingNewlinesLength ? 0)
+    offsetInChunk += leadingWhitespace.length + (leadingNewlinesLength ? 0)
     commentAttachments = for {content, length}, i in contents
       commentAttachment =
         content: content
@@ -404,8 +404,10 @@ exports.Lexer = class Lexer
           offset: match.index + match[1].length
       when match = @matchWithInterpolations HEREGEX, '///'
         {tokens, index} = match
-        comments = @chunk[0...index].match /\s+(#(?!{).*)/g
-        @commentToken comment for comment in comments if comments
+        while matchedComment = HEREGEX_COMMENT.exec @chunk[0...index]
+          {index: commentIndex} = matchedComment
+          [withLeadingWhitespace, leadingWhitespace, comment] = matchedComment
+          @commentToken comment, offsetInChunk: commentIndex + leadingWhitespace.length
       when match = REGEX.exec @chunk
         [regex, body, closed] = match
         @validateEscapes body, isRegex: yes, offsetInChunk: 1
@@ -1297,6 +1299,8 @@ HEREGEX_OMIT = ///
   | \\(\s)          # Preserve escaped whitespace.
   | \s+(?:#.*)?     # Remove whitespace and comments.
 ///g
+
+HEREGEX_COMMENT = /(\s+)(#(?!{).*)/g
 
 REGEX_ILLEGAL = /// ^ ( / | /{3}\s*) (\*) ///
 

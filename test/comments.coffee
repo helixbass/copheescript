@@ -1003,7 +1003,7 @@ test "#4706: Flow comments after class name", ->
   var Container;
 
   Container = class Container/*::<T> */ {
-    method() {
+    method/*::<U> */() {
       return true;
     }
 

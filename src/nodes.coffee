@@ -122,12 +122,18 @@ exports.Base = class Base
 
   withBabylonComments: (o, compiled) ->
     return compiled unless @comments
+    # dump 'adding comments', {compiled, @comments}
+    {start} = (compiled ?= {})
     comments =
-      compact(
-        for comment in @comments when comment not in @compiledBabylonComments
-          @compiledBabylonComments.push comment
-          new (if comment.here then HereComment else LineComment)(comment).compileToBabylon o
-      )
+      # compact(
+      for comment in @comments when comment not in @compiledBabylonComments
+        @compiledBabylonComments.push comment
+        compiledComment = new (if comment.here then HereComment else LineComment)(comment).compileToBabylon o
+        continue unless compiledComment?
+        leading = compiledComment.end <= start
+        compiledComment.leading = leading
+        compiledComment.trailing = not leading
+        compiledComment
     return compiled unless comments.length
     if isArray compiled
       [...rest, last] = compiled
@@ -149,7 +155,7 @@ exports.Base = class Base
   withBabylonLocationData: (compiled, node) ->
     return (@withBabylonLocationData(item, node) for item in compiled) if isArray compiled
     {locationData} = node or @
-    return compiled unless locationData and compiled
+    return compiled unless locationData and compiled and not compiled.start?
     merge compiled, locationDataToBabylon locationData
 
   withCopiedBabylonLocationData: (compiled, other) ->
@@ -671,7 +677,7 @@ exports.Block = class Block extends Base
     super o, lvl
 
   compileToBabylon: (o, level) ->
-    return @compileRootToBabylon(o) unless o.scope
+    return @withBabylonComments o, @compileRootToBabylon o unless o.scope
     super o, level
 
   initializeScope: (o) ->
@@ -691,6 +697,7 @@ exports.Block = class Block extends Base
     comments
 
   compileRootToBabylon: (o) ->
+    # dump root: @
     # @spaced   = yes
     @initializeScope o
 
@@ -756,7 +763,7 @@ exports.Block = class Block extends Base
     }
 
   compileWithDeclarationsToBabylon: (o) ->
-    @_compileToBabylon merge o, level: LEVEL_TOP, withDeclarations: yes
+    @withBabylonComments o, @_compileToBabylon merge o, level: LEVEL_TOP, withDeclarations: yes
 
   compileScopeDeclarationsToBabylon: (o) ->
     @withEmptyBabylonLocationData {
@@ -796,28 +803,46 @@ exports.Block = class Block extends Base
         kind: 'var'
     ]
 
-  hoistBabylonComments: (compiled) ->
+  hoistBabylonComments: (compiled, {onlyTrailing, onlyLeading} = {}) ->
     targetNode =
       if isArray compiled
         (do -> return item for item in compiled when item.type) ? compiled[0]
       else compiled
     comments = targetNode.comments ? []
-    traverseBabylonAst compiled, (node) =>
+    isDummyLocationData = targetNode.start < 0
+    traverseBabylonAst compiled, (node, {parent, key}) =>
+      return 'STOP' if parent?.type is 'TemplateLiteral'
+      return 'STOP' if parent?.type in ['FunctionExpression', 'ArrowFunctionExpression'] and key is 'params'
+      return 'STOP' if parent?.type is 'ClassExpression' and key is 'id'
+      return 'STOP' if parent?.type is 'ClassMethod' and key is 'key'
+      if parent?.type is 'JSXExpressionContainer' and node.type?
+        @hoistBabylonComments node
+        return 'STOP'
+      if node.type is 'ObjectProperty'
+        @hoistBabylonComments node, onlyTrailing: yes
+        return
+      if node.type is 'ArrowFunctionExpression'
+        @hoistBabylonComments node, onlyLeading: yes
+        return
       if node.type in BABYLON_STATEMENT_TYPES
         @hoistBabylonComments node
         return 'STOP'
       return (if node.start? and not node.type? then 'REMOVE') unless node.comments?.length
       # dump 'hoisting comments', {compiled, targetNode, node, comments}
-      comments.push node.comments...
+      nonmatching = [] if onlyTrailing or onlyLeading
+      comments.push compact(
+        for comment in node.comments
+          leading = comment.end <= targetNode.start or isDummyLocationData
+          if onlyTrailing and leading or onlyLeading and not leading
+            nonmatching.push comment
+            continue
+          comment.leading = leading
+          comment.trailing = not leading
+          comment)...
       return 'REMOVE' unless node.type
-      node.comments = null
+      node.comments = if nonmatching?.length then nonmatching else null
     , skip: [compiled, targetNode]
-    targetNode.comments =
-      for comment in comments
-        trailing = comment.start >= targetNode.end
-        comment.leading = not trailing
-        comment.trailing = trailing
-        comment
+    targetNode.comments = comments
     compiled
     # {...compiled, comments}
 
@@ -1808,8 +1833,20 @@ exports.Super = class Super extends Base
   _compileToBabylon: (o) ->
     @setAccessor o
 
-    new Value(new SuperLiteral, if @accessor then [@accessor] else [])
-    .compileToBabylon o
+    if @accessor?.name?.comments
+      # A `super()` call gets compiled to e.g. `super.method()`, which means
+      # the `method` property name gets compiled for the first time here, and
+      # again when the `method:` property of the class gets compiled. Since
+      # this compilation happens first, comments attached to `method:` would
+      # get incorrectly output near `super.method()`, when we want them to
+      # get output on the second pass when `method:` is output. So set them
+      # aside during this compilation pass, and put them back on the object so
+      # that they’re there for the later compilation.
+      salvagedComments = @accessor.name.comments
+      delete @accessor.name.comments
+    compiled = new Value(new SuperLiteral, if @accessor then [@accessor] else []).compileToBabylon o
+    attachCommentsToNode salvagedComments, @accessor.name if salvagedComments
+    compiled
 
   setAccessor: (o) ->
     method = o.scope.namedMethod()
@@ -1817,6 +1854,7 @@ exports.Super = class Super extends Base
 
     unless method.ctor? or @accessor?
       {name, variable} = method
+      # name = name.cloneWithoutComments()
       if name.shouldCache() or (name instanceof Index and name.index.isAssignable())
         nref = new IdentifierLiteral o.scope.parent.freeVariable 'name'
         name.index = new Assign nref, name.index
@@ -2605,12 +2643,17 @@ exports.Class = class Class extends Base
   compileClassDeclarationToBabylon: (o) ->
     @prepareConstructor()
     @proxyBoundMethods() if @boundMethods.length
+    id = new IdentifierLiteral @name if @name
+    if @variable?.comments? and id
+      (id.comments ?= []).push @variable.comments...
+      @variable.comments.length = 0
+      @variable.base?.comments?.length = 0
     type:
       if o.level is LEVEL_TOP
         'ClassDeclaration'
       else
         'ClassExpression'
-    id: new IdentifierLiteral(@name).compileToBabylon o if @name
+    id: id.compileToBabylon o if id
     superClass: @parent.compileToBabylon o if @parent
     body: @body.compileToBabylon o, LEVEL_TOP
 
@@ -2736,7 +2779,7 @@ exports.Class = class Class extends Base
     return variable.looksStatic @name
 
   # Returns a configured class initializer method
-  addInitializerMethod: ({variable, value: method}) ->
+  addInitializerMethod: ({variable, value: method, operatorToken}) ->
     method.isMethod = yes
     method.isStatic = variable.looksStatic @name
 
@@ -2750,6 +2793,7 @@ exports.Class = class Class extends Base
       method.ctor = (if @parent then 'derived' else 'base') if methodName.value is 'constructor'
       method.error 'Cannot define a constructor as a bound (fat arrow) function' if method.bound and method.ctor
 
+    (method.name.comments ?= []).push operatorToken.comments... if operatorToken?.comments
     method
 
   makeDefaultConstructor: ->
@@ -3209,6 +3253,8 @@ exports.Assign = class Assign extends Base
         ]
         kind: 'var'
 
+    compiledValue    = @value.compileToBabylon    o, LEVEL_LIST
+    compiledVariable = @variable.compileToBabylon o, LEVEL_LIST
     {
       ...(
         if @param or @nestedLhs
@@ -3217,8 +3263,8 @@ exports.Assign = class Assign extends Base
           type: 'AssignmentExpression'
           operator: @context or '=' # TODO: using @context here is wrong?
       )
-      left: @variable.compileToBabylon o, LEVEL_LIST
-      right: @value.compileToBabylon o, LEVEL_LIST
+      left: compiledVariable
+      right: compiledValue
     }
 
   compileCSXAttributeToBabylon: (o) ->
@@ -3806,6 +3852,10 @@ exports.Code = class Code extends Base
       yieldNode = @body.contains (node) -> node instanceof Op and node.operator is 'yield'
       (yieldNode or @).error 'yield cannot occur inside bound (fat arrow) functions'
 
+    # ((if params.length then params[0] else @body).comments ?= []).push @paramStart.comments... if @paramStart?.comments?
+    (@comments                                             ?= []).push @paramStart.comments... if @paramStart?.comments?
+    (@body                                       .comments ?= []).push @funcGlyph.comments...  if @funcGlyph?.comments?
+
     {
       type:
         if @isMethod
@@ -4055,6 +4105,8 @@ exports.Code = class Code extends Base
     if @isMethod
       [methodScope, o.scope] = [o.scope, o.scope.parent]
       name = @name.compileToFragments o
+      if @name.comments?
+        @compileCommentFragments o, @name, name
       name.shift() if name[0].code is '.'
       o.scope = methodScope
 
@@ -5107,7 +5159,9 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
       else
         element.withBabylonLocationData
           type: 'JSXExpressionContainer'
-          expression: compiled
+          expression: do ->
+            compiled.type ?= 'JSXEmptyExpression'
+            compiled
 
   prepareElementValue: (element) ->
     element.value = element.unquote yes, @csx
@@ -5721,7 +5775,7 @@ TAB = '  '
 
 SIMPLENUM = /^[+-]?\d+$/
 
-BABYLON_STATEMENT_TYPES = ['ExpressionStatement', 'ClassMethod', 'ArrayExpression', 'ObjectProperty', 'ReturnStatement']
+BABYLON_STATEMENT_TYPES = ['ExpressionStatement', 'ClassMethod', 'ArrayExpression', 'ReturnStatement', 'TemplateElement', 'JSXEmptyExpression', 'ThrowStatement', 'IfStatement', 'ForStatement', 'ForInStatement', 'BlockStatement', 'ImportSpecifier']
 
 # Helper Functions
 # ----------------

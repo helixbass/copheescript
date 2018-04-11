@@ -1,18 +1,21 @@
 prettier = require 'prettier'
 babylon = require 'babylon'
-formatWithPrettier = (js) ->
-  # formatted = prettier.format "FORCE_NON_DIRECTIVE; #{js}"
-  {parsed: {ast}, opts} = prettier.__debug.parse "FORCE_NON_DIRECTIVE; #{js}"
-  opts.originalText = js
-  {formatted} = prettier.__debug.formatAST ast, opts
+formatWithPrettier = (js, {returnAll} = {}) ->
+  formatted = prettier.format "FORCE_NON_DIRECTIVE; #{js}"
+  # {parsed: {ast}, opts} = prettier.__debug.parse "FORCE_NON_DIRECTIVE; #{js}"
+  # opts.originalText = js
+  # {formatted} = prettier.__debug.formatAST ast, opts
   # formatted = prettier.format formatted
   {tokens} = babylon.parse formatted,
     tokens: yes
     sourceType: 'module'
     allowImportExportEverywhere: yes
     plugins: ['jsx']
-  (value ? type.label for {value, type} in tokens)# when type isnt 'CommentLine'
-  .join ' '
+  joined =
+    (value ? type.label for {value, type} in tokens)# when type isnt 'CommentLine'
+    .join ' '
+  return joined unless returnAll
+  {joined, tokens, formatted}
 
 # See [http://wiki.ecmascript.org/doku.php?id=harmony:egal](http://wiki.ecmascript.org/doku.php?id=harmony:egal).
 egal = (a, b) ->
@@ -30,6 +33,8 @@ arrayEgal = (a, b) ->
     yes
 
 diffOutput = (expectedOutput, actualOutput) ->
+  expected = formatWithPrettier expectedOutput, returnAll: yes
+  actual = formatWithPrettier actualOutput, returnAll: yes
   expectedOutputLines = expectedOutput.split '\n'
   actualOutputLines = actualOutput.split '\n'
   for line, i in actualOutputLines
@@ -38,7 +43,16 @@ diffOutput = (expectedOutput, actualOutput) ->
   """Expected generated JavaScript to be:
   #{reset}#{expectedOutput}#{red}
     but instead it was:
-  #{reset}#{actualOutputLines.join '\n'}#{red}"""
+  #{reset}#{actualOutputLines.join '\n'}#{red}
+    Expected formatted:
+  #{reset}#{expected.formatted}#{red}
+    actual formatted:
+  #{reset}#{actual.formatted}#{red}
+    Expected tokens:
+  #{reset}#{expected.joined}#{red}
+    actual tokens:
+  #{reset}#{actual.joined}#{red}
+  """
 
 exports.eq = (a, b, msg) ->
   ok egal(a, b), msg or
