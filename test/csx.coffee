@@ -737,8 +737,8 @@ test '#4686: comments inside interpolations that also contain CSX attributes', -
     </div>
   ''', '''
     <div>
-      {  // comment
-    <div anAttr={"value"} />}
+      <div anAttr={  // comment
+    "value"} />
     </div>;
   '''
 
