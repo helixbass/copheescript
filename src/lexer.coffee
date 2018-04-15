@@ -869,7 +869,10 @@ exports.Lexer = class Lexer
             placeholderToken[2] = value[0][2]
             for val in value when val.comments
               placeholderToken.comments ?= []
-              placeholderToken.comments.push val.comments...
+              placeholderToken.comments.push (
+                for comment in val.comments
+                  comment.forceLeading = yes
+                  comment)...
             value.splice 1, 0, placeholderToken
           # Push all the tokens in the fake `'TOKENS'` token. These already have
           # sane location data.

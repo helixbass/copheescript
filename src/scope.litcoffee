@@ -17,6 +17,7 @@ that should be output as part of variable declarations.
       constructor: (@parent, @expressions, @method, @referencedVars) ->
         @variables = []
         @comments  = {}
+        @commentNodes = {}
         @lookup = {}
         @utilities = {} unless @parent
         @add 'arguments', 'arguments', yes

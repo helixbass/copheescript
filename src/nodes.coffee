@@ -120,16 +120,16 @@ exports.Base = class Base
       return node.compileClosureToBabylon o unless o.level is LEVEL_TOP or not node.isStatement o
       @withBabylonLocationData node._compileToBabylon o
 
-  withBabylonComments: (o, compiled) ->
-    return compiled unless @comments
+  withBabylonComments: (o, compiled, {comments = @comments} = {}) ->
+    return compiled unless comments
     {start} = (compiled ?= {})
     comments =
       # compact(
-      for comment in @comments when comment not in @compiledBabylonComments
+      for comment in comments when comment not in @compiledBabylonComments and not comment.includeWithDeclaration
         @compiledBabylonComments.push comment
         compiledComment = new (if comment.here then HereComment else LineComment)(comment).compileToBabylon o
         continue unless compiledComment?
-        leading = compiledComment.end <= start
+        leading = comment.forceLeading or compiledComment.end <= start
         compiledComment.leading = leading
         compiledComment.trailing = not leading
         compiledComment
@@ -325,9 +325,9 @@ exports.Base = class Base
     @compileToFragments = (o) ->
       target.update compileToFragments, o
 
-    _compileToBabylon = @_compileToBabylon
-    @_compileToBabylon = (o) ->
-      target.updateBabylon _compileToBabylon, o
+    compileToBabylon = @compileToBabylon
+    @compileToBabylon = (o) ->
+      target.updateBabylon compileToBabylon, o
 
     target
 
@@ -777,14 +777,18 @@ exports.Block = class Block extends Base
     @withBabylonComments o, @_compileToBabylon merge o, level: LEVEL_TOP, withDeclarations: yes
 
   compileScopeDeclarationsToBabylon: (o) ->
-    @withEmptyBabylonLocationData {
-      type: 'VariableDeclarator'
-      id:
-        @withEmptyBabylonLocationData
-          type: 'Identifier'
-          name: declaredVariable
-      init: null
-    } for declaredVariable in o.scope.declaredVariables()
+    for declaredVariable in o.scope.declaredVariables()
+      @withBabylonComments o, @withEmptyBabylonLocationData(
+        type: 'VariableDeclarator'
+        id:
+          @withEmptyBabylonLocationData
+            type: 'Identifier'
+            name: declaredVariable
+        init: null
+      ), comments:
+        for comment in o.scope.commentNodes[declaredVariable] ? [] when comment
+          comment.includeWithDeclaration = no
+          comment
 
   compileScopeAssignedVariablesToBabylon: (o) ->
     @withEmptyBabylonLocationData {
@@ -825,30 +829,46 @@ exports.Block = class Block extends Base
       return 'STOP' if parent?.type is 'TemplateLiteral'
       return 'STOP' if parent?.type in ['FunctionExpression', 'ArrowFunctionExpression'] and key is 'params'
       return 'STOP' if parent?.type is 'ClassExpression' and key is 'id'
-      return 'STOP' if parent?.type is 'ClassMethod' and key is 'key'
+      # return 'STOP' if parent?.type is 'ClassMethod' and key is 'key'
+      onlyAlreadyLeading = yes if parent?.type is 'ClassMethod' and key is 'key'
+      if parent?.type is 'AssignmentExpression' and key is 'left'
+        @hoistBabylonComments node
+        return 'STOP'
+      if parent?.type is 'ArrayExpression' and key is 'elements'
+        @hoistBabylonComments node
+        return 'STOP'
       if parent?.type is 'JSXExpressionContainer' and node.type?
         @hoistBabylonComments node
         return 'STOP'
-      if node.type is 'ObjectProperty'
+      if parent?.type is 'ClassMethod' and key is 'params'
         @hoistBabylonComments node, onlyTrailing: yes
+        return
+      if node.type is 'ObjectProperty'
+        @hoistBabylonComments node#, onlyTrailing: yes
         return
       if node.type is 'ArrowFunctionExpression'
         @hoistBabylonComments node, onlyLeading: yes
         return
       if node.type in BABYLON_STATEMENT_TYPES
         @hoistBabylonComments node
-        return 'STOP'
-      return (if node.start? and not node.type? then 'REMOVE') unless node.comments?.length
-      # dump 'hoisting comments', {compiled, targetNode, node, comments}
-      nonmatching = [] if onlyTrailing or onlyLeading
-      comments.push compact(
+        if key is 'body' and parent?.type is 'ArrowFunctionExpression'
+          makeLeadingIntoDangling = yes
+        else
+          return 'STOP'
+      return (if node.loc? and not node.type? then 'REMOVE') unless node.comments?.length
+      # dump 'hoisting comments', {compiled, targetNode, node, comments, makeLeadingIntoDangling}
+      nonmatching = [] if onlyTrailing or onlyLeading or onlyAlreadyLeading or makeLeadingIntoDangling
+      comments.push (
         for comment in node.comments
-          leading = comment.end <= targetNode.start or isDummyLocationData
-          if onlyTrailing and leading or onlyLeading and not leading
+          leading = comment.forceLeading or comment.end <= targetNode.start or isDummyLocationData
+          if (onlyTrailing and leading or onlyLeading and not leading or onlyAlreadyLeading and not comment.leading) and not (makeLeadingIntoDangling and comment.leading)
             nonmatching.push comment
             continue
-          comment.leading = leading
-          comment.trailing = not leading
+          if makeLeadingIntoDangling
+            comment.leading = comment.trailing = no
+          else
+            comment.leading = leading
+            comment.trailing = not leading
           comment)...
       return 'REMOVE' unless node.type
       node.comments = if nonmatching?.length then nonmatching else null
@@ -3328,6 +3348,8 @@ exports.Assign = class Assign extends Base
           commentFragments = []
           @compileCommentFragments o, commentsNode, commentFragments
           o.scope.comments[name.value] = commentFragments
+          o.scope.commentNodes[name.value] = name.comments
+          comment.includeWithDeclaration = yes for comment in name.comments
 
   # Compile an assignment, delegating to `compileDestructuring` or
   # `compileSplice` if appropriate. Keep track of the name of the base object
@@ -5789,7 +5811,7 @@ TAB = '  '
 
 SIMPLENUM = /^[+-]?\d+$/
 
-BABYLON_STATEMENT_TYPES = ['ExpressionStatement', 'ClassMethod', 'ArrayExpression', 'ReturnStatement', 'TemplateElement', 'JSXEmptyExpression', 'ThrowStatement', 'IfStatement', 'ForStatement', 'ForInStatement', 'BlockStatement', 'ImportSpecifier']
+BABYLON_STATEMENT_TYPES = ['ExpressionStatement', 'ClassMethod', 'ArrayExpression', 'ReturnStatement', 'TemplateElement', 'JSXEmptyExpression', 'ThrowStatement', 'IfStatement', 'ForStatement', 'ForInStatement', 'BlockStatement', 'ImportSpecifier', 'VariableDeclarator']
 
 # Helper Functions
 # ----------------

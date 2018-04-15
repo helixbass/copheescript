@@ -12,7 +12,11 @@ formatWithPrettier = (js, {returnAll} = {}) ->
     allowImportExportEverywhere: yes
     plugins: ['jsx']
   joined =
-    (value ? type.label for {value, type} in tokens)# when type isnt 'CommentLine'
+    (for {value, type} in tokens # when type isnt 'CommentLine'
+      if type is 'CommentBlock'
+        value.replace /\s+/g, ' '
+      else
+        value ? type.label)
     .join ' '
   return joined unless returnAll
   {joined, tokens, formatted}
@@ -53,6 +57,7 @@ diffOutput = (expectedOutput, actualOutput) ->
     actual tokens:
   #{reset}#{actual.joined}#{red}
   """
+  # #{reset}#{JSON.stringify({label, value} for {type: {label}, value} in actual.tokens)}#{red}
 
 exports.eq = (a, b, msg) ->
   ok egal(a, b), msg or
