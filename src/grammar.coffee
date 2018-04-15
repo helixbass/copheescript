@@ -812,7 +812,7 @@ grammar =
     o 'SimpleAssignable ++',                    -> new Op '++', $1, null, true
 
     # [The existential operator](http://coffeescript.org/#existential-operator).
-    o 'Expression ?',                           -> new Existence $1
+    o 'Expression ?',                           -> new Existence $1, operatorToken: LOC(2)(new Literal $2)
 
     o 'Expression +  Expression',               -> new Op '+' , $1, $3
     o 'Expression -  Expression',               -> new Op '-' , $1, $3

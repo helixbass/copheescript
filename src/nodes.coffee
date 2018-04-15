@@ -4697,7 +4697,7 @@ exports.Op = class Op extends Base
     [cachedFirstAssign, first] = @first.cache o
     @withLocationData(
       new If(
-        new Existence cachedFirstAssign, checkOnlyUndefined
+        new Existence cachedFirstAssign, onlyUndefined: checkOnlyUndefined
         first
         type: 'if'
       )
@@ -4712,7 +4712,7 @@ exports.Op = class Op extends Base
     else
       fst = @first
       ref = fst
-    new If(new Existence(fst, checkOnlyUndefined), ref, type: 'if').addElse(@second).compileToFragments o
+    new If(new Existence(fst, onlyUndefined: checkOnlyUndefined), ref, type: 'if').addElse(@second).compileToFragments o
 
   # Compile a unary **Op**.
   compileUnary: (o) ->
@@ -4958,7 +4958,7 @@ exports.Throw = class Throw extends Base
 # similar to `.nil?` in Ruby, and avoids having to consult a JavaScript truth
 # table. Optionally only check if a variable is not `undefined`.
 exports.Existence = class Existence extends Base
-  constructor: (@expression, onlyNotUndefined = no) ->
+  constructor: (@expression, {onlyNotUndefined = no, @operatorToken} = {}) ->
     super()
     @comparisonTarget = if onlyNotUndefined then 'undefined' else 'null'
     salvagedComments = []
@@ -4985,6 +4985,7 @@ exports.Existence = class Existence extends Base
               compareOp
               new Op 'typeof', @expression
               new StringLiteral "'undefined'"
+              .withLocationDataFrom @operatorToken ? @
             )
           return comparisonAgainstUndefined if @comparisonTarget is 'undefined'
 
