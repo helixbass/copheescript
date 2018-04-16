@@ -1,0 +1,26 @@
+valid-typeof
+prefer-const (trivially, since only looks for let)
+no-const-assign (trivially, since we don't generate const)
+no-new-object
+object-shorthand properties
+array-callback-return
+prefer-destructuring
+prefer-template
+no-useless-concat
+no-eval
+no-implied-eval
+no-useless-escape (though prettier strips them from the output)
+func-style (trivially, since we only output function expressions I think)
+no-loop-func
+no-new-func
+no-param-reassign
+
+not sure:
+prefer-spread (works on manual .apply(), wasn't able to trigger it in simple check of generated .apply(), if it does get triggered by generated .apply()'s, could presumably get rid of generated .apply()'s)
+
+not usable:
+prefer-rest-params (we could presumably get rid of our generate uses of arguments to free up this rule)
+
+not usable but not meaningful:
+no-var
+object-shorthand methods (we don't generate method shorthand)

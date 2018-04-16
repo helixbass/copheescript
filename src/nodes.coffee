@@ -143,13 +143,7 @@ exports.Base = class Base
       {comments}
 
   withEmptyBabylonLocationData: (compiled) ->
-    @withBabylonLocationData compiled,
-      locationData:
-        first_line: 0
-        first_column: 0
-        last_line: 0
-        last_column: 0
-        range: [-1, -1]
+    @withBabylonLocationData compiled, emptyLocationData
 
   withBabylonLocationData: (compiled, node) ->
     return (@withBabylonLocationData(item, node) for item in compiled) if isArray compiled
@@ -168,6 +162,9 @@ exports.Base = class Base
   withLocationDataFrom: ({locationData}, {force} = {}) ->
     @forceUpdateLocation = yes if force
     @updateLocationDataIfMissing locationData
+
+  withEmptyLocationData: ->
+    @withLocationDataFrom emptyLocationData
 
   compileClosureToBabylon: (o) ->
     if jumpNode = @jumps()
@@ -1542,7 +1539,7 @@ exports.Value = class Value extends Base
           ref = new IdentifierLiteral o.scope.freeVariable 'ref'
           fst = new Parens new Assign ref, fst
           snd.base = ref
-        return new If new Existence(fst), snd, soak: on
+        return @withLocationData new If new Existence(fst), snd, soak: on
       no
 
   eachName: (iterator) ->
@@ -2674,7 +2671,7 @@ exports.Class = class Class extends Base
   compileClassDeclarationToBabylon: (o) ->
     @prepareConstructor()
     @proxyBoundMethods() if @boundMethods.length
-    id = new IdentifierLiteral @name if @name
+    id = @withLocationData new IdentifierLiteral @name if @name
     if @variable?.comments? and id
       (id.comments ?= []).push @variable.comments...
       @variable.comments.length = 0
@@ -2828,11 +2825,11 @@ exports.Class = class Class extends Base
     method
 
   makeDefaultConstructor: ->
-    ctor = @addInitializerMethod new Assign (new Value new PropertyName 'constructor'), new Code
+    ctor = @addInitializerMethod @withLocationData new Assign (new Value new PropertyName 'constructor'), new Code
     @body.unshift ctor
 
     if @parent
-      ctor.body.push new SuperCall new Super, [new Splat new IdentifierLiteral 'arguments']
+      ctor.body.push @withLocationData new SuperCall new Super, [new Splat new IdentifierLiteral 'arguments']
 
     if @externalCtor
       applyCtor = new Value @externalCtor, [ new Access new PropertyName 'apply' ]
@@ -2847,7 +2844,7 @@ exports.Class = class Class extends Base
       method.classVariable = @variableRef if @parent
 
       name = new Value(new ThisLiteral, [ method.name ])
-      new Assign name, new Call(new Value(name, [new Access new PropertyName 'bind']), [new ThisLiteral])
+      @withLocationData new Assign name, new Call(new Value(name, [new Access new PropertyName 'bind']), [new ThisLiteral])
 
     null
 
@@ -3879,7 +3876,7 @@ exports.Code = class Code extends Base
     {params, exprs, haveSplatParam} = @processParams o
     @body.expressions.unshift exprs...
     if @isMethod and @bound and not @isStatic and @classVariable
-      @body.expressions.unshift utilityBabylon 'boundMethodCheck', merge o, invokedWithArgs: [new Value(new ThisLiteral), @classVariable]
+      @body.expressions.unshift @withLocationData utilityBabylon 'boundMethodCheck', merge o, invokedWithArgs: [new Value(new ThisLiteral), @classVariable]
     @body.makeReturn() unless wasEmpty or @noReturn
 
     if @bound and @isGenerator
@@ -5827,6 +5824,15 @@ utility = (name, o) ->
     root.assign ref, UTILITIES[name] o
     root.utilities[name] = ref
 
+emptyLocationData =
+  locationData:
+    first_line: 0
+    first_column: 0
+    last_line: 0
+    last_column: 0
+    # range: [-1, -1]
+    range: [-2, -2]
+
 utilityBabylon = (name, o) ->
   calledWithArgs  = del o, 'calledWithArgs'
   appliedWithArgs = del o, 'appliedWithArgs'
@@ -5837,9 +5843,9 @@ utilityBabylon = (name, o) ->
       root.utilities[name]
     else
       ref = root.freeVariable name
-      root.assign ref, UTILITIES_BABYLON[name] o
+      root.assign ref, UTILITIES_BABYLON[name](o).withEmptyLocationData()
       root.utilities[name] = ref
-  )
+  )#.withEmptyLocationData()
   return ref unless calledWithArgs or appliedWithArgs or invokedWithArgs
   new Call(
     new Value ref,
@@ -5848,7 +5854,7 @@ utilityBabylon = (name, o) ->
       else
         [new Access new PropertyName if calledWithArgs then 'call' else 'apply']
     calledWithArgs ? appliedWithArgs ? invokedWithArgs
-  )
+  )#.withEmptyLocationData()
 
 multident = (code, tab, includingFirstLine = yes) ->
   endsWithNewLine = code[code.length - 1] is '\n'

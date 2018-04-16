@@ -227,10 +227,12 @@ espreeTokenTypes =
   '}': 'Punctuator'
   '[': 'Punctuator'
   ']': 'Punctuator'
+  '+': 'Punctuator'
 getEspreeTokenType = (type) ->
   espreeTokenTypes[type] ? type
 
 extraTokensForESLint = (ast) ->
+  return []
   extraTokens = []
   traverseBabylonAst ast, (node) ->
     return unless node

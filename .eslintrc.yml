@@ -12,5 +12,18 @@ globals:
   arrayEq: no
   deepEqual: no
   doesNotThrow: no
-# rules:
-#   no-param-reassign: error
+rules:
+  no-new-object: error
+  no-array-constructor: error
+  object-shorthand: [error, properties]
+  array-callback-return: error
+  prefer-destructuring: error
+  prefer-template: error
+  no-useless-concat: error
+  no-eval: error
+  no-implied-eval: error
+  func-style: error
+  no-loop-func: error
+  no-new-func: error
+  no-param-reassign: [error, props: true]
+  prefer-spread: error
