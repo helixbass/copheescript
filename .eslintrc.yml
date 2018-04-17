@@ -27,3 +27,25 @@ rules:
   no-new-func: error
   no-param-reassign: [error, props: true]
   prefer-spread: error
+  no-useless-constructor: error
+  no-duplicate-imports: error
+  import/prefer-default-export: error
+  # import/first: [error, absolute-first]
+  import/no-webpack-loader-syntax: error
+  no-iterator: error
+  no-restricted-syntax: [error, WithStatement]
+  dot-notation: error
+  no-restricted-properties: [error, {object: 'Math', property: 'pow'}]
+  no-multi-assign: error
+  no-plusplus: [error, allowForLoopAfterthoughts: true]
+  eqeqeq: [error, always, null: ignore]
+  no-case-declarations: error
+  no-unneeded-ternary: error
+  no-new-wrappers: error
+  radix: error
+  camelcase: [error, properties: always]
+  new-cap: [error, capIsNew: true]
+  no-underscore-dangle: error
+  no-restricted-globals: [error, location]
+
+  yoda: off

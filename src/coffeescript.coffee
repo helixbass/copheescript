@@ -227,6 +227,8 @@ espreeTokenTypes =
   '}': 'Punctuator'
   '[': 'Punctuator'
   ']': 'Punctuator'
+  'INDEX_START': 'Punctuator'
+  'INDEX_END':   'Punctuator'
   '+': 'Punctuator'
 getEspreeTokenType = (type) ->
   espreeTokenTypes[type] ? type

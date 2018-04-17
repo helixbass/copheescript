@@ -877,7 +877,7 @@ exports.Block = class Block extends Base
   asExpressionStatement: (compiled) ->
     @includeCommentsInLocationData @hoistBabylonComments do ->
       return compiled unless compiled.type
-      return compiled if compiled.type in ['VariableDeclaration', 'ImportDeclaration']
+      return compiled if compiled.type in ['VariableDeclaration', 'ImportDeclaration', 'ClassMethod']
       type: 'ExpressionStatement'
       expression: compiled
       loc: compiled.loc
@@ -1201,6 +1201,7 @@ exports.PassthroughLiteral = class PassthroughLiteral extends Literal
   _compileToBabylon: (o) ->
     return null unless @value.length
     @withEnhancedComments do =>
+      # TODO: location data is incorrect (starts from 0 at beginning of backticked JS)
       try
         parsed = babylon.parse(@value, sourceType: 'module', ranges: yes).program.body
         return parsed if parsed?.length
@@ -2834,7 +2835,7 @@ exports.Class = class Class extends Base
     if @externalCtor
       applyCtor = new Value @externalCtor, [ new Access new PropertyName 'apply' ]
       applyArgs = [ new ThisLiteral, new IdentifierLiteral 'arguments' ]
-      ctor.body.push new Call applyCtor, applyArgs
+      ctor.body.push @externalCtor.withLocationData new Call applyCtor, applyArgs
       ctor.body.makeReturn()
 
     ctor
@@ -2865,7 +2866,7 @@ exports.ExecutableClassBody = class ExecutableClassBody extends Base
     wrapper = @class.withLocationData new Code [], @body
     o.classScope = wrapper.makeScope o.scope
     @name = @class.name ? o.classScope.freeVariable @defaultClassVariableName
-    ident = new IdentifierLiteral @name
+    ident = @class.withLocationData new IdentifierLiteral @name
     directives = @walkBody()
     @setContext()
 
@@ -2877,13 +2878,13 @@ exports.ExecutableClassBody = class ExecutableClassBody extends Base
       @class.parent = parent
 
     if @externalCtor
-      externalCtor = new IdentifierLiteral o.classScope.freeVariable 'ctor', reserve: no
+      externalCtor = @externalCtor.withLocationData new IdentifierLiteral o.classScope.freeVariable 'ctor', reserve: no
       @class.externalCtor = externalCtor
       @externalCtor.variable.base = externalCtor
 
     @body.expressions.unshift(
       if @name isnt @class.name
-        new Assign (new IdentifierLiteral @name), @class
+        @class.withLocationData new Assign (new IdentifierLiteral @name), @class
       else
         @class
     )
@@ -2979,7 +2980,7 @@ exports.ExecutableClassBody = class ExecutableClassBody extends Base
   addProperties: (assigns) ->
     result = for assign in assigns
       variable = assign.variable
-      base     = variable?.base
+      base     = variable.base
       value    = assign.value
       delete assign.context
 
@@ -2988,7 +2989,7 @@ exports.ExecutableClassBody = class ExecutableClassBody extends Base
           base.error 'constructors must be defined at the top level of a class body'
 
         # The class scope is not available yet, so return the assignment to update later
-        assign = @externalCtor = new Assign new Value, value
+        assign = @externalCtor = assign.withLocationData new Assign new Value, value
       else if not assign.variable.this
         name      = new (if base.shouldCache() then Index else Access) base
         prototype = new Access new PropertyName 'prototype'

@@ -14,13 +14,43 @@ func-style (trivially, since we only output function expressions I think)
 no-loop-func
 no-new-func
 no-param-reassign
+no-useless-constructor
+no-dupe-class-members
+no-duplicate-imports
+import/prefer-default-export
+import/no-webpack-loader-syntax
+no-iterator
+no-restricted-syntax (depending on what AST types are disallowed, we may generate them, but looks like airbnb blacklist are not generated)
+dot-notation
+no-restricted-properties (like no-restricted-syntax, depending on what's disallowed we may generate it)
+no-undef
+no-multi-assign
+no-plusplus (only if allowForLoopAfterthoughts is on, since we generate ++/-- in for loops)
+eqeqeq (only if null: ignore or smart (ie not just always), since we generate != null in existence checks)
+no-case-declarations (trivially, as it seems impossible to generate a declaration inside a case)
+no-unneeded-ternary (perhaps confusing naming since in the source it's an if rather than a ternary, but works)
+no-new-wrappers
+radix
+new-cap
+no-underscore-dangle
+no-restricted-globals
 
 not sure:
 prefer-spread (works on manual .apply(), wasn't able to trigger it in simple check of generated .apply(), if it does get triggered by generated .apply()'s, could presumably get rid of generated .apply()'s)
 
 not usable:
 prefer-rest-params (we could presumably get rid of our generate uses of arguments to free up this rule)
+import/no-mutable-export (since you can't control whether an exported member is const)
+import/first (since var declarations get generated before imports - this seems fixable? absolute-first works)
+yoda (we generate for loop conditions that violate - should be fixable)
+no-else-if (we generate if { return } else { return } when making if return - would be nice to support this)
+spaced-comment (expects top-level ast.comments, should be doable to include these just for eslint)
+id-length (eg for loops generate one-character variable names)
 
 not usable but not meaningful:
 no-var
 object-shorthand methods (we don't generate method shorthand)
+prefer-arrow-callback
+arrow-body-style
+one-var
+no-nested-ternary (we generate nested ternaries in expression if/else if constructs, but you can't explicitly write ternaries so never would catch anything useful)
