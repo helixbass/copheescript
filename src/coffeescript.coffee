@@ -230,6 +230,7 @@ espreeTokenTypes =
   'INDEX_START': 'Punctuator'
   'INDEX_END':   'Punctuator'
   '+': 'Punctuator'
+  'REGEX': 'RegularExpression'
 getEspreeTokenType = (type) ->
   espreeTokenTypes[type] ? type
 

@@ -24,7 +24,6 @@ no-restricted-syntax (depending on what AST types are disallowed, we may generat
 dot-notation
 no-restricted-properties (like no-restricted-syntax, depending on what's disallowed we may generate it)
 no-undef
-no-multi-assign
 no-plusplus (only if allowForLoopAfterthoughts is on, since we generate ++/-- in for loops)
 eqeqeq (only if null: ignore or smart (ie not just always), since we generate != null in existence checks)
 no-case-declarations (trivially, as it seems impossible to generate a declaration inside a case)
@@ -34,6 +33,32 @@ radix
 new-cap
 no-underscore-dangle
 no-restricted-globals
+constructor-super (we catch some of these up front, but this works for eg missing super() in derived class constructor)
+no-class-assign (mostly useless (won't catch reassignment of class name at same level) since we always generate an assignment for named classes - not sure why we do that, if we didn't then this rule could presumably catch reassignments? But this can catch eg reassignment of class name inside class method)
+no-new-symbol
+no-restricted-imports
+no-this-before-super (we catch this references before super(), but this catches eg super.foo() called before super())
+no-useless-computed-key
+no-useless-rename
+prefer-numeric-literals
+require-yield (trivially, since we only generate generators based on presence of yield)
+require-await (trivially, since we only generate async based on presence of await)
+sort-imports
+symbol-description
+for-direction (trivially, as we typically generate the for loop direction - seems like it could in theory catch eg a for [10..1] by 2 but guessing it just looks at ++/-- rather than +=?)
+getter-return (works for Object.defineProperty() calls or if you backtick the object/class getter syntaxes)
+no-await-in-loop
+no-compare-neg-zero
+no-cond-assign (except except-parens exception doesn't work, since it looks for double-parens)
+no-console
+no-constant-condition
+no-control-regex (works but doesn't catch eg ///\x1f#{a}/// because compiles into template string - is that a bug in our compilation or does the rule not handle template strings?)
+no-debugger
+no-dupe-args (trivially, as we catch duplicate parameters)
+no-dupe-keys
+no-duplicate-case
+no-empty (with allowEmptyCatch option, since we generate empty catch block when just a try is specified - not sure if we generate empty blocks elsewhere? This rule seems not super valuable as afaik it's not easy to create empty blocks in Coffeescript)
+no-empty-character-class
 
 not sure:
 prefer-spread (works on manual .apply(), wasn't able to trigger it in simple check of generated .apply(), if it does get triggered by generated .apply()'s, could presumably get rid of generated .apply()'s)
@@ -46,6 +71,8 @@ yoda (we generate for loop conditions that violate - should be fixable)
 no-else-if (we generate if { return } else { return } when making if return - would be nice to support this)
 spaced-comment (expects top-level ast.comments, should be doable to include these just for eslint)
 id-length (eg for loops generate one-character variable names)
+no-multi-assign (eg for loops can generate multi-assigns)
+no-self-compare (seems to rely on location data, so generated comparisons with identical location data on each side can trigger this, eg y.z?.a)
 
 not usable but not meaningful:
 no-var

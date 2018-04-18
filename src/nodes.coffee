@@ -151,6 +151,11 @@ exports.Base = class Base
     return compiled unless locationData and compiled and not compiled.start?
     merge compiled, locationDataToBabylon locationData
 
+  withoutBabylonLocationData: (compiled) ->
+    return compiled unless compiled?.start?
+    compiled.start = compiled.end = compiled.loc = compiled.range = null
+    compiled
+
   withCopiedBabylonLocationData: (compiled, other) ->
     compiled[field] = other[field] for field in babylonLocationFields
     compiled
@@ -1262,6 +1267,10 @@ exports.StatementLiteral = class StatementLiteral extends Literal
       when 'break'
         type: 'BreakStatement'
         label: null
+      # TODO: no tests broke without this, include test with debugger statement?
+      when 'debugger'
+        type: 'DebuggerStatement'
+      # TODO: any others? throw error in else if we fall off the end of this switch?
 
   compileNode: (o) ->
     [@makeCode "#{@tab}#{@value};"]
@@ -1873,7 +1882,10 @@ exports.Super = class Super extends Base
       # that they’re there for the later compilation.
       salvagedComments = @accessor.name.comments
       delete @accessor.name.comments
-    compiled = new Value(new SuperLiteral, if @accessor then [@accessor] else []).compileToBabylon o
+    compiled =
+      new Value new SuperLiteral, if @accessor then [@accessor] else []
+      .withLocationDataFrom @
+      .compileToBabylon o
     attachCommentsToNode salvagedComments, @accessor.name if salvagedComments
     compiled
 
@@ -4884,12 +4896,12 @@ exports.Try = class Try extends Base
 
   _compileToBabylon: (o) ->
     if @recovery or not @ensure
-      placeholder = new IdentifierLiteral o.scope.freeVariable 'error', reserve: no
-      @recovery.unshift new Assign @errorVariable, placeholder if @errorVariable
+      placeholder = (@recovery or @).withLocationData new IdentifierLiteral o.scope.freeVariable 'error', reserve: no
+      @recovery.unshift @recovery.withLocationData new Assign @errorVariable, placeholder if @errorVariable
 
     type: 'TryStatement'
     block: @attempt.compileToBabylon o, LEVEL_TOP
-    handler: {
+    handler: (@recovery or @).withBabylonLocationData {
       type: 'CatchClause'
       param: placeholder.compileToBabylon o
       body: (@recovery or @withLocationData new Block).compileToBabylon o, LEVEL_TOP
@@ -5368,7 +5380,7 @@ exports.For = class For extends While
       type: 'ForStatement'
       ...(
         if @range
-          @source.base.compileToBabylon merge o, {indexVar, keyVar, @step, shouldCache: shouldCacheOrIsAssignable}
+          @withoutBabylonLocationData @source.base.compileToBabylon merge o, {indexVar, keyVar, @step, shouldCache: shouldCacheOrIsAssignable}
         else
           @compileForPartsToBabylon {o, keyVar, indexVar, sourceVar, stepVar}
       )

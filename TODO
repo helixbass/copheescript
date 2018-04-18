@@ -2,3 +2,5 @@
 - why does y = (x for x in [0..a]) generate ref?
 - does x for [0..3] by y double-declare ref?
   - same for 0 for [1..2] double-declaring i
+
+- should localize generation of comment inside catch block?

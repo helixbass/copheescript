@@ -36,7 +36,6 @@ rules:
   no-restricted-syntax: [error, WithStatement]
   dot-notation: error
   no-restricted-properties: [error, {object: 'Math', property: 'pow'}]
-  no-multi-assign: error
   no-plusplus: [error, allowForLoopAfterthoughts: true]
   eqeqeq: [error, always, null: ignore]
   no-case-declarations: error
@@ -47,5 +46,17 @@ rules:
   new-cap: [error, capIsNew: true]
   no-underscore-dangle: error
   no-restricted-globals: [error, location]
+  constructor-super: error
+  no-restricted-imports: [error, patterns: [lodash*]]
+  no-useless-rename: error
+  prefer-numeric-literals: error
+  sort-imports: error
+  for-direction: error
+  getter-return: error
+  no-await-in-loop: error
+  no-console: error
+  no-constant-condition: [error, checkLoops: true]
+  no-empty: [error, allowEmptyCatch: true]
+  no-empty-character-class: error
 
   yoda: off
