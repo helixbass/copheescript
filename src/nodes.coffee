@@ -4676,7 +4676,7 @@ exports.Op = class Op extends Base
   compileBinaryToBabylon: (o) -> {
     type:
       switch @operator
-        when '||' or '&&' then 'LogicalExpression'
+        when '||', '&&' then 'LogicalExpression'
         else 'BinaryExpression'
     left: @first.compileToBabylon o, LEVEL_OP
     @operator

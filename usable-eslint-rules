@@ -85,7 +85,35 @@ no-alert
 no-caller
 no-div-regex
 no-empty-function (however, it doesn't seem currently easy/possible to place a comment inside an empty function body, so not very useful)
-no-empty-pattern
+no-empty-pattern (though doesn't catch [] = foo, since we compile that to just foo)
+no-extend-native
+no-extra-bind
+no-extra-label (trivially, as I think it's impossible to generate a labeled statement (or label) in Coffeescript)
+no-fallthrough (trivially, this is built into Coffeescript since it generates case break/return for us)
+no-global-assign (not sure I understand this rule, but I think the fact that we always generate declarations for assigned variables means that it can't be violated)
+no-implicit-coercion (though may depend on options if we generate unary + (not sure)?)
+no-implicit-globals (trivially, I think - seems like it'd depend on whether compiled with bare and whether it should be sourceType: 'module')
+no-invalid-this (but you can't generate eg function Foo(), Foo = -> @ will fail)
+no-labels (trivially, since you can't create labels in Coffeescript)
+no-lone-blocks (trivially, since afaik you can't create "standalone" blocks in Coffeescript)
+no-multi-str (trivially, doesn't seem to be able to trigger on multiline regular or heredoc strings)
+no-new
+no-octal (trivially, since we throw an error on unprefixed octal literal)
+no-octal-escape (trivially, since we throw an error on octal escape sequence)
+no-proto
+no-redeclare (trivially, since you can't generate multiple var declarations of the same variable. builtinGlobals doesn't seem to work eg top-level Object = 1, probably has to do with bare compilation?)
+no-return-assign (except-parens doesn't always work, since the closing paren can get stomped on by the OUTDENT that's assigned the same location data)
+no-script-url
+no-self-assign (looks like as opposed to no-self-compare, this uses AST comparison rather than token comparison)
+no-throw-literal
+no-unmodified-loop-condition
+no-unused-expressions
+no-unused-labels (trivially, since you can't create labels in Coffeescript)
+no-useless-call (I don't think we generate any "useless" .call()/.apply()'s?)
+no-useless-return (looks like this can't trigger, as we don't generate "useless" returns)
+no-with (trivially, as Coffeescript doesn't support with statements)
+prefer-promise-reject-errors
+vars-on-top (not sure in what cases we put things before var declarations in a block?)
 
 not sure:
 prefer-spread (works on manual .apply(), wasn't able to trigger it in simple check of generated .apply(), if it does get triggered by generated .apply()'s, could presumably get rid of generated .apply()'s)
@@ -102,6 +130,10 @@ no-multi-assign (eg for loops can generate multi-assigns)
 no-self-compare (seems to rely on location data, so generated comparisons with identical location data on each side can trigger this, eg y.z?.a)
 prefer-destructuring (we generate eg indexOf = [].indexOf - this seems like we could change to allow this useful rule)
 no-sequences (we generate sequences)
+no-eq-null (we generate != null as part of existence checks)
+no-magic-numbers (seems like the assignment of the magic number to a var is always flagged since it's not part of the variable declaration)
+no-return-await (we generate return await when await is the last statement in a function, should we not?)
+no-warning-comments (like spaced-comment, expects top-level ast.comments)
 
 not usable but not meaningful:
 no-var
@@ -110,3 +142,5 @@ prefer-arrow-callback
 arrow-body-style
 one-var
 no-nested-ternary (we generate nested ternaries in expression if/else if constructs, but you can't explicitly write ternaries so never would catch anything useful)
+no-void (we generate void 0 for undefined, but you can't explicitly write void)
+strict (I think we test that our generated JS follows strict mode semantics? how does it relate to sourceType: 'module'?)
