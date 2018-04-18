@@ -1209,7 +1209,9 @@ exports.PassthroughLiteral = class PassthroughLiteral extends Literal
       # TODO: location data is incorrect (starts from 0 at beginning of backticked JS)
       try
         parsed = babylon.parse(@value, sourceType: 'module', ranges: yes).program.body
-        return parsed if parsed?.length
+        if parsed?.length
+          return parsed[0].expression if parsed.length is 1 and parsed[0].type is 'ExpressionStatement'
+          return parsed
       catch
       try
         return babylon.parseExpression @value, ranges: yes
@@ -4855,7 +4857,7 @@ exports.In = class In extends Base
   compileLoopTestToBabylon: (o) ->
     [cachedObjVarAssign, objVar] = @object.cache o, onlyIfCached: yes
 
-    indexOfCheck = new Op (if @negated then '<' else '>='),
+    indexOfCheck = @withLocationData new Op (if @negated then '<' else '>='),
       utilityBabylon 'indexOf', merge o, calledWithArgs: [@array, objVar]
       new NumberLiteral '0'
 

@@ -4,7 +4,6 @@ no-const-assign (trivially, since we don't generate const)
 no-new-object
 object-shorthand properties
 array-callback-return
-prefer-destructuring
 prefer-template
 no-useless-concat
 no-eval
@@ -59,6 +58,22 @@ no-dupe-keys
 no-duplicate-case
 no-empty (with allowEmptyCatch option, since we generate empty catch block when just a try is specified - not sure if we generate empty blocks elsewhere? This rule seems not super valuable as afaik it's not easy to create empty blocks in Coffeescript)
 no-empty-character-class
+no-ex-assign (trivially, as we seem to always generate an error variable and then assign it to the specified var - so can't use this rule to achieve what it's meant to achieve)
+no-extra-boolean-cast
+no-func-assign (trivially, since I don't think we ever generate named functions)
+no-inner-declarations (trivially, since again don't think we generate named functions, and we always declare vars at top-level)
+no-invalid-regexp
+no-irregular-whitespace (can catch inside eg templates depending on which options are enabled)
+no-obj-calls
+no-prototype-builtins
+no-regex-spaces
+no-sparse-arrays
+no-template-curly-in-string (though not super helpful, as Coffeescript has a different interpolation syntax)
+no-unreachable
+no-unsafe-finally
+no-unsafe-negation
+use-isnan (trivially, since you can't generate a literal NaN)
+valid-jsdoc (doesn't break, but doesn't seem to pick up JSDoc comments so doesn't do anything)
 
 not sure:
 prefer-spread (works on manual .apply(), wasn't able to trigger it in simple check of generated .apply(), if it does get triggered by generated .apply()'s, could presumably get rid of generated .apply()'s)
@@ -73,6 +88,8 @@ spaced-comment (expects top-level ast.comments, should be doable to include thes
 id-length (eg for loops generate one-character variable names)
 no-multi-assign (eg for loops can generate multi-assigns)
 no-self-compare (seems to rely on location data, so generated comparisons with identical location data on each side can trigger this, eg y.z?.a)
+prefer-destructuring (we generate eg indexOf = [].indexOf - this seems like we could change to allow this useful rule)
+no-sequences (we generate sequences)
 
 not usable but not meaningful:
 no-var
