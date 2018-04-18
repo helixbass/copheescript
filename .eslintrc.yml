@@ -63,5 +63,14 @@ rules:
   one-var: off
   no-sequences: off
   valid-jsdoc: error
+  accessor-pairs: error
+  block-scoped-var: error
+  class-methods-use-this: error
+  consistent-return: error
+  default-case: error
+  guard-for-in: error
+  no-alert: error
+  no-caller: error
+  no-div-regex: error
 
   yoda: off

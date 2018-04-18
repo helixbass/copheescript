@@ -74,6 +74,18 @@ no-unsafe-finally
 no-unsafe-negation
 use-isnan (trivially, since you can't generate a literal NaN)
 valid-jsdoc (doesn't break, but doesn't seem to pick up JSDoc comments so doesn't do anything)
+accessor-pairs (works for Object.defineProperty() calls, and for backticked objects with accessors)
+block-scoped-var (trivially, since we always hoist var declarations)
+class-methods-use-this
+complexity
+consistent-return
+default-case (but there doesn't seem to be an easy way to generate an empty default case, nor does the // do nothing comment currently get correctly positioned to get picked up)
+guard-for-in
+no-alert
+no-caller
+no-div-regex
+no-empty-function (however, it doesn't seem currently easy/possible to place a comment inside an empty function body, so not very useful)
+no-empty-pattern
 
 not sure:
 prefer-spread (works on manual .apply(), wasn't able to trigger it in simple check of generated .apply(), if it does get triggered by generated .apply()'s, could presumably get rid of generated .apply()'s)
@@ -83,7 +95,7 @@ prefer-rest-params (we could presumably get rid of our generate uses of argument
 import/no-mutable-export (since you can't control whether an exported member is const)
 import/first (since var declarations get generated before imports - this seems fixable? absolute-first works)
 yoda (we generate for loop conditions that violate - should be fixable)
-no-else-if (we generate if { return } else { return } when making if return - would be nice to support this)
+no-else-return (we generate if { return } else { return } when making if return - would be nice to support this)
 spaced-comment (expects top-level ast.comments, should be doable to include these just for eslint)
 id-length (eg for loops generate one-character variable names)
 no-multi-assign (eg for loops can generate multi-assigns)

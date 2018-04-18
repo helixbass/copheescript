@@ -2389,7 +2389,7 @@ exports.Obj = class Obj extends Base
     return unless @lhs
 
     for prop in @properties
-      if prop instanceof Assign
+      if prop instanceof Assign and prop.context is 'object'
         {value} = prop
         unwrappedVal = value.unwrapAll()
         if unwrappedVal instanceof Arr or unwrappedVal instanceof Obj
@@ -5268,13 +5268,13 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
 exports.For = class For extends While
   constructor: (body, source) ->
     super()
-    {@source, @guard, @step, @name, @index, @accumulateIndex} = source
+    {@source, @guard, @step, @name, @index, @accumulateIndex, @ownTag} = source
     @body    = Block.wrap [body]
     @own     = source.own?
     @object  = source.object?
     @from    = source.from?
     @index.error 'cannot use index with for-from' if @from and @index
-    source.ownTag.error "cannot use own with for-#{if @from then 'from' else 'in'}" if @own and not @object
+    @ownTag.error "cannot use own with for-#{if @from then 'from' else 'in'}" if @own and not @object
     [@name, @index] = [@index, @name] if @object
     @index.error 'index cannot be a pattern matching expression' if @index?.isArray?() or @index?.isObject?()
     @range   = @source instanceof Value and @source.base instanceof Range and not @source.properties.length and not @from
@@ -5307,7 +5307,7 @@ exports.For = class For extends While
 
   compileObjectToBabylon: ({o, sourceVar, keyVar, resultsVar, cachedSourceVarAssign}) ->
     if @own
-      @body.expressions.unshift new If(
+      @body.expressions.unshift @ownTag.withLocationData new If(
         new Op '!',
           utilityBabylon 'hasProp', merge o, calledWithArgs: [sourceVar, keyVar]
         new StatementLiteral 'continue'
@@ -5708,7 +5708,8 @@ exports.If = class If extends Base
     this
 
   ensureBlock: (node) ->
-    if node instanceof Block then node else new Block [node]
+    @withLocationData(
+      if node instanceof Block then node else @withLocationData new Block [node])
 
   # Compile the `If` as a regular *if-else* statement. Flattened chains
   # force inner *else* bodies into statement form.
