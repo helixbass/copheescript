@@ -134,6 +134,17 @@ no-bitwise
 no-lonely-if (trivially, since now generate else if when else clause is just an if statement)
 operator-assignment (but can't use never setting, since we generate += in for with step)
 sort-keys (I don't think we generate objects/object properties?)
+callback-return
+global-require
+handle-callback-err
+no-buffer-constructor
+no-mixed-requires (trivially, since we don't typically generate initialized declarations)
+no-new-require
+no-path-concat
+no-process-env
+no-process-exit
+no-restricted-modules
+no-sync
 
 need visibility of top-level ast.comments (should be doable to "hoist" comments just for eslint):
 spaced-comment

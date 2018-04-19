@@ -1530,10 +1530,11 @@ exports.Value = class Value extends Base
         if prop instanceof Slice
           prop.compileValueToBabylon o, ret
         else
-          type: 'MemberExpression'
-          object: ret
-          property: prop.compileToBabylon o
-          computed: prop instanceof Index or prop.name?.unwrap() not instanceof PropertyName
+          prop.withBabylonLocationData # TODO: should include location up through this prop
+            type: 'MemberExpression'
+            object: ret
+            property: prop.compileToBabylon o
+            computed: prop instanceof Index or prop.name?.unwrap() not instanceof PropertyName
     ret
 
   # Unfold a soak into an `If`: `a?.b` -> `a.b if a?`
