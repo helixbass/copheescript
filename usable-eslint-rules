@@ -102,7 +102,7 @@ no-octal (trivially, since we throw an error on unprefixed octal literal)
 no-octal-escape (trivially, since we throw an error on octal escape sequence)
 no-proto
 no-redeclare (trivially, since you can't generate multiple var declarations of the same variable. builtinGlobals doesn't seem to work eg top-level Object = 1, probably has to do with bare compilation?)
-no-return-assign (except-parens doesn't always work, since the closing paren can get stomped on by the OUTDENT that's assigned the same location data)
+no-return-assign (except-parens doesn't always work, since the closing paren can get stomped on by the OUTDENT that's assigned the same location data. also, this doesn't distinguish implicit from explicit returns)
 no-script-url
 no-self-assign (looks like as opposed to no-self-compare, this uses AST comparison rather than token comparison)
 no-throw-literal
@@ -114,17 +114,42 @@ no-useless-return (looks like this can't trigger, as we don't generate "useless"
 no-with (trivially, as Coffeescript doesn't support with statements)
 prefer-promise-reject-errors
 vars-on-top (not sure in what cases we put things before var declarations in a block?)
+no-delete-var (mostly trivially, as we throw an error when deleting an existing var, but this can catch delete of var that's not yet been seen)
+no-label-var (trivially, since you can't create labels)
+no-shadow-restricted-names (trivially, since we flag attempts to assign to any of the restricted names)
+no-undef-init (trivially, since we don't generated initialized var declarations)
+no-undefined (trivially, since we generate void 0 for undefined and don't allow assigning to undefined)
+no-unused-vars
+no-catch-shadow (trivially, we always generate a free error variable, so would never trigger)
+camelcase
+consistent-this
+func-name-matching (looks like this trivially works since it only looks for named functions (which we never generate), but it's conceptually irrelevant for Coffeescript since you can't "name" a function)
+id-blacklist
+max-depth
+max-lines (though seems like it's off by one)
+max-nested-callbacks
+max-params
+no-array-constructor
+no-bitwise
+no-lonely-if (trivially, since now generate else if when else clause is just an if statement)
+operator-assignment (but can't use never setting, since we generate += in for with step)
+sort-keys (I don't think we generate objects/object properties?)
 
-not sure:
-prefer-spread (works on manual .apply(), wasn't able to trigger it in simple check of generated .apply(), if it does get triggered by generated .apply()'s, could presumably get rid of generated .apply()'s)
+need visibility of top-level ast.comments (should be doable to "hoist" comments just for eslint):
+spaced-comment
+no-warning-comments
+capitalized-comments
+line-comment-position
+multiline-comment-style
+no-inline-comments
+require-jsdoc
 
-not usable:
+not usable (could get triggered by generated code):
 prefer-rest-params (we could presumably get rid of our generate uses of arguments to free up this rule)
 import/no-mutable-export (since you can't control whether an exported member is const)
 import/first (since var declarations get generated before imports - this seems fixable? absolute-first works)
 yoda (we generate for loop conditions that violate - should be fixable)
 no-else-return (we generate if { return } else { return } when making if return - would be nice to support this)
-spaced-comment (expects top-level ast.comments, should be doable to include these just for eslint)
 id-length (eg for loops generate one-character variable names)
 no-multi-assign (eg for loops can generate multi-assigns)
 no-self-compare (seems to rely on location data, so generated comparisons with identical location data on each side can trigger this, eg y.z?.a)
@@ -133,7 +158,18 @@ no-sequences (we generate sequences)
 no-eq-null (we generate != null as part of existence checks)
 no-magic-numbers (seems like the assignment of the magic number to a var is always flagged since it's not part of the variable declaration)
 no-return-await (we generate return await when await is the last statement in a function, should we not?)
-no-warning-comments (like spaced-comment, expects top-level ast.comments)
+no-use-before-define (this gets confused by location data of generated constructs)
+id-match (we generate vars that may not match the specified name pattern)
+lines-between-class-members (we generate constructors with fake location data)
+no-shadow (do (x) -> construct gets flagged, as does what we generate for classes eg A = class A)
+max-statements (generated var declarations get counted)
+max-statements-per-line
+no-continue (we generate continue statements as part of for when guard)
+no-negated-condition (unless generates a negated condition)
+padding-line-between-statements (we generate statements with fake location data)
+
+not sure if it could get triggered by generated code:
+prefer-spread (works on manual .apply(), wasn't able to trigger it in simple check of generated .apply(), if it does get triggered by generated .apply()'s, could presumably get rid of generated .apply()'s)
 
 not usable but not meaningful:
 no-var
@@ -144,3 +180,8 @@ one-var
 no-nested-ternary (we generate nested ternaries in expression if/else if constructs, but you can't explicitly write ternaries so never would catch anything useful)
 no-void (we generate void 0 for undefined, but you can't explicitly write void)
 strict (I think we test that our generated JS follows strict mode semantics? how does it relate to sourceType: 'module'?)
+init-declarations (we generate all declarations, typically unininitialized)
+func-names (we never generate named functions)
+linebreak-style (I think? not sure how prettier generates linebreaks/why this isn't in eslint-config-prettier)
+no-ternary (we generate ternary for if expressions)
+sort-vars (we generated alphabetized var declarations but put initialized last)

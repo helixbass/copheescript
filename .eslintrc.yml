@@ -88,5 +88,14 @@ rules:
   no-useless-return: error
   prefer-promise-reject-errors: error
   vars-on-top: error
+  no-shadow: error
+  consistent-this: [error, that]
+  max-nested-callbacks: [error, 3]
+  max-params: [error, 3]
+  no-bitwise: error
+  no-lonely-if: error
+  no-negated-condition: error
+  operator-assignment: error
 
+  no-use-before-define: off
   yoda: off
