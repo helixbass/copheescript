@@ -8,9 +8,7 @@ prefer-template
 no-useless-concat
 no-eval
 no-implied-eval
-no-useless-escape (though prettier strips them from the output)
 func-style (trivially, since we only output function expressions I think)
-no-loop-func
 no-new-func
 no-param-reassign
 no-useless-constructor
@@ -23,7 +21,7 @@ no-restricted-syntax (depending on what AST types are disallowed, we may generat
 dot-notation
 no-restricted-properties (like no-restricted-syntax, depending on what's disallowed we may generate it)
 no-undef
-no-plusplus (only if allowForLoopAfterthoughts is on, since we generate ++/-- in for loops)
+no-plusplus (only if allowForLoopAfterthoughts is on, since we generate ++/-- in for loops - actually this can still fail, as the rule only checks if the immediate parent is a for, and we generate assignments to ++, I'd consider this a bug in the rule)
 eqeqeq (only if null: ignore or smart (ie not just always), since we generate != null in existence checks)
 no-case-declarations (trivially, as it seems impossible to generate a declaration inside a case)
 no-unneeded-ternary (perhaps confusing naming since in the source it's an if rather than a ternary, but works)
@@ -50,7 +48,7 @@ no-await-in-loop
 no-compare-neg-zero
 no-cond-assign (except except-parens exception doesn't work, since it looks for double-parens)
 no-console
-no-constant-condition
+no-constant-condition (but only with checkLoops: false, since loop generates a constant condition)
 no-control-regex (works but doesn't catch eg ///\x1f#{a}/// because compiles into template string - is that a bug in our compilation or does the rule not handle template strings?)
 no-debugger
 no-dupe-args (trivially, as we catch duplicate parameters)
@@ -78,7 +76,6 @@ accessor-pairs (works for Object.defineProperty() calls, and for backticked obje
 block-scoped-var (trivially, since we always hoist var declarations)
 class-methods-use-this
 complexity
-consistent-return
 default-case (but there doesn't seem to be an easy way to generate an empty default case, nor does the // do nothing comment currently get correctly positioned to get picked up)
 guard-for-in
 no-alert
@@ -91,7 +88,6 @@ no-extra-bind
 no-extra-label (trivially, as I think it's impossible to generate a labeled statement (or label) in Coffeescript)
 no-fallthrough (trivially, this is built into Coffeescript since it generates case break/return for us)
 no-global-assign (not sure I understand this rule, but I think the fact that we always generate declarations for assigned variables means that it can't be violated)
-no-implicit-coercion (though may depend on options if we generate unary + (not sure)?)
 no-implicit-globals (trivially, I think - seems like it'd depend on whether compiled with bare and whether it should be sourceType: 'module')
 no-invalid-this (but you can't generate eg function Foo(), Foo = -> @ will fail)
 no-labels (trivially, since you can't create labels in Coffeescript)
@@ -101,12 +97,9 @@ no-new
 no-octal (trivially, since we throw an error on unprefixed octal literal)
 no-octal-escape (trivially, since we throw an error on octal escape sequence)
 no-proto
-no-redeclare (trivially, since you can't generate multiple var declarations of the same variable. builtinGlobals doesn't seem to work eg top-level Object = 1, probably has to do with bare compilation?)
-no-return-assign (except-parens doesn't always work, since the closing paren can get stomped on by the OUTDENT that's assigned the same location data. also, this doesn't distinguish implicit from explicit returns)
 no-script-url
 no-self-assign (looks like as opposed to no-self-compare, this uses AST comparison rather than token comparison)
 no-throw-literal
-no-unmodified-loop-condition
 no-unused-expressions
 no-unused-labels (trivially, since you can't create labels in Coffeescript)
 no-useless-call (I don't think we generate any "useless" .call()/.apply()'s?)
@@ -178,6 +171,12 @@ max-statements-per-line
 no-continue (we generate continue statements as part of for when guard)
 no-negated-condition (unless generates a negated condition)
 padding-line-between-statements (we generate statements with fake location data)
+no-return-assign (except-parens doesn't always work, since the closing paren can get stomped on by the OUTDENT that's assigned the same location data. also, this doesn't distinguish implicit from explicit returns. also, we generate assignments that could get included in implicit/explicit return, eg a[b] ? c)
+no-unmodified-loop-condition (can get triggered by generated for-loop condition's location data - if there was an option to disable this rule for for-loops, would be safe/usable since we always generate correct modification of for-loop variables?)
+consistent-return (eg a function ending with an if statement and no else generates an explicit return value inside the if and no corresponding return outside the if)
+no-implicit-coercion (we can generate !! in "bare" switch with negated case (seems like this should be optimized away?))
+no-loop-func (we generate a nested closure function when you have nested for loops as an expression)
+no-useless-escape (though prettier strips them from the output - we seem to generate "useless" escapes in regexes)
 
 not sure if it could get triggered by generated code:
 prefer-spread (works on manual .apply(), wasn't able to trigger it in simple check of generated .apply(), if it does get triggered by generated .apply()'s, could presumably get rid of generated .apply()'s)
@@ -196,3 +195,4 @@ func-names (we never generate named functions)
 linebreak-style (I think? not sure how prettier generates linebreaks/why this isn't in eslint-config-prettier)
 no-ternary (we generate ternary for if expressions)
 sort-vars (we generated alphabetized var declarations but put initialized last)
+no-redeclare (eg export class A seems to trigger. builtinGlobals doesn't seem to work eg top-level Object = 1, probably has to do with bare compilation?)

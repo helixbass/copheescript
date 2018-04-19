@@ -404,7 +404,7 @@ exports.Base = class Base
         return true if children.replaceInContext match, replacement
 
   invert: ->
-    new Op '!', this
+    @withLocationData new Op '!', this
 
   unwrapAll: ->
     node = this
@@ -2674,7 +2674,7 @@ exports.Class = class Class extends Base
       @variable ?= new IdentifierLiteral o.scope.freeVariable '_class'
       [@variable, @variableRef] = @variable.cache o unless @variableRef?
 
-    if @variable
+    if @variable and (executableBody or @name isnt @variable.unwrap?().value or o.level is LEVEL_TOP)
       node = new Assign @variable, node, { @moduleDeclaration }
 
     @_compileToBabylon = @compileClassDeclarationToBabylon
@@ -3505,7 +3505,7 @@ exports.Assign = class Assign extends Base
       processObjects objects
 
     assigns.push value unless o.level is LEVEL_TOP# or @subpattern
-    (new Sequence assigns).compileToBabylon o, LEVEL_LIST
+    @withLocationData(new Block assigns).compileToBabylon o
 
   # Brief implementation of recursive pattern matching, when assigning array or
   # object literals to a value. Peeks at their properties to assign inner names.
@@ -4562,7 +4562,7 @@ exports.Op = class Op extends Base
   isChainable: ->
     @operator in ['<', '>', '>=', '<=', '===', '!==']
 
-  invert: ->
+  invert: -> @withLocationData do =>
     if @isChainable() and @first.isChainable()
       allInvertable = yes
       curr = this
@@ -4899,7 +4899,7 @@ exports.Try = class Try extends Base
 
   _compileToBabylon: (o) ->
     if @recovery or not @ensure
-      placeholder = (@recovery or @).withLocationData new IdentifierLiteral o.scope.freeVariable 'error', reserve: no
+      placeholder = new IdentifierLiteral(o.scope.freeVariable 'error', reserve: no).withEmptyLocationData()
       @recovery.unshift @recovery.withLocationData new Assign @errorVariable, placeholder if @errorVariable
 
     type: 'TryStatement'

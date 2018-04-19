@@ -12,8 +12,8 @@
 {Rewriter, INVERSES} = require './rewriter'
 
 # Import the helpers we need.
-{count, starts, compact, repeat, invertLiterate, merge, dump
-attachCommentsToNode, locationDataToString, throwSyntaxError, getNumberValue} = require './helpers'
+{count, repeat, invertLiterate, merge, dump
+attachCommentsToNode, throwSyntaxError, getNumberValue} = require './helpers'
 
 # The Lexer Class
 # ---------------
@@ -551,8 +551,7 @@ exports.Lexer = class Lexer
   # Matches and consumes non-meaningful whitespace. Tag the previous token
   # as being “spaced”, because there are some cases where it makes a difference.
   whitespaceToken: ->
-    return 0 unless (match = WHITESPACE.exec @chunk) or
-                    (nline = @chunk.charAt(0) is '\n')
+    return 0 unless (match = WHITESPACE.exec @chunk) or @chunk.charAt(0) is '\n'
     prev = @prev()
     prev[if match then 'spaced' else 'newLine'] = true if prev
     if match then match[0].length else 0
@@ -590,7 +589,7 @@ exports.Lexer = class Lexer
         prev.spaced or
         prev[0] not in COMPARABLE_LEFT_SIDE
       )
-      [input, id, colon] = match
+      [input, id] = match
       origin = @token 'CSX_TAG', id, 1, id.length
       @token 'CALL_START', '('
       @token '[', '['
@@ -799,7 +798,7 @@ exports.Lexer = class Lexer
       [line, column, offset] = @getLineAndColumnFromChunk offsetInChunk + interpolationOffset
       rest = str[interpolationOffset..]
       {tokens: nested, index} =
-        new Lexer().tokenize rest, line: line, column: column, offset: offset, untilBalanced: on
+        new Lexer().tokenize rest, {line, column, offset, untilBalanced: on}
       # Account for the `#` in `#{`
       index += interpolationOffset
 
@@ -1139,7 +1138,6 @@ isForFrom = (prev) ->
     # `for i from from`, `for from from iterable`
     if prev[1] is 'from'
       prev[1][0] = 'IDENTIFIER'
-      yes
     # `for i from iterable`
     yes
   # `for from…`
@@ -1377,9 +1375,6 @@ MATH = ['*', '/', '%', '//', '%%']
 
 # Relational tokens that are negatable with `not` prefix.
 RELATION = ['IN', 'OF', 'INSTANCEOF']
-
-# Boolean tokens.
-BOOL = ['TRUE', 'FALSE']
 
 # Tokens which could legitimately be invoked or indexed. An opening
 # parentheses or bracket following these tokens will be recorded as the start
