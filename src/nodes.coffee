@@ -111,6 +111,51 @@ exports.Base = class Base
     @compileCommentFragments o, node, fragments
     fragments
 
+  withAstType: (ast) -> {
+    type: do =>
+      return @constructor.name unless @astType
+      @astType?() ? @astType
+    ...ast
+  }
+
+  toAst: (o, level) ->
+    return @compileToBabylon o, level if o.compilingBabylon
+    o = extend {}, o
+    o.level = level if level
+    @withBabylonLocationData @withAstType @_toAst o
+
+  astProps: []
+  getAstProps: ->
+    return @astProps() if isFunction @astProps
+    obj = {}
+    for prop in @astProps
+      obj[prop] = @[prop]
+    obj
+
+  getAstChildren: (o) ->
+    obj = {}
+    addProp = ({prop, key = prop, level}) =>
+      val = @[prop]
+      obj[key] =
+        if isArray val
+          item.toAst o, level for item in val
+        else
+          val.toAst o, level
+
+    children = @astChildren ? @children
+    if isArray children
+      addProp {prop} for prop in children
+    else
+      for prop, key of children
+        {key, level} = key if isPlainObject key
+        addProp {prop, key, level}
+    obj
+
+  _toAst: (o) -> {
+    ...@getAstChildren(o)
+    ...@getAstProps()
+  }
+
   compileToBabylon: (o, level) ->
     o = extend {}, o
     o.level = level if level
@@ -119,6 +164,11 @@ exports.Base = class Base
     @withBabylonComments o, do =>
       return node.compileClosureToBabylon o unless o.level is LEVEL_TOP or not node.isStatement o
       @withBabylonLocationData node._compileToBabylon o
+
+  _compileToBabylon: (o) ->
+    @precompile? o
+
+    @withAstType @_toAst merge o, compilingBabylon: yes
 
   withBabylonComments: (o, compiled, {comments = @comments} = {}) ->
     return compiled unless comments
@@ -371,40 +421,6 @@ exports.Base = class Base
     tree += '?' if @soak
     @eachChild (node) -> tree += node.toString idt + TAB
     tree
-
-  withAstType: (ast) -> {
-    type: do =>
-      return @constructor.name unless @astType
-      @astType?() ? @astType
-    ...ast
-  }
-
-  toAst: ->
-    @withBabylonLocationData @withAstType @_toAst()
-
-  astProps: []
-  getAstProps: ->
-    return @astProps() if isFunction @astProps
-    obj = {}
-    for prop in @astProps
-      obj[prop] = @[prop]
-    obj
-
-  getAstChildren: ->
-    obj = {}
-    for prop in @astChildren ? @children
-      val = @[prop]
-      obj[prop] =
-        if isArray val
-          item.toAst() for item in val
-        else
-          val.toAst()
-    obj
-
-  _toAst: -> {
-    ...@getAstChildren()
-    ...@getAstProps()
-  }
 
   # Passes each child to a function, breaking when the function returns `false`.
   eachChild: (func) ->
@@ -1152,6 +1168,8 @@ exports.Literal = class Literal extends Base
   _compileToBabylon: (o) ->
     return null unless @value
 
+  astProps: ['value']
+
   compileNode: (o) ->
     [@makeCode @value]
 
@@ -1160,15 +1178,16 @@ exports.Literal = class Literal extends Base
     " #{if @isStatement() then super() else @constructor.name}: #{@value}"
 
 exports.NumberLiteral = class NumberLiteral extends Literal
-  _compileToBabylon: (o) ->
+  astType: 'NumericLiteral'
+  astProps: ->
     # TODO: unify the type of @value in the constructor (could be string or number)?
     numberValue = getNumberValue @value
 
-    type: 'NumericLiteral'
     value: numberValue
     extra:
       rawValue: numberValue
       raw: "#{@value}"
+  _compileToBabylon: Base::_compileToBabylon
 
 exports.InfinityLiteral = class InfinityLiteral extends NumberLiteral
   compileNode: ->
@@ -1199,12 +1218,14 @@ exports.StringLiteral = class StringLiteral extends Literal
     extra:
       raw: unquoted
 
-  _compileToBabylon: (o) ->
-    return @compileCSXTextToBabylon o if @csx
-    type: 'StringLiteral'
+  astProps: ->
     value: @unquote()
     extra:
       raw: @value
+
+  _compileToBabylon: (o) ->
+    return @compileCSXTextToBabylon o if @csx
+    @withAstType @_toAst o
 
   unquote: (doubleQuote = no, newLine = no) ->
     unquoted = @value[1...-1]
@@ -1570,6 +1591,9 @@ exports.Value = class Value extends Base
             property: prop.compileToBabylon o
             computed: prop instanceof Index or prop.name?.unwrap() not instanceof PropertyName
     ret
+  toAst: (o) ->
+    return super o if @properties.length
+    @base.toAst o
 
   # Unfold a soak into an `If`: `a?.b` -> `a.b if a?`
   unfoldSoak: (o) ->
@@ -2568,7 +2592,7 @@ exports.Arr = class Arr extends Base
   shouldCache: ->
     not @isAssignable()
 
-  _compileToBabylon: (o) ->
+  precompile: (o) ->
     for obj in @objects
       unwrappedObj = obj.unwrapAll()
       if @lhs
@@ -2577,12 +2601,16 @@ exports.Arr = class Arr extends Base
         else if unwrappedObj instanceof Assign
           unwrappedObj.nestedLhs = yes
 
-    type:
-      if @lhs
-        'ArrayPattern'
-      else
-        'ArrayExpression'
-    elements: obj.compileToBabylon o, LEVEL_LIST for obj in @objects
+  astChildren:
+    objects:
+      key: 'elements'
+      level: LEVEL_LIST
+
+  astType: ->
+    if @lhs
+      'ArrayPattern'
+    else
+      'ArrayExpression'
 
   compileNode: (o) ->
     return [@makeCode '[]'] unless @objects.length

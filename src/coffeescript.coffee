@@ -104,7 +104,7 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
 
   parsed = parser.parse tokens
   # dump {parsed}
-  return parsed.toAST() if options.ast
+  return parsed.toAst options if options.ast
   js = do =>
     if options.usePrettier
       {formatted, ast} = parsed.prettier merge options, {code, returnWithAst: yes}
