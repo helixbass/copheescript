@@ -15,7 +15,7 @@ babylon = require 'babylon'
 addDataToNode, attachCommentsToNode, locationDataToString
 throwSyntaxError, getNumberValue, dump, locationDataToBabylon
 isArray, isBoolean, isPlainObject, mapValues, traverseBabylonAst
-babylonLocationFields} = require './helpers'
+babylonLocationFields, isFunction} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -371,6 +371,40 @@ exports.Base = class Base
     tree += '?' if @soak
     @eachChild (node) -> tree += node.toString idt + TAB
     tree
+
+  withAstType: (ast) -> {
+    type: do =>
+      return @constructor.name unless @astType
+      @astType?() ? @astType
+    ...ast
+  }
+
+  toAst: ->
+    @withBabylonLocationData @withAstType @_toAst()
+
+  astProps: []
+  getAstProps: ->
+    return @astProps() if isFunction @astProps
+    obj = {}
+    for prop in @astProps
+      obj[prop] = @[prop]
+    obj
+
+  getAstChildren: ->
+    obj = {}
+    for prop in @astChildren ? @children
+      val = @[prop]
+      obj[prop] =
+        if isArray val
+          item.toAst() for item in val
+        else
+          val.toAst()
+    obj
+
+  _toAst: -> {
+    ...@getAstChildren()
+    ...@getAstProps()
+  }
 
   # Passes each child to a function, breaking when the function returns `false`.
   eachChild: (func) ->

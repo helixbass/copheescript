@@ -53,8 +53,9 @@ SWITCHES = [
   [      '--tokens',            'print out the tokens that the lexer/rewriter produce']
   ['-v', '--version',           'display the version number']
   ['-w', '--watch',             'watch scripts for changes and rerun commands']
-  [      '--babylon',           'compile to Babylon AST']
+  [      '--babylon',           'print out Babylon AST']
   [      '--prettier',          'compile using Prettier']
+  ['-a', '--ast',               'print out AST']
 ]
 
 # Top-level objects shared by all the functions.
@@ -213,6 +214,8 @@ compileScript = (file, input, base = null) ->
       printLine CoffeeScript.nodes(task.input, task.options).toString().trim()
     else if opts.babylon
       console.log util.inspect CoffeeScript.babylon(task.input, task.options), no, null
+    else if opts.ast
+      console.log util.inspect CoffeeScript.ast(task.input, task.options), no, null
     else if opts.run
       CoffeeScript.register()
       CoffeeScript.eval opts.prelude, task.options if opts.prelude
