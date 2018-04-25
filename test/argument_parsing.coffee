@@ -139,7 +139,8 @@ If called without options, `coffee` will run your script.
       --tokens       print out the tokens that the lexer/rewriter produce
   -v, --version      display the version number
   -w, --watch        watch scripts for changes and rerun commands
-      --babylon      compile to Babylon AST
+      --babylon      print out Babylon AST
       --prettier     compile using Prettier
+  -a, --ast          print out AST
 
   '''

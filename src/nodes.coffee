@@ -27,6 +27,15 @@ NO      = -> no
 THIS    = -> this
 NEGATE  = -> @negated = not @negated; this
 
+# Levels indicate a node's position in the AST. Useful for knowing if
+# parens are necessary or superfluous.
+LEVEL_TOP    = 1  # ...;
+LEVEL_PAREN  = 2  # (...)
+LEVEL_LIST   = 3  # [...]
+LEVEL_COND   = 4  # ... ? x : y
+LEVEL_OP     = 5  # !...
+LEVEL_ACCESS = 6  # ...[0]
+
 #### CodeFragment
 
 # The various nodes defined below all compile to a collection of **CodeFragment** objects.
@@ -111,12 +120,19 @@ exports.Base = class Base
     @compileCommentFragments o, node, fragments
     fragments
 
-  withAstType: (ast) -> {
-    type: do =>
-      return @constructor.name unless @astType
-      @astType?() ? @astType
-    ...ast
-  }
+  withAstType: (ast) ->
+    return ast unless ast
+    return ast if isArray ast
+    return ast if ast.type
+    return ast unless do ->
+      return yes for key in Object.keys(ast) when key not in ['comments', babylonLocationFields...]
+
+    {
+      type: do =>
+        return @constructor.name unless @astType
+        @astType?() ? @astType
+      ...ast
+    }
 
   toAst: (o, level) ->
     return @compileToBabylon o, level if o.compilingBabylon
@@ -1165,10 +1181,9 @@ exports.Literal = class Literal extends Base
   assigns: (name) ->
     name is @value
 
-  _compileToBabylon: (o) ->
-    return null unless @value
-
   astProps: ['value']
+
+  # TODO: throw error if eg _compileToBabylon() called on bare Literal?
 
   compileNode: (o) ->
     [@makeCode @value]
@@ -1187,7 +1202,6 @@ exports.NumberLiteral = class NumberLiteral extends Literal
     extra:
       rawValue: numberValue
       raw: "#{@value}"
-  _compileToBabylon: Base::_compileToBabylon
 
 exports.InfinityLiteral = class InfinityLiteral extends NumberLiteral
   compileNode: ->
@@ -1296,7 +1310,7 @@ exports.CSXTag = class CSXTag extends IdentifierLiteral
 exports.PropertyName = class PropertyName extends Literal
   isAssignable: YES
 
-  _compileToBabylon: (o) ->
+  _toAst: (o) ->
     type: 'Identifier'
     name: @value
 
@@ -1577,9 +1591,9 @@ exports.Value = class Value extends Base
 
     fragments
 
-  _compileToBabylon: (o) ->
+  _toAst: (o) ->
     props = @properties
-    ret = @base.compileToBabylon o, if props.length then LEVEL_ACCESS else null
+    ret = @base.toAst o, if props.length then LEVEL_ACCESS else null
     for prop in props
       ret =
         if prop instanceof Slice
@@ -1588,12 +1602,10 @@ exports.Value = class Value extends Base
           prop.withBabylonLocationData # TODO: should include location up through this prop
             type: 'MemberExpression'
             object: ret
-            property: prop.compileToBabylon o
+            property: prop.toAst o
             computed: prop instanceof Index or prop.name?.unwrap() not instanceof PropertyName
+            optional: prop.soak
     ret
-  toAst: (o) ->
-    return super o if @properties.length
-    @base.toAst o
 
   # Unfold a soak into an `If`: `a?.b` -> `a.b if a?`
   unfoldSoak: (o) ->
@@ -2030,8 +2042,8 @@ exports.Access = class Access extends Base
 
   children: ['name']
 
-  _compileToBabylon: (o) ->
-    @name.compileToBabylon o
+  _toAst: (o) ->
+    @name.toAst o
 
   compileToFragments: (o) ->
     name = @name.compileToFragments o
@@ -4819,7 +4831,7 @@ exports.Op = class Op extends Base
         'AwaitExpression'
       else
         'YieldExpression'
-    argument: @first.compileToBabylon o, LEVEL_OP
+    argument: @first.compileToBabylon o, LEVEL_OP unless @first.unwrap().value is ''
     delegate: @operator is 'yield*'
 
   compileContinuation: (o) ->
@@ -5873,15 +5885,6 @@ UTILITIES_BABYLON =
         b
       )]
     )
-
-# Levels indicate a node's position in the AST. Useful for knowing if
-# parens are necessary or superfluous.
-LEVEL_TOP    = 1  # ...;
-LEVEL_PAREN  = 2  # (...)
-LEVEL_LIST   = 3  # [...]
-LEVEL_COND   = 4  # ... ? x : y
-LEVEL_OP     = 5  # !...
-LEVEL_ACCESS = 6  # ...[0]
 
 # Tabs are two spaces for pretty printing.
 TAB = '  '
