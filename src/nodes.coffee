@@ -756,6 +756,10 @@ exports.Block = class Block extends Base
     return @withBabylonComments o, @compileRootToBabylon o unless o.scope
     super o, level
 
+  toAst: (o, level) ->
+    return @rootToAst o unless o.scope
+    super o, level
+
   initializeScope: (o) ->
     o.scope   = new Scope null, this, null, o.referencedVars ? []
     # Mark given local variables in the root scope as parameters so they don’t
@@ -805,6 +809,33 @@ exports.Block = class Block extends Base
       type: 'File'
       program, comments
     }, program
+
+  rootToAst: (o) ->
+    @initializeScope o
+
+    body = @bodyToAst o
+
+    program = @withBabylonLocationData {
+      type: 'Program'
+      sourceType: 'module'
+      body
+    }
+
+    @withCopiedBabylonLocationData {
+      type: 'File'
+      program
+    }, program
+
+  bodyToAst: (o) ->
+    flatten(
+      for node in @expressions then do =>
+        ast = node.toAst o
+        return [] unless ast
+        return ast.body if node instanceof Block or ast.type is 'BlockStatement'
+        return ast if node.isStatement o
+        return @asExpressionStatement ast unless isArray ast
+        @asExpressionStatement item for item in ast
+    )
 
   _compileToBabylon: (o) ->
     root = del o, 'root'
