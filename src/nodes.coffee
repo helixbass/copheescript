@@ -144,8 +144,12 @@ exports.Base = class Base
   getAstProps: ->
     return @astProps() if isFunction @astProps
     obj = {}
-    for prop in @astProps
-      obj[prop] = @[prop]
+    if isArray @astProps
+      for prop in @astProps
+        obj[prop] = @[prop]
+    else
+      for prop, key of @astProps
+        obj[key] = @[prop]
     obj
 
   getAstChildren: (o) ->
@@ -760,6 +764,10 @@ exports.Block = class Block extends Base
     return @rootToAst o unless o.scope
     super o, level
 
+  astType: 'BlockStatement'
+  astChildren:
+    expressions: 'body'
+
   initializeScope: (o) ->
     o.scope   = new Scope null, this, null, o.referencedVars ? []
     # Mark given local variables in the root scope as parameters so they don’t
@@ -1325,13 +1333,14 @@ exports.IdentifierLiteral = class IdentifierLiteral extends Literal
   eachName: (iterator) ->
     iterator @
 
-  _compileToBabylon: (o) ->
-    type:
-      if @csx
-        'JSXIdentifier'
-      else
-        'Identifier'
-    name: @value
+  astType: ->
+    if @csx
+      'JSXIdentifier'
+    else
+      'Identifier'
+
+  astProps:
+    value: 'name'
 
 exports.CSXTag = class CSXTag extends IdentifierLiteral
   _compileToBabylon: (o) ->
@@ -4026,6 +4035,13 @@ exports.Code = class Code extends Base
       ...@addtlMethodBabylonFields o
     }
 
+  astType: 'FunctionExpression'
+  astProps: -> {
+  #   generator: @isGenerator
+  #   async: @isAsync
+    @bound
+  }
+
   addtlMethodBabylonFields: (o) ->
     return {} unless @isMethod
 
@@ -4348,6 +4364,9 @@ exports.Param = class Param extends Base
       token.error "unexpected #{token.value}"
 
   children: ['name', 'value']
+
+  toAst: (o) ->
+    @name.toAst o
 
   compileToBabylon: (o) ->
     @name.compileToBabylon o, LEVEL_LIST
