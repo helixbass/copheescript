@@ -153,6 +153,7 @@ exports.Base = class Base
     obj
 
   getAstChildren: (o) ->
+    return @astChildren(o) if isFunction @astChildren
     obj = {}
     addProp = ({prop, key = prop, level}) =>
       val = @[prop]
@@ -1820,14 +1821,22 @@ exports.Call = class Call extends Base
 
   _compileToBabylon: (o) ->
     return @compileCSXToBabylon o if @csx
-    type:
-      if @isNew
-        @variable.error "Unsupported reference to 'super'" if @variable instanceof Super
-        'NewExpression'
-      else
-        'CallExpression'
-    callee: @variable.compileToBabylon o, LEVEL_ACCESS
-    arguments: arg.compileToBabylon(o, LEVEL_LIST) for arg in @args
+    super o
+
+  astType: ->
+    if @isNew
+      @variable.error "Unsupported reference to 'super'" if @variable instanceof Super
+      'NewExpression'
+    else
+      'CallExpression'
+
+  astChildren:
+    variable:
+      key: 'callee'
+      level: LEVEL_ACCESS
+    args:
+      key: 'arguments'
+      level: LEVEL_LIST
 
   # Compile a vanilla function call.
   compileNode: (o) ->
@@ -3384,6 +3393,17 @@ exports.Assign = class Assign extends Base
   unfoldSoak: (o) ->
     unfoldSoak o, this, 'variable'
 
+  astType: 'AssignmentExpression'
+  astChildren:
+    value:
+      key: 'right'
+      level: LEVEL_LIST
+    variable:
+      key: 'left'
+      level: LEVEL_LIST
+  astProps: ->
+    operator: @context or '='
+
   _compileToBabylon: (o) ->
     return @compileCSXAttributeToBabylon o if @csx
     if @variable instanceof Value
@@ -4755,6 +4775,34 @@ exports.Op = class Op extends Base
         answer = [].concat lhs, @makeCode(" #{@operator} "), rhs
         if o.level <= LEVEL_OP then answer else @wrapInParentheses answer
 
+  astType: ->
+    switch @operator
+      when 'new'      then 'NewExpression'
+      when '||', '&&' then 'LogicalExpression'
+      when '++', '--' then 'UpdateExpression'
+      else
+        if @isUnary()
+          'UnaryExpression'
+        else
+          'BinaryExpression'
+
+  astChildren: (o) ->
+    if @isUnary()
+      argument: @first.toAst o
+    else
+      left: @first.toAst o, LEVEL_OP
+      right: @second.toAst o, LEVEL_OP
+
+  astProps: -> {
+    @operator
+    ...(
+      if @isUnary()
+        prefix: !@flip
+      else
+        {}
+    )
+  }
+
   _compileToBabylon: (o) ->
     isChain = @isChainable() and @first.isChainable()
     if @operator is 'delete' and o.scope.check(@first.unwrapAll().value)
@@ -4773,7 +4821,7 @@ exports.Op = class Op extends Base
 
     return new Parens(this).compileToBabylon o if o.level > LEVEL_OP
 
-    @compileBinaryToBabylon o
+    super o
 
   compileUnaryToBabylon: (o) ->
     if @operator is 'new'
