@@ -2116,8 +2116,8 @@ exports.Index = class Index extends Base
 
   children: ['index']
 
-  _compileToBabylon: (o) ->
-    @index.compileToBabylon o
+  _toAst: (o) ->
+    @index.toAst o
 
   compileToFragments: (o) ->
     [].concat @makeCode("["), @index.compileToFragments(o, LEVEL_PAREN), @makeCode("]")
