@@ -1312,6 +1312,9 @@ exports.PassthroughLiteral = class PassthroughLiteral extends Literal
       node.leading = yes
     compiled
 
+  _toAst: (o) ->
+    return null unless @value.length
+
   _compileToBabylon: (o) ->
     return null unless @value.length
     @withEnhancedComments do =>
