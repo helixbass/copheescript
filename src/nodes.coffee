@@ -1423,8 +1423,6 @@ exports.UndefinedLiteral = class UndefinedLiteral extends Literal
 exports.NullLiteral = class NullLiteral extends Literal
   constructor: ->
     super 'null'
-  _compileToBabylon: (o) ->
-    type: 'NullLiteral'
 
 exports.BooleanLiteral = class BooleanLiteral extends Literal
   _compileToBabylon: (o) ->
@@ -2508,7 +2506,8 @@ exports.Obj = class Obj extends Base
           new Assign prop, prop, context: 'object', shorthand: prop.bareLiteral? IdentifierLiteral
       )
 
-  propagateLhs: ->
+  propagateLhs: (setLhs) ->
+    @lhs = yes if setLhs
     return unless @lhs
 
     for prop in @properties
@@ -2516,7 +2515,7 @@ exports.Obj = class Obj extends Base
         {value} = prop
         unwrappedVal = value.unwrapAll()
         if unwrappedVal instanceof Arr or unwrappedVal instanceof Obj
-          unwrappedVal.lhs = yes
+          unwrappedVal.propagateLhs yes
         else if unwrappedVal instanceof Assign
           unwrappedVal.nestedLhs = yes
       else if prop instanceof Splat
@@ -2638,6 +2637,7 @@ exports.Arr = class Arr extends Base
   constructor: (objs, {@lhs = no} = {}) ->
     super()
     @objects = objs or []
+    @propagateLhs()
 
   children: ['objects']
 
@@ -2656,14 +2656,17 @@ exports.Arr = class Arr extends Base
   shouldCache: ->
     not @isAssignable()
 
-  precompile: (o) ->
+  # If this array is the left-hand side of an assignment, all its children
+  # are too.
+  propagateLhs: (setLhs) ->
+    @lhs = yes if setLhs
+    return unless @lhs
     for obj in @objects
       unwrappedObj = obj.unwrapAll()
-      if @lhs
-        if unwrappedObj instanceof Arr or unwrappedObj instanceof Obj
-          unwrappedObj.lhs = yes
-        else if unwrappedObj instanceof Assign
-          unwrappedObj.nestedLhs = yes
+      if unwrappedObj instanceof Arr or unwrappedObj instanceof Obj
+        unwrappedObj.propagateLhs yes
+      else if unwrappedObj instanceof Assign
+        unwrappedObj.nestedLhs = yes
 
   astChildren:
     objects:
@@ -2691,10 +2694,6 @@ exports.Arr = class Arr extends Base
       if unwrappedObj.comments and
          unwrappedObj.comments.filter((comment) -> not comment.here).length is 0
         unwrappedObj.includeCommentFragments = YES
-      # If this array is the left-hand side of an assignment, all its children
-      # are too.
-      if @lhs
-        unwrappedObj.lhs = yes if unwrappedObj instanceof Arr or unwrappedObj instanceof Obj
 
     compiledObjs = (obj.compileToFragments o, LEVEL_LIST for obj in @objects)
     olen = compiledObjs.length
@@ -3378,6 +3377,7 @@ exports.ExportSpecifier = class ExportSpecifier extends ModuleSpecifier
 exports.Assign = class Assign extends Base
   constructor: (@variable, @value, {@context, @param, @subpattern, @operatorToken, @moduleDeclaration, @shorthand} = {}) ->
     super()
+    @propagateLhs()
 
   children: ['variable', 'value']
 
@@ -3396,7 +3396,12 @@ exports.Assign = class Assign extends Base
   unfoldSoak: (o) ->
     unfoldSoak o, this, 'variable'
 
-  astType: 'AssignmentExpression'
+  isDefault: -> @param or @nestedLhs
+  astType: ->
+    if @isDefault()
+      'AssignmentPattern'
+    else
+      'AssignmentExpression'
   astChildren:
     value:
       key: 'right'
@@ -3405,16 +3410,20 @@ exports.Assign = class Assign extends Base
       key: 'left'
       level: LEVEL_LIST
   astProps: ->
+    return {} if @isDefault()
     operator: @context or '='
+
+  propagateLhs: ->
+    return unless @variable?.isArray?() or @variable?.isObject?()
+    # This is the left-hand side of an assignment; let `Arr` and `Obj`
+    # know that, so that those nodes know that they’re assignable as
+    # destructured variables.
+    @variable.base.propagateLhs yes
 
   _compileToBabylon: (o) ->
     return @compileCSXAttributeToBabylon o if @csx
     if @variable instanceof Value
       if @variable.isArray() or @variable.isObject()
-        # This is the left-hand side of an assignment; let `Arr` and `Obj`
-        # know that, so that those nodes know that they’re assignable as
-        # destructured variables.
-        @variable.base.lhs = yes
         return @compileDestructuringToBabylon o unless @variable.isAssignable()
 
       return @compileSpliceToBabylon      o if @variable.isSplice()
@@ -3434,19 +3443,7 @@ exports.Assign = class Assign extends Base
         ]
         kind: 'var'
 
-    compiledValue    = @value.compileToBabylon    o, LEVEL_LIST
-    compiledVariable = @variable.compileToBabylon o, LEVEL_LIST
-    {
-      ...(
-        if @param or @nestedLhs
-          type: 'AssignmentPattern'
-        else
-          type: 'AssignmentExpression'
-          operator: @context or '=' # TODO: using @context here is wrong?
-      )
-      left: compiledVariable
-      right: compiledValue
-    }
+    super o
 
   compileCSXAttributeToBabylon: (o) ->
     type: 'JSXAttribute'
@@ -3513,10 +3510,6 @@ exports.Assign = class Assign extends Base
       # in ES and we can output it as is; otherwise we `@compileDestructuring`
       # and convert this ES-unsupported destructuring into acceptable output.
       if @variable.isArray() or @variable.isObject()
-        # This is the left-hand side of an assignment; let `Arr` and `Obj`
-        # know that, so that those nodes know that they’re assignable as
-        # destructured variables.
-        @variable.base.lhs = yes
         return @compileDestructuring o unless @variable.isAssignable()
 
       return @compileSplice       o if @variable.isSplice()
@@ -3927,6 +3920,8 @@ exports.Code = class Code extends Base
       if @isGenerator and @isAsync
         node.error "function can't contain both yield and await"
 
+    @propagateLhs()
+
   children: ['params', 'body']
 
   isStatement: -> @isMethod
@@ -3949,6 +3944,10 @@ exports.Code = class Code extends Base
           argument: compiled
       else
         compiled
+
+  propagateLhs: ->
+    for {name} in @params when name instanceof Arr or name instanceof Obj
+      name.propagateLhs yes
 
   processParams: (o) ->
     exprs = []
@@ -3987,8 +3986,6 @@ exports.Code = class Code extends Base
                   asRef
               if name instanceof Arr or name instanceof Obj
                 # This parameter is destructured.
-                name.lhs = yes
-
                 unless param.shouldCache()
                   name.eachName ({value}) ->
                     o.scope.parameter value
@@ -5239,6 +5236,9 @@ exports.Parens = class Parens extends Base
   unwrap: -> @body
 
   shouldCache: -> @body.shouldCache()
+
+  _toAst: (o) ->
+    @body.unwrap().toAst o, LEVEL_PAREN
 
   _compileToBabylon: (o) ->
     expr = @body.unwrap()
