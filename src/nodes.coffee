@@ -1394,7 +1394,7 @@ exports.ThisLiteral = class ThisLiteral extends Literal
   constructor: ->
     super 'this'
 
-  _compileToBabylon: (o) ->
+  _toAst: (o) ->
     value =
       if o.scope.method?.bound
         o.scope.method.context
@@ -2427,19 +2427,16 @@ exports.Obj = class Obj extends Base
     return yes for prop in @properties when prop instanceof Splat
     no
 
-  _compileToBabylon: (o) ->
-    return @compileCSXAttributesToBabylon o if @csx
-    @reorderProperties() if @hasSplat() and @lhs
-    @propagateLhs()
+  astType: ->
+    if @lhs
+      'ObjectPattern'
+    else
+      'ObjectExpression'
 
-    type:
-      if @lhs
-        'ObjectPattern'
-      else
-        'ObjectExpression'
+  astChildren: (o) ->
     properties:
       for prop in @expandProperties(o) then do =>
-        return prop.compileToBabylon o if prop instanceof Splat
+        return prop.toAst o if prop instanceof Splat
         {variable, value, shorthand} = prop
         isComputedPropertyName = variable instanceof Value and variable.base instanceof ComputedPropertyName
 
@@ -2448,8 +2445,8 @@ exports.Obj = class Obj extends Base
             variable.base.value
           else
             variable.unwrap()
-          ).compileToBabylon o, LEVEL_LIST
-        compiledValue = value.compileToBabylon o, LEVEL_LIST
+          ).toAst o, LEVEL_LIST
+        compiledValue = value.toAst o, LEVEL_LIST
         prop.withBabylonLocationData
           type: 'ObjectProperty'
           key: compiledKey
@@ -2462,6 +2459,13 @@ exports.Obj = class Obj extends Base
               compiledValue
           shorthand: !!shorthand
           computed: isComputedPropertyName or variable.shouldCache()
+
+  _compileToBabylon: (o) ->
+    return @compileCSXAttributesToBabylon o if @csx
+    @reorderProperties() if @hasSplat() and @lhs
+    @propagateLhs()
+
+    super o
 
   expandProperties: (o) ->
     for prop in @properties then do =>
@@ -4500,15 +4504,18 @@ exports.Splat = class Splat extends Base
   assigns: (name) ->
     @name.assigns name
 
-  _compileToBabylon: (o) ->
-    type:
-      if @csx
-        'JSXSpreadAttribute'
-      else if @lhs
-        'RestElement'
-      else
-        'SpreadElement'
-    argument: @name.compileToBabylon o, LEVEL_OP
+  astType: ->
+    if @csx
+      'JSXSpreadAttribute'
+    else if @lhs
+      'RestElement'
+    else
+      'SpreadElement'
+
+  astChildren:
+    name:
+      key: 'argument'
+      level: LEVEL_OP
 
   compileNode: (o) ->
     [@makeCode('...'), @name.compileToFragments(o, LEVEL_OP)...]
