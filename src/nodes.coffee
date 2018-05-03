@@ -120,7 +120,7 @@ exports.Base = class Base
     @compileCommentFragments o, node, fragments
     fragments
 
-  withAstType: (ast) ->
+  withAstType: (ast, o) ->
     return ast unless ast
     return ast if isArray ast
     return ast if ast.type
@@ -130,7 +130,7 @@ exports.Base = class Base
     {
       type: do =>
         return @constructor.name unless @astType
-        @astType?() ? @astType
+        @astType?(o) ? @astType
       ...ast
     }
 
@@ -138,7 +138,7 @@ exports.Base = class Base
     return @compileToBabylon o, level if o.compilingBabylon
     o = extend {}, o
     o.level = level if level
-    @withBabylonLocationData @withAstType @_toAst o
+    @withBabylonLocationData @withAstType @_toAst(o), o
 
   astProps: []
   getAstProps: ->
@@ -189,7 +189,7 @@ exports.Base = class Base
   _compileToBabylon: (o) ->
     @precompile? o
 
-    @withAstType @_toAst merge o, compilingBabylon: yes
+    @withAstType @_toAst(merge o, compilingBabylon: yes), o
 
   withBabylonComments: (o, compiled, {comments = @comments} = {}) ->
     return compiled unless comments
@@ -822,7 +822,7 @@ exports.Block = class Block extends Base
   rootToAst: (o) ->
     @initializeScope o
 
-    body = @bodyToAst o
+    body = @bodyToAst merge o, level: LEVEL_TOP
 
     program = @withBabylonLocationData {
       type: 'Program'
@@ -4065,6 +4065,11 @@ exports.Code = class Code extends Base
   #   async: @isAsync
     @bound
   }
+  # astChildren:
+  #   params: 'params'
+  #   body:
+  #     key: 'body'
+  #     level: LEVEL_TOP
 
   addtlMethodBabylonFields: (o) ->
     return {} unless @isMethod
@@ -4794,21 +4799,27 @@ exports.Op = class Op extends Base
           'BinaryExpression'
 
   astChildren: (o) ->
-    if @isUnary()
-      argument: @first.toAst o
-    else
-      left: @first.toAst o, LEVEL_OP
-      right: @second.toAst o, LEVEL_OP
-
-  astProps: -> {
-    @operator
-    ...(
-      if @isUnary()
-        prefix: !@flip
+    switch
+      when @operator is 'new'
+        callee: @first.toAst o
+        arguments: []
+      when @isUnary()
+        argument: @first.toAst o
       else
-        {}
-    )
-  }
+        left: @first.toAst o, LEVEL_OP
+        right: @second.toAst o, LEVEL_OP
+
+  astProps: ->
+    return {} if @operator is 'new'
+    {
+      @operator
+      ...(
+        if @isUnary()
+          prefix: !@flip
+        else
+          {}
+      )
+    }
 
   _compileToBabylon: (o) ->
     isChain = @isChainable() and @first.isChainable()
@@ -5855,34 +5866,38 @@ exports.If = class If extends Base
   compileNode: (o) ->
     if @isStatement o then @compileStatement o else @compileExpression o
 
-  _compileToBabylon: (o) ->
-    if @isStatement o then @compileStatementToBabylon o else @compileExpressionToBabylon o
+  astType: (o) ->
+    if @isStatement o
+      'IfStatement'
+    else
+      'ConditionalExpression'
 
-  compileStatementToBabylon: (o) ->
+  _toAst: (o) ->
+    if @isStatement o then @statementToAst o else @expressionToAst o
+
+  statementToAst: (o) ->
     exeq = del o, 'isExistentialEquals'
     if exeq
-      return new If(@condition.invert(), @elseBodyNode(), type: 'if').compileToBabylon o
+      return new If(@condition.invert(), @elseBodyNode(), type: 'if').toAst o
 
-    type: 'IfStatement'
-    test: @condition.compileToBabylon o, LEVEL_PAREN
-    consequent: @ensureBlock(@body).compileToBabylon o
+    test: @condition.toAst o, LEVEL_PAREN
+    consequent: @ensureBlock(@body).toAst o
     alternate: do =>
       return unless @elseBody
-      compiled = @elseBody.compileToBabylon o, LEVEL_TOP
+      compiled = @elseBody.toAst o, LEVEL_TOP
       if compiled.type is 'BlockStatement' and compiled.body.length is 1 and compiled.body[0].type is 'IfStatement'
         compiled.body[0]
       else
         compiled
 
-  compileExpressionToBabylon: (o) ->
-    type: 'ConditionalExpression'
-    test: @condition.compileToBabylon o, LEVEL_COND
-    consequent: @bodyNode().compileToBabylon o, LEVEL_LIST
+  expressionToAst: (o) ->
+    test: @condition.toAst o, LEVEL_COND
+    consequent: @bodyNode().toAst o, LEVEL_LIST
     alternate:
       if @elseBodyNode()
-        @elseBodyNode().compileToBabylon o, LEVEL_LIST
+        @elseBodyNode().toAst o, LEVEL_LIST
       else
-        new UndefinedLiteral().compileToBabylon o
+        new UndefinedLiteral().toAst o
 
   makeReturn: (res) ->
     @elseBody  or= new Block [new UndefinedLiteral] if res
