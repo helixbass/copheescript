@@ -452,6 +452,7 @@ grammar =
     o 'EXPORT DEFAULT Expression',                           -> new ExportDefaultDeclaration $3
     o 'EXPORT DEFAULT INDENT Object OUTDENT',                -> new ExportDefaultDeclaration new Value $4
     o 'EXPORT EXPORT_ALL FROM String',                       -> new ExportAllDeclaration new Literal($2), $4
+    o 'EXPORT { } FROM String',                              -> new ExportNamedDeclaration new ExportSpecifierList([]), $5
     o 'EXPORT { ExportSpecifierList OptComma } FROM String', -> new ExportNamedDeclaration new ExportSpecifierList($3), $7
   ]
 

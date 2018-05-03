@@ -3256,25 +3256,27 @@ exports.ExportDeclaration = class ExportDeclaration extends ModuleDeclaration
     code
 
 exports.ExportNamedDeclaration = class ExportNamedDeclaration extends ExportDeclaration
-  _compileToBabylon: (o) ->
+  _toAst: (o) ->
     @checkScope o, 'export'
     if @clause instanceof Class and not @clause.variable
       @clause.error 'anonymous classes cannot be exported'
 
     @clause.moduleDeclaration = 'export'
 
-    {
-      type: 'ExportNamedDeclaration'
-      ...(
-        if @clause instanceof ExportSpecifierList
-          specifiers: @clause.compileToBabylon o
-        else
-          specifiers: []
-          declaration: @clause.compileToBabylon o
-      )
-      source: @source?.compileToBabylon o
-      exportKind: 'value'
-    }
+    super o
+
+  astChildren: (o) -> {
+    ...(
+      if @clause instanceof ExportSpecifierList
+        specifiers: @clause.toAst o
+      else
+        specifiers: []
+        declaration: @clause.toAst o
+    )
+    source: @source?.toAst o
+  }
+  astProps: ->
+    exportKind: 'value'
 
 exports.ExportDefaultDeclaration = class ExportDefaultDeclaration extends ExportDeclaration
   _compileToBabylon: (o) ->
@@ -3335,6 +3337,10 @@ exports.ModuleSpecifier = class ModuleSpecifier extends Base
   addIdentifierToScope: (o) ->
     o.scope.find @identifier, @moduleDeclarationType
 
+  _toAst: (o) ->
+    @addIdentifierToScope o
+    super o
+
   compileNode: (o) ->
     @addIdentifierToScope o
     code = []
@@ -3360,10 +3366,6 @@ exports.ImportSpecifier = class ImportSpecifier extends ModuleSpecifier
     imported: compiledOriginal
     local: @alias?.toAst(o) ? compiledOriginal
 
-  _toAst: (o) ->
-    @addIdentifierToScope o
-    super o
-
 exports.ImportDefaultSpecifier = class ImportDefaultSpecifier extends ImportSpecifier
   astChildren:
     original: 'local'
@@ -3378,12 +3380,10 @@ exports.ExportSpecifier = class ExportSpecifier extends ModuleSpecifier
   constructor: (local, exported) ->
     super local, exported, 'export'
 
-  _compileToBabylon: (o) ->
-    @addIdentifierToScope o
-    compiledOriginal = @original.compileToBabylon o
-    type: 'ExportSpecifier'
+  astChildren: (o) ->
+    compiledOriginal = @original.toAst o
     local: compiledOriginal
-    exported: @alias?.compileToBabylon(o) ? compiledOriginal
+    exported: @alias?.toAst(o) ? compiledOriginal
 
 #### Assign
 

@@ -254,6 +254,10 @@ test "export empty object", ->
   eqJS "export {}",
   "export {};"
 
+test "export empty object from another module", ->
+  eqJS "export {} from 'lib'",
+  "export {} from 'lib';"
+
 test "export named members within an object", ->
   eqJS "export { foo, bar }",
   """
