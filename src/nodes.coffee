@@ -3286,11 +3286,13 @@ exports.ExportDefaultDeclaration = class ExportDefaultDeclaration extends Export
     declaration: @clause.compileToBabylon o
 
 exports.ExportAllDeclaration = class ExportAllDeclaration extends ExportDeclaration
-  _compileToBabylon: (o) ->
-    @checkScope o, 'export'
-    type: 'ExportAllDeclaration'
-    source: @source.compileToBabylon o
+  astChildren: ['source']
+  astProps: ->
     exportKind: 'value'
+
+  _toAst: (o) ->
+    @checkScope o, 'export'
+    super o
 
 exports.ModuleSpecifierList = class ModuleSpecifierList extends Base
   constructor: (@specifiers) ->
