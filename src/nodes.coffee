@@ -161,7 +161,7 @@ exports.Base = class Base
         if isArray val
           item.toAst o, level for item in val
         else
-          val.toAst o, level
+          val?.toAst o, level
 
     children = @astChildren ? @children
     if isArray children
@@ -1470,9 +1470,11 @@ exports.Return = class Return extends Base
     expr = @expression?.makeReturn()
     if expr and expr not instanceof Return then expr.compileToBabylon o, level else super o, level
 
-  _compileToBabylon: (o) ->
-    type: 'ReturnStatement'
-    argument: @expression?.compileToBabylon(o, LEVEL_PAREN) ? null
+  astType: 'ReturnStatement'
+  astChildren:
+    expression:
+      key: 'argument'
+      level: LEVEL_PAREN
 
   compileNode: (o) ->
     answer = []
@@ -1820,8 +1822,8 @@ exports.Call = class Call extends Base
       ifn = unfoldSoak o, call, 'variable'
     ifn
 
-  _compileToBabylon: (o) ->
-    return @compileCSXToBabylon o if @csx
+  _toAst: (o) ->
+    return @CSXToAst o if @csx
     super o
 
   astType: ->
@@ -1869,7 +1871,7 @@ exports.Call = class Call extends Base
     fragments.push @makeCode('('), compiledArgs..., @makeCode(')')
     fragments
 
-  compileCSXToBabylon: (o) ->
+  CSXToAst: (o) ->
     [attributes, content] = @args
     tagName = @variable.base
     {
@@ -1884,7 +1886,7 @@ exports.Call = class Call extends Base
           type: 'JSXElement'
           openingElement:
             type: 'JSXOpeningElement'
-            name: tagName.compileToBabylon o#, LEVEL_ACCESS
+            name: tagName.toAst o#, LEVEL_ACCESS
             attributes: flatten(
               if attributes.base instanceof Arr
                 for obj in attributes.base.objects
@@ -1895,7 +1897,7 @@ exports.Call = class Call extends Base
                       Unexpected token. Allowed CSX attributes are: id="val", src={source}, {props...} or attribute.
                     """
                   attr.csx = yes
-                  compiled = attr.compileToBabylon o#, LEVEL_PAREN
+                  compiled = attr.toAst o#, LEVEL_PAREN
                   if attr instanceof IdentifierLiteral
                     type: 'JSXAttribute'
                     name: compiled
@@ -1906,13 +1908,13 @@ exports.Call = class Call extends Base
           closingElement:
             if content
               type: 'JSXClosingElement'
-              name: tagName.compileToBabylon o
+              name: tagName.toAst o
       )
       children:
         if content and not content.base.isEmpty?()
           content.base.csx = yes
           compact flatten [
-            content.compileToBabylon o#, LEVEL_LIST
+            content.toAst o#, LEVEL_LIST
           ]
         else []
     }
@@ -2460,8 +2462,12 @@ exports.Obj = class Obj extends Base
           shorthand: !!shorthand
           computed: isComputedPropertyName or variable.shouldCache()
 
+  _toAst: (o) ->
+    return @CSXAttributesToAst o if @csx
+    super o
+
   _compileToBabylon: (o) ->
-    return @compileCSXAttributesToBabylon o if @csx
+    return @CSXAttributesToAst merge o, compilingBabylon: yes if @csx
     @reorderProperties() if @hasSplat() and @lhs
     @propagateLhs()
 
@@ -2618,10 +2624,10 @@ exports.Obj = class Obj extends Base
       prop = prop.unwrapAll()
       prop.eachName iterator if prop.eachName?
 
-  compileCSXAttributesToBabylon: (o) ->
+  CSXAttributesToAst: (o) ->
     for prop in @properties
       prop.csx = yes
-      prop.compileToBabylon o#, LEVEL_TOP
+      prop.toAst o#, LEVEL_TOP
 
   compileCSXAttributes: (o) ->
     props = @properties
@@ -3424,8 +3430,12 @@ exports.Assign = class Assign extends Base
     # destructured variables.
     @variable.base.propagateLhs yes
 
+  _toAst: (o) ->
+    return @CSXAttributeToAst o if @csx
+    super o
+
   _compileToBabylon: (o) ->
-    return @compileCSXAttributeToBabylon o if @csx
+    return @CSXAttributeToAst merge o, compilingBabylon: yes if @csx
     if @variable instanceof Value
       if @variable.isArray() or @variable.isObject()
         return @compileDestructuringToBabylon o unless @variable.isAssignable()
@@ -3449,7 +3459,7 @@ exports.Assign = class Assign extends Base
 
     super o
 
-  compileCSXAttributeToBabylon: (o) ->
+  CSXAttributeToAst: (o) ->
     type: 'JSXAttribute'
     name: @variable.base.withBabylonLocationData
       type: 'JSXIdentifier'
@@ -3457,7 +3467,7 @@ exports.Assign = class Assign extends Base
     value: do =>
       val = @value.base
       val.csxAttribute = yes
-      compiled = val.compileToBabylon o
+      compiled = val.toAst o
       return compiled if val instanceof StringLiteral
       type: 'JSXExpressionContainer'
       expression: compiled
@@ -5343,8 +5353,8 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
 
     elements
 
-  _compileToBabylon: (o) ->
-    return @compileCSXContentToBabylon o if @csx
+  astType: 'TemplateLiteral'
+  astChildren: (o) ->
     elements = @extractElements()
     [first] = elements
     elements.unshift (@startQuote ? @).withLocationData new StringLiteral '' unless first instanceof StringLiteral
@@ -5357,7 +5367,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
     lastElement = null
     for element, index in elements
       if element instanceof StringLiteral
-        @prepareElementValue(element)
+        @prepareElementValue(element)# if o.compilingBabylon
         quasis.push element.withBabylonLocationData
           type: 'TemplateElement'
           value:
@@ -5371,21 +5381,22 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
             value:
               raw: ''
               tail: no
-        expressions.push element.compileToBabylon o, LEVEL_PAREN
+        expressions.push element.toAst o, LEVEL_PAREN
         lastElement = element
         justSawInterpolation = yes
 
-    {
-      type: 'TemplateLiteral'
-      expressions, quasis
-    }
+    {expressions, quasis}
 
-  compileCSXContentToBabylon: (o) ->
+  _toAst: (o) ->
+    return @CSXContentToAst o if @csx
+    super o
+
+  CSXContentToAst: (o) ->
     elements = @extractElements()
 
     for element in elements
       element.csx = yes
-      compiled = element.compileToBabylon o
+      compiled = element.toAst o
       hasComment = do ->
         hasComment = no
         element.traverseChildren no, ({comments, csxAttribute}) ->
