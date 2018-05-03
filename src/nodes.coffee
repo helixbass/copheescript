@@ -822,7 +822,7 @@ exports.Block = class Block extends Base
   rootToAst: (o) ->
     @initializeScope o
 
-    body = @bodyToAst merge o, level: LEVEL_TOP
+    body = @bodyToAst merge o, level: LEVEL_TOP, root: yes
 
     program = @withBabylonLocationData {
       type: 'Program'
@@ -836,8 +836,11 @@ exports.Block = class Block extends Base
     }, program
 
   bodyToAst: (o) ->
+    root = del o, 'root'
+
     flatten(
       for node in @expressions then do =>
+        node.topLevel = root
         ast = node.toAst o
         return [] unless ast
         return ast.body if node instanceof Block or ast.type is 'BlockStatement'
@@ -3175,13 +3178,17 @@ exports.ModuleDeclaration = class ModuleDeclaration extends Base
       @error "#{moduleDeclarationType} statements must be at top-level scope"
 
 exports.ImportDeclaration = class ImportDeclaration extends ModuleDeclaration
-  _compileToBabylon: (o) ->
+  astChildren:
+    clause: 'specifiers'
+    source: 'source'
+  astProps: ->
+    importKind: 'value' if @clause
+
+  _toAst: (o) ->
     @checkScope o, 'import'
     o.importedSymbols = []
-    type: 'ImportDeclaration'
-    specifiers: @clause?.compileToBabylon(o) ? []
-    source: @source.compileToBabylon o
-    importKind: 'value' if @clause
+
+    super o
 
   compileNode: (o) ->
     @checkScope o, 'import'
@@ -3204,10 +3211,10 @@ exports.ImportClause = class ImportClause extends Base
 
   children: ['defaultBinding', 'namedImports']
 
-  _compileToBabylon: (o) ->
+  _toAst: (o) ->
     compact flatten [
-      @defaultBinding?.compileToBabylon o
-      @namedImports?.compileToBabylon o
+      @defaultBinding?.toAst o
+      @namedImports?.toAst o
     ]
 
   compileNode: (o) ->
@@ -3289,8 +3296,8 @@ exports.ModuleSpecifierList = class ModuleSpecifierList extends Base
 
   children: ['specifiers']
 
-  _compileToBabylon: (o) ->
-    specifier.compileToBabylon o for specifier in @specifiers
+  _toAst: (o) ->
+    specifier.toAst o for specifier in @specifiers
 
   compileNode: (o) ->
     code = []
@@ -3348,26 +3355,24 @@ exports.ImportSpecifier = class ImportSpecifier extends ModuleSpecifier
       o.importedSymbols.push @identifier
     super o
 
-  _compileToBabylon: (o) ->
-    @addIdentifierToScope o
-    compiledOriginal = @original.compileToBabylon o
-    type: 'ImportSpecifier'
+  astChildren: (o) ->
+    compiledOriginal = @original.toAst o
     imported: compiledOriginal
-    local: @alias?.compileToBabylon(o) ? compiledOriginal
+    local: @alias?.toAst(o) ? compiledOriginal
+
+  _toAst: (o) ->
+    @addIdentifierToScope o
+    super o
 
 exports.ImportDefaultSpecifier = class ImportDefaultSpecifier extends ImportSpecifier
-  _compileToBabylon: (o) ->
-    @addIdentifierToScope o
-    type: 'ImportDefaultSpecifier'
-    local: @original.compileToBabylon o
+  astChildren:
+    original: 'local'
 
 exports.ImportNamespaceSpecifier = class ImportNamespaceSpecifier extends ImportSpecifier
-  _compileToBabylon: (o) ->
-    @addIdentifierToScope o
-    type: 'ImportNamespaceSpecifier'
+  astChildren: (o) ->
     local: do =>
-      return @alias.compileToBabylon o if @alias
-      @original.compileToBabylon o
+      return @alias.toAst o if @alias
+      @original.toAst o
 
 exports.ExportSpecifier = class ExportSpecifier extends ModuleSpecifier
   constructor: (local, exported) ->
