@@ -640,8 +640,8 @@ grammar =
   While: [
     o 'WhileSource Block',                      -> $1.addBody $2
     o 'WhileLineSource Block',                  -> $1.addBody $2
-    o 'Statement  WhileSource',                 -> $2.addBody LOC(1) Block.wrap([$1])
-    o 'Expression WhileSource',                 -> $2.addBody LOC(1) Block.wrap([$1])
+    o 'Statement  WhileSource',                 -> (extend $2, postfix: yes).addBody LOC(1) Block.wrap([$1])
+    o 'Expression WhileSource',                 -> (extend $2, postfix: yes).addBody LOC(1) Block.wrap([$1])
     o 'Loop',                                   -> $1
   ]
 

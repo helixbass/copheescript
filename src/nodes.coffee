@@ -4681,10 +4681,10 @@ exports.Elision = class Elision extends Base
 # it, all other loops can be manufactured. Useful in cases where you need more
 # flexibility or more speed than a comprehension can provide.
 exports.While = class While extends Base
-  constructor: (condition, {invert, @guard} = {}) ->
+  constructor: (@condition, {@invert, @guard} = {}) ->
     super()
 
-    @condition = if invert then condition.invert() else condition
+    @processedCondition = if @invert then @condition.invert() else @condition
 
   children: ['condition', 'guard', 'body']
 
@@ -4707,6 +4707,19 @@ exports.While = class While extends Base
       return jumpNode if jumpNode = node.jumps loop: yes
     no
 
+  astType: 'WhileStatement'
+  astChildren:
+    condition:
+      key: 'test'
+      level: LEVEL_PAREN
+    body:
+      level: LEVEL_TOP
+    guard: 'guard'
+
+  astProps: -> {
+    inverted: @invert
+    @postfix
+  }
 
   wrapInResultAccumulatingBlock: ({o, resultsVar, cachedSourceVarAssign, cachedStepVarAssign}) -> (compiled) =>
     return compiled unless @returns or cachedSourceVarAssign or cachedStepVarAssign
@@ -4735,9 +4748,8 @@ exports.While = class While extends Base
       resultsVar = new IdentifierLiteral o.scope.freeVariable 'results'
       @body.makeReturn resultsVar.value
 
-    @wrapInResultAccumulatingBlock({o, resultsVar})
-      type: 'WhileStatement'
-      test: @condition.compileToBabylon o, LEVEL_PAREN
+    @wrapInResultAccumulatingBlock({o, resultsVar}) @withAstType
+      test: @processedCondition.compileToBabylon o, LEVEL_PAREN
       body: @bodyWithGuard().compileToBabylon o, LEVEL_TOP
 
   bodyWithGuard: ->
@@ -4762,7 +4774,7 @@ exports.While = class While extends Base
           @body.makeReturn rvar = o.scope.freeVariable 'results'
           set = "#{@tab}#{rvar} = [];\n"
         [].concat @makeCode("\n"), (@bodyWithGuard().compileToFragments o, LEVEL_TOP), @makeCode("\n#{@tab}")
-    answer = [].concat @makeCode(set + @tab + "while ("), @condition.compileToFragments(o, LEVEL_PAREN),
+    answer = [].concat @makeCode(set + @tab + "while ("), @processedCondition.compileToFragments(o, LEVEL_PAREN),
       @makeCode(") {"), body, @makeCode("}")
     if @returns
       answer.push @makeCode "\n#{@tab}return #{rvar};"
