@@ -9,6 +9,10 @@ test "#4798 destructuring of objects with splat within arrays", ->
   eq q.b, r.b
   eq q.a, a
 
+  arr2 = [arr[1]]
+  [{a2...}] = arr2
+  eq a2.a, arr2[0].a
+
 test "destructuring assignment with objects and splats: ES2015", ->
   obj = {a: 1, b: 2, c: 3, d: 4, e: 5}
   throws (-> CoffeeScript.compile "{a, r..., s...} = x"), null, "multiple rest elements are disallowed"
@@ -315,16 +319,16 @@ test "object spread properties: ES2015", ->
   deepEqual obj9["e"], {}
 
 test "#4673: complex destructured object spread variables", ->
-  # b = c: 1
-  # {{a...}...} = b
-  # eq a.c, 1
+  b = c: 1
+  {{a...}...} = b
+  eq a.c, 1
 
   d = {}
   {d.e...} = f: 1
   eq d.e.f, 1
 
-  # {{g}...} = g: 1
-  # eq g, 1
+  {{g}...} = g: 1
+  eq g, 1
 
 test "rest element destructuring in function definition", ->
   obj = {a: 1, b: 2, c: 3, d: 4, e: 5}
@@ -407,9 +411,9 @@ test "rest element destructuring in function definition", ->
   deepEqual [42, 43], f {a:42, b:43}
 
 test "#4673: complex destructured object spread variables", ->
-  # f = ({{a...}...}) ->
-  #   a
-  # eq f(c: 1).c, 1
+  f = ({{a...}...}) ->
+    a
+  eq f(c: 1).c, 1
 
   g = ({@y...}) ->
     eq @y.b, 1

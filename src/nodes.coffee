@@ -694,6 +694,12 @@ exports.Block = class Block extends Base
       expr = @expressions[len]
       @expressions[len] = expr.makeReturn res
       @expressions.splice(len, 1) if expr instanceof Return and not expr.expression
+      # We also need to check that we’re not returning a CSX tag if there’s an
+      # adjacent one at the same level; JSX doesn’t allow that.
+      if expr.unwrapAll().csx
+        for csxCheckIndex in [len..0]
+          if @expressions[csxCheckIndex].unwrapAll().csx
+            expr.error 'Adjacent JSX elements must be wrapped in an enclosing tag'
       break
     this
 
@@ -2541,10 +2547,10 @@ exports.Obj = class Obj extends Base
     props = @properties
     lastIndex = props.length - 1
     prevLast = props[lastIndex]
-    splatProps = (prop for prop in props when prop instanceof Splat)
-    props[splatProps[1]].error "multiple spread elements are disallowed" if splatProps.length > 1
-    objProps = (prop for prop in props when prop not instanceof Splat)
-    @objects = @properties = [...objProps, ...splatProps].map (prop, index) ->
+    splatProps = (i for prop, i in props when prop instanceof Splat)
+    props[splatProps[1]].error "multiple spread elements are disallowed" if splatProps?.length > 1
+    splatProp = props.splice splatProps[0], 1
+    @objects = @properties = ([].concat props, splatProp).map (prop, index) ->
       return prop unless index is lastIndex
       prevLast.withLocationData prop, force: yes
 
@@ -3551,7 +3557,11 @@ exports.Assign = class Assign extends Base
       # in ES and we can output it as is; otherwise we `@compileDestructuring`
       # and convert this ES-unsupported destructuring into acceptable output.
       if @variable.isArray() or @variable.isObject()
-        return @compileDestructuring o unless @variable.isAssignable()
+        unless @variable.isAssignable()
+          if @variable.isObject() and @variable.base.hasSplat()
+            return @compileObjectDestruct o
+          else
+            return @compileDestructuring o
 
       return @compileSplice       o if @variable.isSplice()
       return @compileConditional  o if @context in ['||=', '&&=', '?=']
@@ -3630,6 +3640,13 @@ exports.Assign = class Assign extends Base
     pushAssign = (variable, value) =>
       assigns.push new Assign variable, value, {@param}#, subpattern: yes
 
+    if isSplat
+      splatVar = objects[splats[0]].name.unwrap()
+      if splatVar instanceof Arr or splatVar instanceof Obj
+        splatVarRef = new IdentifierLiteral o.scope.freeVariable 'ref'
+        objects[splats[0]].name = splatVarRef
+        splatVarAssign = -> pushAssign new Value(splatVar), splatVarRef
+
     loopObjects = (objs, rhs) ->
       for obj, i in objs when obj not instanceof Elision
         if obj instanceof Assign and obj.context is 'object'
@@ -3675,8 +3692,22 @@ exports.Assign = class Assign extends Base
     else
       processObjects objects
 
+    splatVarAssign?()
     assigns.push value unless o.level is LEVEL_TOP# or @subpattern
     @withLocationData(new Block assigns).compileToBabylon o
+
+  # Object rest property is not assignable: `{{a}...}`
+  compileObjectDestruct: (o) ->
+    @variable.base.reorderProperties()
+    {properties: props} = @variable.base
+    [..., splat] = props
+    splatProp = splat.name
+    assigns = []
+    refVal = new Value new IdentifierLiteral o.scope.freeVariable 'ref'
+    props.splice -1, 1, new Splat refVal
+    assigns.push new Assign(new Value(new Obj props), @value).compileToFragments o, LEVEL_LIST
+    assigns.push new Assign(new Value(splatProp), refVal).compileToFragments o, LEVEL_LIST
+    @joinFragmentArrays assigns, ', '
 
   # Brief implementation of recursive pattern matching, when assigning array or
   # object literals to a value. Peeks at their properties to assign inner names.
@@ -3715,6 +3746,15 @@ exports.Assign = class Assign extends Base
     vvar     = value.compileToFragments o, LEVEL_LIST
     vvarText = fragmentsToText vvar
     assigns  = []
+    pushAssign = (variable, val) =>
+      assigns.push new Assign(variable, val, param: @param, subpattern: yes).compileToFragments o, LEVEL_LIST
+
+    if isSplat
+      splatVar = objects[splats[0]].name.unwrap()
+      if splatVar instanceof Arr or splatVar instanceof Obj
+        splatVarRef = new IdentifierLiteral o.scope.freeVariable 'ref'
+        objects[splats[0]].name = splatVarRef
+        splatVarAssign = -> pushAssign new Value(splatVar), splatVarRef
 
     # At this point, there are several things to destructure. So the `fn()` in
     # `{a, b} = fn()` must be cached, for example. Make vvar into a simple
@@ -3747,7 +3787,7 @@ exports.Assign = class Assign extends Base
       return yes for obj in objs when not obj.isAssignable()
       no
 
-    # `objects` are complex when there is object spread ({a...}), object assign ({a:1}),
+    # `objects` are complex when there is object assign ({a:1}),
     # unassignable object, or just a single node.
     complexObjects = (objs) ->
       hasObjAssigns(objs).length or objIsUnassignable(objs) or olen is 1
@@ -3777,13 +3817,13 @@ exports.Assign = class Assign extends Base
             else new Value new Literal(vvarTxt), [new Index new NumberLiteral i]
         message = isUnassignable vvar.unwrap().value
         vvar.error message if message
-        assigns.push new Assign(vvar, vval, param: @param, subpattern: yes).compileToFragments o, LEVEL_LIST
+        pushAssign vvar, vval
 
     # "Simple" `objects` can be split and compiled to arrays, [a, b, c] = arr, [a, b, c...] = arr
     assignObjects = (objs, vvar, vvarTxt) =>
       vvar = new Value new Arr(objs, lhs: yes)
       vval = if vvarTxt instanceof Value then vvarTxt else new Value new Literal(vvarTxt)
-      assigns.push new Assign(vvar, vval, param: @param, subpattern: yes).compileToFragments o, LEVEL_LIST
+      pushAssign vvar, vval
 
     processObjects = (objs, vvar, vvarTxt) ->
       if complexObjects objs
@@ -3820,6 +3860,7 @@ exports.Assign = class Assign extends Base
     else
       # There is no `Splat` or `Expansion` in `objects`.
       processObjects objects, vvar, vvarText
+    splatVarAssign?()
     assigns.push vvar unless top or @subpattern
     fragments = @joinFragmentArrays assigns, ', '
     if o.level < LEVEL_LIST then fragments else @wrapInParentheses fragments
@@ -3958,8 +3999,8 @@ exports.Code = class Code extends Base
         @isGenerator = yes
       if (node instanceof Op and node.isAwait()) or node instanceof AwaitReturn
         @isAsync = yes
-      if @isGenerator and @isAsync
-        node.error "function can't contain both yield and await"
+      if node instanceof For and node.isAwait()
+        @isAsync = yes
 
     @propagateLhs()
 
@@ -4550,6 +4591,7 @@ exports.Splat = class Splat extends Base
   shouldCache: -> no
 
   isAssignable: ->
+    return no if @name instanceof Obj or @name instanceof Parens
     @name.isAssignable() and (not @name.isAtomic or @name.isAtomic())
 
   assigns: (name) ->
@@ -5509,15 +5551,27 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
 exports.For = class For extends While
   constructor: (body, source) ->
     super()
-    {@source, @guard, @step, @name, @index, @accumulateIndex, @ownTag} = source
-    @body    = Block.wrap [body]
-    @own     = source.own?
-    @object  = source.object?
-    @from    = source.from?
+    @addBody body
+    @addSource source
+
+  children: ['body', 'source', 'guard', 'step']
+
+  isAwait: -> @await ? no
+
+  addBody: (body) ->
+    @body = Block.wrap [body]
+    this
+
+  addSource: (source) ->
+    {@source  = no} = source
+    attribs   = ["name", "index", "guard", "step", "own", "ownTag", "await", "awaitTag", "object", "from", "accumulateIndex"]
+    @[attr]   = source[attr] ? @[attr] for attr in attribs
+    return this unless @source
     @index.error 'cannot use index with for-from' if @from and @index
     @ownTag.error "cannot use own with for-#{if @from then 'from' else 'in'}" if @own and not @object
     [@name, @index] = [@index, @name] if @object
     @index.error 'index cannot be a pattern matching expression' if @index?.isArray?() or @index?.isObject?()
+    @awaitTag.error 'await must be used with for-from' if @await and not @from
     @range   = @source instanceof Value and @source.base instanceof Range and not @source.properties.length and not @from
     @pattern = @name instanceof Value
     @index.error 'indexes do not apply to range loops' if @range and @index
@@ -5540,8 +5594,7 @@ exports.For = class For extends While
           comment.newLine = comment.unshift = yes for comment in node.comments
           moveComments node, @[attribute]
       moveComments @[attribute], @
-
-  children: ['body', 'source', 'guard', 'step']
+    this
 
   compileBodyToBabylon: (o) ->
     @body.compileToBabylon o, LEVEL_TOP
@@ -5768,15 +5821,21 @@ exports.For = class For extends While
       forPartFragments = [@makeCode("#{kvar} in #{svar}")]
       guardPart = "\n#{idt1}if (!#{utility 'hasProp', o}.call(#{svar}, #{kvar})) continue;" if @own
     else if @from
-      forPartFragments = [@makeCode("#{kvar} of #{svar}")]
+      if @await
+        forPartFragments = new Op 'await', new Parens new Literal "#{kvar} of #{svar}"
+        forPartFragments = forPartFragments.compileToFragments o, LEVEL_TOP
+      else
+        forPartFragments = [@makeCode("#{kvar} of #{svar}")]
     bodyFragments = body.compileToFragments merge(o, indent: idt1), LEVEL_TOP
     if bodyFragments and bodyFragments.length > 0
       bodyFragments = [].concat @makeCode('\n'), bodyFragments, @makeCode('\n')
 
     fragments = [@makeCode(defPart)]
     fragments.push @makeCode(resultPart) if resultPart
-    fragments = fragments.concat @makeCode(@tab), @makeCode( 'for ('),
-      forPartFragments, @makeCode(") {#{guardPart}#{varPart}"), bodyFragments,
+    forCode = if @await then 'for ' else 'for ('
+    forClose = if @await then '' else ')'
+    fragments = fragments.concat @makeCode(@tab), @makeCode( forCode),
+      forPartFragments, @makeCode("#{forClose} {#{guardPart}#{varPart}"), bodyFragments,
       @makeCode(@tab), @makeCode('}')
     fragments.push @makeCode(returnResult) if returnResult
     fragments
