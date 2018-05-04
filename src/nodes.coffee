@@ -765,7 +765,11 @@ exports.Block = class Block extends Base
     return @rootToAst o unless o.scope
     super o, level
 
-  astType: 'BlockStatement'
+  astType: ->
+    if @isClassBody
+      'ClassBody'
+    else
+      'BlockStatement'
   astChildren:
     expressions: 'body'
 
@@ -875,12 +879,7 @@ exports.Block = class Block extends Base
     body = @compileBodyToBabylon merge o, {root}
     body = [...@compileDeclarationsToBabylon(o), ...body] if withDeclarations
     return body if root
-    @includeCommentsInLocationData @withBabylonLocationData {
-      type:
-        if @isClassBody
-          'ClassBody'
-        else
-          'BlockStatement'
+    @includeCommentsInLocationData @withBabylonLocationData @withAstType {
       body
       @directives
     }
@@ -2824,22 +2823,36 @@ exports.Class = class Class extends Base
     finally
       delete @_compileToBabylon
 
+  astType: (o) ->
+    if o.level is LEVEL_TOP
+      'ClassDeclaration'
+    else
+      'ClassExpression'
+
+  astChildren:
+    variable: 'id'
+    parent: 'superClass'
+    body:
+      level: LEVEL_TOP
+
+  _toAst: (o) ->
+    @body.isClassBody = yes
+    super o
+
   compileClassDeclarationToBabylon: (o) ->
     @prepareConstructor()
     @proxyBoundMethods() if @boundMethods.length
-    id = @withLocationData new IdentifierLiteral @name if @name
+    id = @variable.withLocationData new IdentifierLiteral @name if @name
     if @variable?.comments? and id
       (id.comments ?= []).push @variable.comments...
       @variable.comments.length = 0
       @variable.base?.comments?.length = 0
-    type:
-      if o.level is LEVEL_TOP
-        'ClassDeclaration'
-      else
-        'ClassExpression'
-    id: id.compileToBabylon o if id
-    superClass: @parent.compileToBabylon o if @parent
-    body: @body.compileToBabylon o, LEVEL_TOP
+
+    @withAstType
+      id: id.compileToBabylon o if id
+      superClass: @parent.compileToBabylon o if @parent
+      body: @body.compileToBabylon o, LEVEL_TOP
+      o
 
   prepareConstructor: ->
     @ctor ?= @makeDefaultConstructor() if @externalCtor or @boundMethods.length
@@ -3281,11 +3294,14 @@ exports.ExportNamedDeclaration = class ExportNamedDeclaration extends ExportDecl
     exportKind: 'value'
 
 exports.ExportDefaultDeclaration = class ExportDefaultDeclaration extends ExportDeclaration
-  _compileToBabylon: (o) ->
+  astChildren:
+    clause: 'declaration'
+
+  _toAst: (o) ->
     @checkScope o, 'export'
     @clause.isExport = yes
-    type: 'ExportDefaultDeclaration'
-    declaration: @clause.compileToBabylon o
+
+    super o
 
 exports.ExportAllDeclaration = class ExportAllDeclaration extends ExportDeclaration
   astChildren: ['source']
