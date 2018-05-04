@@ -135,7 +135,7 @@ exports.Base = class Base
     }
 
   toAst: (o, level) ->
-    return @compileToBabylon o, level if o.compilingBabylon
+    return @compileToBabylon o, level if o.compiling
     o = extend {}, o
     o.level = level if level
     @withBabylonLocationData @withAstType @_toAst(o), o
@@ -189,7 +189,7 @@ exports.Base = class Base
   _compileToBabylon: (o) ->
     @precompile? o
 
-    @withAstType @_toAst(merge o, compilingBabylon: yes), o
+    @withAstType @_toAst(o), o
 
   withBabylonComments: (o, compiled, {comments = @comments} = {}) ->
     return compiled unless comments
@@ -789,6 +789,7 @@ exports.Block = class Block extends Base
     # dump root: @
     # @spaced   = yes
     @initializeScope o
+    o.compilingBabylon = o.compiling = yes
 
     compiledBody = @hoistBabylonComments HoistTarget.expandBabylon @compileWithDeclarationsToBabylon merge o, root: yes
     if compiledBody.length is 1 and not compiledBody[0].type
@@ -1045,6 +1046,7 @@ exports.Block = class Block extends Base
   compileRoot: (o) ->
     o.indent  = if o.bare then '' else TAB
     o.level   = LEVEL_TOP
+    o.compiling = yes
     @spaced   = yes
     @initializeScope(o)
     fragments = @compileWithDeclarations o
@@ -2470,7 +2472,7 @@ exports.Obj = class Obj extends Base
     super o
 
   _compileToBabylon: (o) ->
-    return @CSXAttributesToAst merge o, compilingBabylon: yes if @csx
+    return @CSXAttributesToAst o if @csx
     @reorderProperties() if @hasSplat() and @lhs
     @propagateLhs()
 
@@ -3442,7 +3444,7 @@ exports.Assign = class Assign extends Base
     super o
 
   _compileToBabylon: (o) ->
-    return @CSXAttributeToAst merge o, compilingBabylon: yes if @csx
+    return @CSXAttributeToAst o if @csx
     if @variable instanceof Value
       if @variable.isArray() or @variable.isObject()
         return @compileDestructuringToBabylon o unless @variable.isAssignable()
@@ -5850,13 +5852,13 @@ exports.Switch = class Switch extends Base
 # Single-expression **Ifs** are compiled into conditional operators if possible,
 # because ternaries are already proper expressions, and don’t need conversion.
 exports.If = class If extends Base
-  constructor: (condition, @body, options = {}) ->
+  constructor: (@condition, @body, options = {}) ->
     super()
-    @condition = if options.type is 'unless' then condition.invert() else condition
     @elseBody  = null
     @isChain   = false
-    {@soak}    = options
+    {@soak, @type, statement: @postfix} = options
     moveComments @condition, @ if @condition.comments
+    @processedCondition = if @type is 'unless' then @condition.invert() else @condition
 
   children: ['condition', 'body', 'elseBody']
 
@@ -5876,6 +5878,7 @@ exports.If = class If extends Base
   # The **If** only compiles into a statement if either of its bodies needs
   # to be a statement. Otherwise a conditional operator is safe.
   isStatement: (o) ->
+    return no if @postfix and not o.compiling
     o?.level is LEVEL_TOP or
       @bodyNode().isStatement(o) or @elseBodyNode()?.isStatement(o)
 
@@ -5890,32 +5893,47 @@ exports.If = class If extends Base
     else
       'ConditionalExpression'
 
-  _toAst: (o) ->
-    if @isStatement o then @statementToAst o else @expressionToAst o
+  _toAst: (o) -> if @isStatement o then @statementToAst o else @expressionToAst o
+
+  astFields: (o) ->
+    return {} if o.compiling
+    {
+      @postfix
+      inverted: @type is 'unless'
+    }
+
+  useCondition: (o) ->
+    if o.compiling then @processedCondition else @condition
 
   statementToAst: (o) ->
+    {compiling} = o
     exeq = del o, 'isExistentialEquals'
     if exeq
-      return new If(@condition.invert(), @elseBodyNode(), type: 'if').toAst o
+      return new If(@processedCondition.invert(), @elseBodyNode(), type: 'if').toAst o
 
-    test: @condition.toAst o, LEVEL_PAREN
-    consequent: @ensureBlock(@body).toAst o
-    alternate: do =>
-      return unless @elseBody
-      compiled = @elseBody.toAst o, LEVEL_TOP
-      if compiled.type is 'BlockStatement' and compiled.body.length is 1 and compiled.body[0].type is 'IfStatement'
-        compiled.body[0]
-      else
-        compiled
+    {
+      test: @useCondition(o).toAst o, LEVEL_PAREN
+      consequent: @ensureBlock(@body).toAst o
+      alternate: do =>
+        return unless @elseBody
+        compiled = @elseBody.toAst o, LEVEL_TOP
+        if compiled.type is 'BlockStatement' and compiled.body.length is 1 and compiled.body[0].type is 'IfStatement'
+          compiled.body[0]
+        else
+          compiled
+      ...@astFields o
+    }
 
-  expressionToAst: (o) ->
-    test: @condition.toAst o, LEVEL_COND
+  expressionToAst: (o) -> {
+    test: @useCondition(o).toAst o, LEVEL_COND
     consequent: @bodyNode().toAst o, LEVEL_LIST
     alternate:
       if @elseBodyNode()
         @elseBodyNode().toAst o, LEVEL_LIST
       else
         new UndefinedLiteral().toAst o
+    ...@astFields o
+  }
 
   makeReturn: (res) ->
     @elseBody  or= new Block [new UndefinedLiteral] if res
@@ -5934,10 +5952,10 @@ exports.If = class If extends Base
     exeq     = del o, 'isExistentialEquals'
 
     if exeq
-      return new If(@condition.invert(), @elseBodyNode(), type: 'if').compileToFragments o
+      return new If(@processedCondition.invert(), @elseBodyNode(), type: 'if').compileToFragments o
 
     indent   = o.indent + TAB
-    cond     = @condition.compileToFragments o, LEVEL_PAREN
+    cond     = @processedCondition.compileToFragments o, LEVEL_PAREN
     body     = @ensureBlock(@body).compileToFragments merge o, {indent}
     ifPart   = [].concat @makeCode("if ("), cond, @makeCode(") {\n"), body, @makeCode("\n#{@tab}}")
     ifPart.unshift @makeCode @tab unless child
@@ -5952,7 +5970,7 @@ exports.If = class If extends Base
 
   # Compile the `If` as a conditional operator.
   compileExpression: (o) ->
-    cond = @condition.compileToFragments o, LEVEL_COND
+    cond = @processedCondition.compileToFragments o, LEVEL_COND
     body = @bodyNode().compileToFragments o, LEVEL_LIST
     alt  = if @elseBodyNode() then @elseBodyNode().compileToFragments(o, LEVEL_LIST) else [@makeCode('void 0')]
     fragments = cond.concat @makeCode(" ? "), body, @makeCode(" : "), alt
