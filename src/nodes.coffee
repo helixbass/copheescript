@@ -141,8 +141,8 @@ exports.Base = class Base
     @withBabylonLocationData @withAstType @_toAst(o), o
 
   astProps: []
-  getAstProps: ->
-    return @astProps() if isFunction @astProps
+  getAstProps: (o) ->
+    return @astProps o if isFunction @astProps
     obj = {}
     if isArray @astProps
       for prop in @astProps
@@ -173,8 +173,8 @@ exports.Base = class Base
     obj
 
   _toAst: (o) -> {
-    ...@getAstChildren(o)
-    ...@getAstProps()
+    ...@getAstChildren o
+    ...@getAstProps o
   }
 
   compileToBabylon: (o, level) ->
@@ -1434,8 +1434,7 @@ exports.BooleanLiteral = class BooleanLiteral extends Literal
     value: if @value is 'true' then yes else no
 
 exports.SuperLiteral = class SuperLiteral extends Literal
-  _compileToBabylon: (o) ->
-    type: 'Super'
+  astType: 'Super'
 
 exports.DefaultLiteral = class DefaultLiteral extends Literal
   _compileToBabylon: (o) ->
@@ -1997,7 +1996,7 @@ exports.Super = class Super extends Base
 
   children: ['accessor']
 
-  _compileToBabylon: (o) ->
+  _toAst: (o) ->
     @setAccessor o
 
     if @accessor?.name?.comments
@@ -2014,17 +2013,17 @@ exports.Super = class Super extends Base
     compiled =
       new Value new SuperLiteral, if @accessor then [@accessor] else []
       .withLocationDataFrom @
-      .compileToBabylon o
+      .toAst o
     attachCommentsToNode salvagedComments, @accessor.name if salvagedComments
     compiled
 
   setAccessor: (o) ->
     method = o.scope.namedMethod()
     @error 'cannot use super outside of an instance method' unless method?.isMethod
+    return unless o.compiling
 
     unless method.ctor? or @accessor?
       {name, variable} = method
-      # name = name.cloneWithoutComments()
       if name.shouldCache() or (name instanceof Index and name.index.isAssignable())
         nref = new IdentifierLiteral o.scope.parent.freeVariable 'name'
         name.index = new Assign nref, name.index
@@ -2768,7 +2767,7 @@ exports.Class = class Class extends Base
 
   compileNode: (o) ->
     @name          = @determineName()
-    executableBody = @walkBody()
+    executableBody = @walkBody o
 
     # Special handling to allow `class expr.A extends A` declarations
     parentName    = @parent.base.value if @parent instanceof Value and not @parent.hasProperties()
@@ -2797,7 +2796,7 @@ exports.Class = class Class extends Base
 
   _compileToBabylon: (o) ->
     @name = @determineName()
-    executableBody = @walkBody()
+    executableBody = @walkBody o
 
     parentName    = @parent.base.value if @parent instanceof Value and not @parent.hasProperties()
     @hasNameClash = @name? and @name is parentName
@@ -2837,6 +2836,7 @@ exports.Class = class Class extends Base
 
   _toAst: (o) ->
     @body.isClassBody = yes
+    @walkBody o
     super o
 
   compileClassDeclarationToBabylon: (o) ->
@@ -2897,13 +2897,14 @@ exports.Class = class Class extends Base
       @variable.error message if message
     if name in JS_FORBIDDEN then "_#{name}" else name
 
-  walkBody: ->
+  walkBody: (o) ->
     @ctor          = null
     @boundMethods  = []
     executableBody = null
 
     initializer     = []
     { expressions } = @body
+    {compiling} = o
 
     i = 0
     for expression in expressions.slice()
@@ -2940,6 +2941,7 @@ exports.Class = class Class extends Base
       else if method.bound
         @boundMethods.push method
 
+    return unless compiling
     if initializer.length isnt expressions.length
       @body.expressions = (expression.hoist() for expression in initializer)
       new Block expressions
@@ -4088,17 +4090,21 @@ exports.Code = class Code extends Base
           'FunctionExpression'
       generator: @isGenerator
       async: @isAsync
-      static: @isMethod and @isStatic
       params: @compileParamsToBabylon {params, haveSplatParam, o}
       body: @body.compileWithDeclarationsToBabylon o
-      ...@addtlMethodBabylonFields o
+      ...@methodAstFields o
     }
 
-  astType: 'FunctionExpression'
-  astProps: -> {
-  #   generator: @isGenerator
-  #   async: @isAsync
+  astType: ->
+    if @isMethod
+      'ClassMethod'
+    else
+     'FunctionExpression'
+  astProps: (o) -> {
+    generator: @isGenerator
+    async: @isAsync
     @bound
+    ...@methodAstFields o
   }
   # astChildren:
   #   params: 'params'
@@ -4106,11 +4112,11 @@ exports.Code = class Code extends Base
   #     key: 'body'
   #     level: LEVEL_TOP
 
-  addtlMethodBabylonFields: (o) ->
+  methodAstFields: (o) ->
     return {} unless @isMethod
 
     [methodScope, o.scope] = [o.scope, o.scope.parent]
-    compiledName = @name.compileToBabylon o
+    compiledName = @name.toAst o
     o.scope = methodScope
 
     kind:
@@ -4120,6 +4126,11 @@ exports.Code = class Code extends Base
         'method'
     key: compiledName
     computed: @name instanceof Index or @name instanceof Access and (@name.name instanceof ComputedPropertyName or @name.name instanceof NumberLiteral or @name.name instanceof StringLiteral)
+    static: @isStatic
+
+  _toAst: (o) ->
+    @updateOptions o
+    super o
 
   expandThisParams: (o) ->
     thisAssignments  = @thisAssignments?.slice() ? []
