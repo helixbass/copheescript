@@ -4032,19 +4032,13 @@ exports.Code = class Code extends Base
   makeScope: (parentScope) -> new Scope parentScope, @body, this
 
   compileParamsToBabylon: ({params, haveSplatParam, o}) ->
-    lastIndex = params.length - 1
     for param, index in params
       scopeVariablesCount = o.scope.variables.length
       compiled = param.compileToBabylon o
       if scopeVariablesCount isnt o.scope.variables.length
         generatedVariables = o.scope.variables.splice scopeVariablesCount
         o.scope.parent.variables.push generatedVariables...
-      if haveSplatParam and index is lastIndex
-        param.withBabylonLocationData
-          type: 'RestElement'
-          argument: compiled
-      else
-        compiled
+      compiled
 
   propagateLhs: ->
     for {name} in @params when name instanceof Arr or name instanceof Obj
@@ -4071,7 +4065,7 @@ exports.Code = class Code extends Base
           else
             splatParamName = param.asReference o
           o.scope.parameter splatParamName.unwrap().value
-          splatParamName
+          new Splat splatParamName, lhs: yes
         else
           asRef =
             if param.shouldCache()
@@ -4166,11 +4160,20 @@ exports.Code = class Code extends Base
     @bound
     ...@methodAstFields o
   }
-  # astChildren:
-  #   params: 'params'
-  #   body:
-  #     key: 'body'
-  #     level: LEVEL_TOP
+  astChildren: (o) ->
+    params: @paramsToAst o
+    body: @body.toAst o, LEVEL_TOP
+
+  paramsToAst: (o) ->
+    for {name, value, splat} in @params
+      (
+        if splat
+          new Splat name, lhs: yes
+        else if value?
+          new Assign name, value, param: yes
+        else
+          name
+      ).toAst o
 
   methodAstFields: (o) ->
     return {} unless @isMethod
@@ -4501,10 +4504,7 @@ exports.Param = class Param extends Base
   children: ['name', 'value']
 
   toAst: (o) ->
-    @name.toAst o
-
-  compileToBabylon: (o) ->
-    @name.compileToBabylon o, LEVEL_LIST
+    @name.toAst o, LEVEL_LIST
 
   compileToFragments: (o) ->
     @name.compileToFragments o, LEVEL_LIST
@@ -4601,7 +4601,7 @@ exports.Param = class Param extends Base
 # A splat, either as a parameter to a function, an argument to a call,
 # or as part of a destructuring assignment.
 exports.Splat = class Splat extends Base
-  constructor: (name) ->
+  constructor: (name, {@lhs} = {}) ->
     super()
     @name = if name.compile then name else new Literal name
 
@@ -4928,15 +4928,21 @@ exports.Op = class Op extends Base
       )
     }
 
-  _compileToBabylon: (o) ->
-    isChain = @isChainable() and @first.isChainable()
+  _toAst: (o) ->
     if @operator is 'delete' and o.scope.check(@first.unwrapAll().value)
       @error 'delete operand may not be argument or var'
     if @operator in ['--', '++']
       message = isUnassignable @first.unwrapAll().value
       @first.error message if message
+    super o
+
+  _compileToBabylon: (o) ->
+    if @operator is '!' and @first instanceof Existence
+      @first.negated = not @first.negated
+      return @first.compileToBabylon o
+    isChain = @isChainable() and @first.isChainable()
     return @compileContinuationToBabylon o if @isYield() or @isAwait()
-    return @compileUnaryToBabylon o if @isUnary()
+    return super o if @isUnary()
     return @compileChainToBabylon o if isChain
 
     switch @operator
@@ -4944,42 +4950,9 @@ exports.Op = class Op extends Base
       when '//' then return @compileFloorDivisionToBabylon o
       when '%%' then return @compileModuloToBabylon o
 
-    return new Parens(this).compileToBabylon o if o.level > LEVEL_OP
+    # return new Parens(this).compileToBabylon o if o.level > LEVEL_OP
 
     super o
-
-  compileUnaryToBabylon: (o) ->
-    if @operator is 'new'
-      return
-        type: 'NewExpression'
-        callee: @first.compileToBabylon o
-        arguments: []
-
-    if @operator is '!' and @first instanceof Existence
-      @first.negated = not @first.negated
-      return @first.compileToBabylon o
-
-    {
-      type:
-        switch @operator
-          when '++', '--'
-            'UpdateExpression'
-          else
-            'UnaryExpression'
-      @operator
-      prefix: !@flip
-      argument: @first.compileToBabylon o
-    }
-
-  compileBinaryToBabylon: (o) -> {
-    type:
-      switch @operator
-        when '||', '&&' then 'LogicalExpression'
-        else 'BinaryExpression'
-    left: @first.compileToBabylon o, LEVEL_OP
-    @operator
-    right: @second.compileToBabylon o, LEVEL_OP
-  }
 
   compileChainToBabylon: (o) ->
     [@first.second, shared] = @first.second.cache o
