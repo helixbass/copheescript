@@ -3471,7 +3471,11 @@ exports.Assign = class Assign extends Base
     return @CSXAttributeToAst o if @csx
     if @variable instanceof Value
       if @variable.isArray() or @variable.isObject()
-        return @compileDestructuringToBabylon o unless @variable.isAssignable()
+        unless @variable.isAssignable()
+          if @variable.isObject() and @variable.base.hasSplat()
+            return @compileObjectDestructToBabylon o
+          else
+            return @compileDestructuringToBabylon o
 
       return @compileSpliceToBabylon      o if @variable.isSplice()
       return @compileConditionalToBabylon o if @context in ['||=', '&&=', '?=']
@@ -3695,6 +3699,18 @@ exports.Assign = class Assign extends Base
     splatVarAssign?()
     assigns.push value unless o.level is LEVEL_TOP# or @subpattern
     @withLocationData(new Block assigns).compileToBabylon o
+
+  compileObjectDestructToBabylon: (o) ->
+    @variable.base.reorderProperties()
+    {properties: props} = @variable.base
+    [..., splat] = props
+    splatProp = splat.name
+    assigns = []
+    refVal = new Value new IdentifierLiteral o.scope.freeVariable 'ref'
+    props.splice -1, 1, new Splat refVal
+    assigns.push new Assign new Value(new Obj props), @value
+    assigns.push new Assign new Value(splatProp), refVal
+    new Block(assigns).compileToBabylon o
 
   # Object rest property is not assignable: `{{a}...}`
   compileObjectDestruct: (o) ->
