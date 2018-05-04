@@ -1850,6 +1850,9 @@ exports.Call = class Call extends Base
       key: 'arguments'
       level: LEVEL_LIST
 
+  astProps:
+    soak: 'optional'
+
   # Compile a vanilla function call.
   compileNode: (o) ->
     return @compileCSX o if @csx
