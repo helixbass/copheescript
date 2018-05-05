@@ -1275,7 +1275,7 @@ exports.StringLiteral = class StringLiteral extends Literal
   compileNode: (o) ->
     res = if @csx then [@makeCode @unquote(yes, yes)] else super()
 
-  compileCSXTextToBabylon: (o) ->
+  CSXTextToAst: (o) ->
     unquoted = @unquote yes, yes
     type: 'JSXText'
     value: unquoted
@@ -1287,9 +1287,9 @@ exports.StringLiteral = class StringLiteral extends Literal
     extra:
       raw: @value
 
-  _compileToBabylon: (o) ->
-    return @compileCSXTextToBabylon o if @csx
-    @withAstType @_toAst o
+  _toAst: (o) ->
+    return @CSXTextToAst o if @csx
+    super o
 
   unquote: (doubleQuote = no, newLine = no) ->
     unquoted = @value[1...-1]
@@ -5268,6 +5268,9 @@ exports.Existence = class Existence extends Base
   children: ['expression']
 
   invert: NEGATE
+
+  astChildren:
+    expression: 'argument'
 
   _compileToBabylon: (o) ->
     compareOp = if @negated then '===' else '!=='

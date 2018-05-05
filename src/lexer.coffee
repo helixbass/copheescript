@@ -831,12 +831,16 @@ exports.Lexer = class Lexer
 
     [firstToken, ..., lastToken] = tokens
     firstToken[2].first_column -= delimiter.length
+    firstToken[2].range[0]     -= delimiter.length
+    lastToken[2].range[1]      += closingDelimiter.length
     if lastToken[1].substr(-1) is '\n'
       lastToken[2].last_line += 1
       lastToken[2].last_column = closingDelimiter.length - 1
     else
       lastToken[2].last_column += closingDelimiter.length
-    lastToken[2].last_column -= 1 if lastToken[1].length is 0
+    if lastToken[1].length is 0
+      lastToken[2].last_column -= 1
+      lastToken[2].range[1]    -= 1
 
     {tokens, index: offsetInChunk + closingDelimiter.length}
 
