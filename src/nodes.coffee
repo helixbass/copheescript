@@ -1276,6 +1276,7 @@ exports.StringLiteral = class StringLiteral extends Literal
     super ''
     @fromSourceString = @quote?
     @quote ?= '"'
+    @originalValue = unwrapStringObject @originalValue
     @formatValue()
 
   formatValue: ->
@@ -6285,3 +6286,6 @@ unfoldSoak = (o, parent, name) ->
   parent[name] = ifn.body
   ifn.body = new Value parent
   ifn
+
+unwrapStringObject = (str) ->
+  str.valueOf?() ? str
