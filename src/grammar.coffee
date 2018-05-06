@@ -166,8 +166,8 @@ grammar =
   ]
 
   String: [
-    o 'STRING',                                 -> new StringLiteral $1
-    o 'STRING_START Body STRING_END',           -> new StringWithInterpolations $2, startQuote: LOC(1)(new Literal $1), endQuote: LOC(3)(new Literal $3)
+    o 'STRING',                                 -> new StringLiteral $1, quote: $1.quote, initialChunk: $1.initialChunk, finalChunk: $1.finalChunk, indent: $1.indent, double: $1.double
+    o 'STRING_START Body STRING_END',           -> new StringWithInterpolations $2, quote: $1.quote, startQuote: LOC(1)(new Literal $1), endQuote: LOC(3)(new Literal $3)
   ]
 
   Regex: [

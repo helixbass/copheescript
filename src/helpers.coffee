@@ -1,5 +1,3 @@
-util = require 'util'
-
 # This file contains the common helper functions that we'd like to share among
 # the **Lexer**, **Rewriter**, and the **Nodes**. Merge objects, flatten
 # arrays, count characters, that sort of thing.
@@ -280,7 +278,9 @@ exports.getNumberValue = (number) ->
   return val unless invert
   val * -1
 
-exports.dump = dump = (...args, obj) -> console.log ...args, util.inspect obj, no, null
+exports.dump = dump = (...args, obj) ->
+  util = require 'util'
+  console.log ...args, util.inspect obj, no, null
 
 exports.locationDataToBabylon = ({first_line, first_column, last_line, last_column, range}) -> {
   loc:
@@ -343,3 +343,24 @@ exports.traverseBabylonAsts = traverseBabylonAsts = (node, correspondingNode, fu
   if isPlainObject node
     return unless isPlainObject correspondingNode
     traverseBabylonAsts(child, correspondingNode[key], func) for own key, child of node when key not in locationFields
+
+exports.makeDelimitedLiteral = (body, options = {}) ->
+    body = '(?:)' if body is '' and options.delimiter is '/'
+    regex = ///
+        (\\\\)                               # Escaped backslash.
+      | (\\0(?=[1-7]))                       # Null character mistaken as octal escape.
+      | \\?(#{options.delimiter})            # (Possibly escaped) delimiter.
+      | \\?(?: (\n)|(\r)|(\u2028)|(\u2029) ) # (Possibly escaped) newlines.
+      | (\\.)                                # Other escapes.
+    ///g
+    body = body.replace regex, (match, backslash, nul, delimiter, lf, cr, ls, ps, other) -> switch
+      # Ignore escaped backslashes.
+      when backslash then (if options.double then backslash + backslash else backslash)
+      when nul       then '\\x00'
+      when delimiter then "\\#{delimiter}"
+      when lf        then '\\n'
+      when cr        then '\\r'
+      when ls        then '\\u2028'
+      when ps        then '\\u2029'
+      when other     then (if options.double then "\\#{other}" else other)
+    "#{options.delimiter}#{body}#{options.delimiter}"

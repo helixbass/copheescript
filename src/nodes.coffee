@@ -15,7 +15,7 @@ babylon = require 'babylon'
 addDataToNode, attachCommentsToNode, locationDataToString
 throwSyntaxError, getNumberValue, dump, locationDataToBabylon
 isArray, isBoolean, isPlainObject, mapValues, traverseBabylonAst
-babylonLocationFields, isFunction} = require './helpers'
+babylonLocationFields, isFunction, makeDelimitedLiteral} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -1272,8 +1272,42 @@ exports.NaNLiteral = class NaNLiteral extends NumberLiteral
     new Op('/', new NumberLiteral('0'), new NumberLiteral('0')).compileToBabylon o
 
 exports.StringLiteral = class StringLiteral extends Literal
+  constructor: (@originalValue, {@quote, @initialChunk, @finalChunk, @indent, @double} = {}) ->
+    super ''
+    @fromSourceString = @quote?
+    @quote ?= '"'
+    @formatValue()
+
+  formatValue: ->
+    heredoc = @quote.length is 3
+    @value = do =>
+      val = @originalValue
+      val =
+        unless @fromSourceString
+          val
+        else if heredoc
+          indentRegex = /// \n#{@indent} ///g if @indent
+
+          val = val.replace indentRegex, '\n' if indentRegex
+          val = val.replace LEADING_BLANK_LINE,  '' if @initialChunk
+          val = val.replace TRAILING_BLANK_LINE, '' if @finalChunk
+          val
+        else
+          val.replace SIMPLE_STRING_OMIT, (match, offset) =>
+            if (@initialChunk and offset is 0) or
+               (@finalChunk and offset + match.length is val.length)
+              ''
+            else
+              ' '
+      makeDelimitedLiteral val, {
+        delimiter: @quote.charAt 0
+        @double
+      }
+
   compileNode: (o) ->
-    res = if @csx then [@makeCode @unquote(yes, yes)] else super()
+    return [@makeCode @unquote(yes, yes)] if @csx
+    # @formatValue()
+    super o
 
   CSXTextToAst: (o) ->
     unquoted = @unquote yes, yes
@@ -1291,10 +1325,10 @@ exports.StringLiteral = class StringLiteral extends Literal
     return @CSXTextToAst o if @csx
     super o
 
-  unquote: (doubleQuote = no, newLine = no) ->
+  unquote: (doubleQuote = no, csx = no) ->
     unquoted = @value[1...-1]
     unquoted = unquoted.replace /\\"/g, '"'  if doubleQuote
-    unquoted = unquoted.replace /\\n/g, '\n' if newLine
+    unquoted = unquoted.replace /\\n/g, '\n' if csx
     unquoted
 
   isEmpty: ->
@@ -1809,7 +1843,7 @@ exports.Call = class Call extends Base
       rite.isNew = @isNew
       left = new Op '===',
         new Op 'typeof', left
-        new StringLiteral '"function"'
+        new StringLiteral 'function'
       return new If left, new Value(rite), soak: yes
     call = this
     list = []
@@ -5281,7 +5315,7 @@ exports.Existence = class Existence extends Base
             @withLocationData new Op(
               compareOp
               new Op 'typeof', @expression
-              new StringLiteral "'undefined'"
+              new StringLiteral 'undefined'
               .withLocationDataFrom @operatorToken ? @
             )
           return comparisonAgainstUndefined if @comparisonTarget is 'undefined'
@@ -5390,7 +5424,7 @@ exports.Parens = class Parens extends Base
 #### StringWithInterpolations
 
 exports.StringWithInterpolations = class StringWithInterpolations extends Base
-  constructor: (@body, {@startQuote, @endQuote} = {}) ->
+  constructor: (@body, {@quote, @startQuote, @endQuote} = {}) ->
     super()
 
   children: ['body']
@@ -6108,7 +6142,7 @@ UTILITIES_BABYLON =
         new Op 'instanceof', instance, Constructor
         Block.wrap [new Throw new Op 'new', new Call(
           new Value new IdentifierLiteral 'Error'
-          [new StringLiteral "'Bound instance method accessed before binding'"]
+          [new StringLiteral 'Bound instance method accessed before binding']
         )]
         type: 'unless'
       )]
@@ -6141,6 +6175,9 @@ UTILITIES_BABYLON =
 TAB = '  '
 
 SIMPLENUM = /^[+-]?\d+$/
+SIMPLE_STRING_OMIT = /\s*\n\s*/g
+LEADING_BLANK_LINE  = /^[^\n\S]*\n/
+TRAILING_BLANK_LINE = /\n[^\n\S]*$/
 
 BABYLON_STATEMENT_TYPES = ['ExpressionStatement', 'ClassMethod', 'ArrayExpression', 'ReturnStatement', 'TemplateElement', 'JSXEmptyExpression', 'ThrowStatement', 'IfStatement', 'ForStatement', 'ForInStatement', 'BlockStatement', 'ImportSpecifier', 'VariableDeclarator']
 
