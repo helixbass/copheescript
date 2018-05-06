@@ -6023,7 +6023,7 @@ exports.If = class If extends Base
     alternate:
       if @elseBodyNode()
         @elseBodyNode().toAst o, LEVEL_LIST
-      else
+      else if o.compiling
         new UndefinedLiteral().toAst o
     ...@astFields o
   }
