@@ -1300,10 +1300,13 @@ exports.StringLiteral = class StringLiteral extends Literal
               ''
             else
               ' '
-      makeDelimitedLiteral val, {
-        delimiter: @quote.charAt 0
-        @double
-      }
+      @delimit val
+
+  delimit: (val) ->
+    makeDelimitedLiteral val, {
+      delimiter: @quote.charAt 0
+      @double
+    }
 
   compileNode: (o) ->
     return [@makeCode @unquote(yes, yes)] if @csx
@@ -1317,13 +1320,23 @@ exports.StringLiteral = class StringLiteral extends Literal
     extra:
       raw: unquoted
 
-  astProps: ->
-    value: @unquote()
+  astProps: (o) ->
+    value:
+      if o.compiling
+        @unquote()
+      else
+        @originalValue
     extra:
-      raw: @value
+      raw:
+        if o.compiling
+          @value
+        else
+          @delimit @originalValue
 
   _toAst: (o) ->
     return @CSXTextToAst o if @csx
+    if not o.compiling and @originalValue.indexOf('\n') > -1
+      return @withLocationData(new StringWithInterpolations Block.wrap [new Value @]).toAst o
     super o
 
   unquote: (doubleQuote = no, csx = no) ->
@@ -5490,7 +5503,11 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
         quasis.push element.withBabylonLocationData
           type: 'TemplateElement'
           value:
-            raw: element.value
+            raw:
+              if o.compiling
+                element.value
+              else
+                element.originalValue
             tail: element is last
         justSawInterpolation = no
       else
