@@ -1435,8 +1435,7 @@ exports.NullLiteral = class NullLiteral extends Literal
     super 'null'
 
 exports.BooleanLiteral = class BooleanLiteral extends Literal
-  _compileToBabylon: (o) ->
-    type: 'BooleanLiteral'
+  astProps: ->
     value: if @value is 'true' then yes else no
 
 exports.SuperLiteral = class SuperLiteral extends Literal
@@ -2072,10 +2071,10 @@ exports.TaggedTemplateCall = class TaggedTemplateCall extends Call
     arg = new StringWithInterpolations Block.wrap([ new Value arg ]) if arg instanceof StringLiteral
     super variable, [ arg ], soak
 
-  _compileToBabylon: (o) ->
-    type: 'TaggedTemplateExpression'
-    tag: @variable.compileToBabylon o, LEVEL_ACCESS
-    quasi: @args[0].compileToBabylon o, LEVEL_LIST
+  astType: 'TaggedTemplateExpression'
+  astChildren: (o) ->
+    tag: @variable.toAst o, LEVEL_ACCESS
+    quasi: @args[0].toAst o, LEVEL_LIST
 
   compileNode: (o) ->
     @variable.compileToFragments(o, LEVEL_ACCESS).concat @args[0].compileToFragments(o, LEVEL_LIST)
@@ -5492,7 +5491,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
         hasComment
       if element instanceof StringLiteral
         compiled unless element.isEmpty()
-      else if compiled.type is 'JSXElement' and not hasComment
+      else if compiled.type in ['JSXElement', 'JSXFragment'] and not hasComment
         compiled
       else
         element.withBabylonLocationData
