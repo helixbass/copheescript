@@ -771,13 +771,22 @@ exports.Block = class Block extends Base
     return @rootToAst o unless o.scope
     super o, level
 
+  _toAst: (o) ->
+    top = o.level is LEVEL_TOP
+
+    if not top and @expressions.length
+      # return @withLocationData(new UndefinedLiteral).compileToBabylon o unless @expressions.length
+      return (new Sequence @expressions).toAst o
+
+    super o
+
   astType: ->
     if @isClassBody
       'ClassBody'
     else
       'BlockStatement'
-  astChildren:
-    expressions: 'body'
+  astChildren: (o) ->
+    body: @bodyToAst o
 
   initializeScope: (o) ->
     o.scope   = new Scope null, this, null, o.referencedVars ? []
@@ -1336,7 +1345,7 @@ exports.StringLiteral = class StringLiteral extends Literal
   _toAst: (o) ->
     return @CSXTextToAst o if @csx
     if not o.compiling and @originalValue.indexOf('\n') > -1
-      return @withLocationData(new StringWithInterpolations Block.wrap [new Value @]).toAst o
+      return @withLocationData(StringWithInterpolations.fromStringLiteral @).toAst o
     super o
 
   unquote: (doubleQuote = no, csx = no) ->
@@ -2116,7 +2125,7 @@ exports.RegexWithInterpolations = class RegexWithInterpolations extends Call
 
 exports.TaggedTemplateCall = class TaggedTemplateCall extends Call
   constructor: (variable, arg, soak) ->
-    arg = new StringWithInterpolations Block.wrap([ new Value arg ]) if arg instanceof StringLiteral
+    arg = StringWithInterpolations.fromStringLiteral arg if arg instanceof StringLiteral
     super variable, [ arg ], soak
 
   astType: 'TaggedTemplateExpression'
@@ -5283,9 +5292,11 @@ exports.Throw = class Throw extends Base
   # A **Throw** is already a return, of sorts...
   makeReturn: THIS
 
-  _compileToBabylon: (o) ->
-    type: 'ThrowStatement'
-    argument: @expression.compileToBabylon o, LEVEL_LIST
+  astType: 'ThrowStatement'
+  astChildren:
+    expression:
+      key: 'argument'
+      level: LEVEL_LIST
 
   compileNode: (o) ->
     fragments = @expression.compileToFragments o, LEVEL_LIST
@@ -5441,6 +5452,9 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
   constructor: (@body, {@quote, @startQuote, @endQuote} = {}) ->
     super()
 
+  @fromStringLiteral: (stringLiteral) ->
+    new StringWithInterpolations Block.wrap([ new Value stringLiteral ]), quote: stringLiteral.quote
+
   children: ['body']
 
   # `unwrap` returns `this` to stop ancestor nodes reaching in to grab @body,
@@ -5521,7 +5535,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
         lastElement = element
         justSawInterpolation = yes
 
-    {expressions, quasis}
+    {expressions, quasis, @quote}
 
   _toAst: (o) ->
     return @CSXContentToAst o if @csx
@@ -5904,12 +5918,11 @@ exports.Sequence = class Sequence extends Base
   constructor: (@expressions) ->
     super()
 
-  _compileToBabylon: (o) ->
-    return @expressions[0].compileToBabylon o if @expressions.length is 1
-    type: 'SequenceExpression'
-    expressions:
-      for expression in @expressions
-        expression.compileToBabylon o
+  astType: 'SequenceExpression'
+
+  _toAst: (o) ->
+    return @expressions[0].toAst o if @expressions.length is 1
+    super o
 
 #### Switch
 
