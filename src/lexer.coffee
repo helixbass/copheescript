@@ -1041,6 +1041,9 @@ exports.Lexer = class Lexer
         token.origin
       else
         token
+    # now that STRING tokens don't have surrounding quotes, allow the fact that
+    # they're wrapped in a String() object to guard against false comparisons
+    # to eg ';'
     if useToken?[0] is 'STRING'
       useToken[1]
     else
