@@ -13,7 +13,8 @@
 
 # Import the helpers we need.
 {count, repeat, invertLiterate, merge, dump, makeDelimitedLiteral
-attachCommentsToNode, throwSyntaxError, getNumberValue} = require './helpers'
+attachCommentsToNode, throwSyntaxError, getNumberValue
+normalizeStringObject} = require './helpers'
 
 # The Lexer Class
 # ---------------
@@ -212,14 +213,15 @@ exports.Lexer = class Lexer
     unless tag is 'PROPERTY' or @exportSpecifierList
       if id in COFFEE_ALIASES
         alias = id
-        id = COFFEE_ALIAS_MAP[id]
-      tag = switch id
+        id = new String COFFEE_ALIAS_MAP[id]
+        id.original = alias
+      tag = switch (normalized = normalizeStringObject id)
         when '!'                 then 'UNARY'
         when '==', '!='          then 'COMPARE'
         when 'true', 'false'     then 'BOOL'
         when 'break', 'continue', \
              'debugger'          then 'STATEMENT'
-        when '&&', '||'          then id
+        when '&&', '||'          then normalized
         else  tag
 
     tagToken = @token tag, id, 0, idLength
@@ -657,7 +659,7 @@ exports.Lexer = class Lexer
 
     if prev and value in ['=', COMPOUND_ASSIGN...]
       skipToken = false
-      if value is '=' and prev[1] in ['||', '&&'] and not prev.spaced
+      if value is '=' and normalizeStringObject(prev[1]) in ['||', '&&'] and not prev.spaced
         prev[0] = 'COMPOUND_ASSIGN'
         prev[1] += '='
         prev = @tokens[@tokens.length - 2]
@@ -1034,10 +1036,15 @@ exports.Lexer = class Lexer
   # Peek at the last value in the token stream.
   value: (useOrigin = no) ->
     [..., token] = @tokens
-    if useOrigin and token?.origin?
-      token.origin?[1]
+    useToken =
+      if useOrigin and token?.origin?
+        token.origin
+      else
+        token
+    if useToken?[0] is 'STRING'
+      useToken[1]
     else
-      token?[1]
+      normalizeStringObject useToken?[1]
 
   # Get the previous token in the token stream.
   prev: ->
@@ -1124,15 +1131,17 @@ exports.Lexer = class Lexer
 # Helper functions
 # ----------------
 
-isUnassignable = (name, displayName = name) -> switch
-  when name in [JS_KEYWORDS..., COFFEE_KEYWORDS...]
-    "keyword '#{displayName}' can't be assigned"
-  when name in STRICT_PROSCRIBED
-    "'#{displayName}' can't be assigned"
-  when name in RESERVED
-    "reserved word '#{displayName}' can't be assigned"
-  else
-    false
+isUnassignable = (name, displayName = name) ->
+  name = normalizeStringObject name
+  switch
+    when name in [JS_KEYWORDS..., COFFEE_KEYWORDS...]
+      "keyword '#{displayName}' can't be assigned"
+    when name in STRICT_PROSCRIBED
+      "'#{displayName}' can't be assigned"
+    when name in RESERVED
+      "reserved word '#{displayName}' can't be assigned"
+    else
+      false
 
 exports.isUnassignable = isUnassignable
 

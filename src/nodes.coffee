@@ -15,7 +15,8 @@ babylon = require 'babylon'
 addDataToNode, attachCommentsToNode, locationDataToString
 throwSyntaxError, getNumberValue, dump, locationDataToBabylon
 isArray, isBoolean, isPlainObject, mapValues, traverseBabylonAst
-babylonLocationFields, isFunction, makeDelimitedLiteral} = require './helpers'
+babylonLocationFields, isFunction, makeDelimitedLiteral
+normalizeStringObject} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -4852,6 +4853,9 @@ exports.Op = class Op extends Base
         return new Value firstCall.newInstance(), if firstCall is unwrapped then [] else unwrapped.properties
       first = new Parens first   if first instanceof Code and first.bound or first.do
 
+    @originalOperator = op.original
+    op = normalizeStringObject op
+    @originalOperator ?= op
     @operator = CONVERSIONS[op] or op
     @first    = first
     @second   = second
@@ -6316,6 +6320,3 @@ unfoldSoak = (o, parent, name) ->
   parent[name] = ifn.body
   ifn.body = new Value parent
   ifn
-
-normalizeStringObject = (str) ->
-  str.valueOf?() ? str
