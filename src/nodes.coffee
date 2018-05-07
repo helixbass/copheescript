@@ -4995,10 +4995,14 @@ exports.Op = class Op extends Base
         left: @first.toAst o, LEVEL_OP
         right: @second.toAst o, LEVEL_OP
 
-  astProps: ->
+  astProps: (o) ->
     return {} if @operator is 'new'
     {
-      @operator
+      operator:
+        if o.compiling
+          @operator
+        else
+          @originalOperator
       ...(
         if @isUnary()
           prefix: !@flip
