@@ -278,9 +278,9 @@ exports.getNumberValue = (number) ->
   return val unless invert
   val * -1
 
-exports.dump = dump = (...args, obj) ->
+exports.dump = dump = (args..., obj) ->
   util = require 'util'
-  console.log ...args, util.inspect obj, no, null
+  console.log args..., util.inspect obj, no, null
 
 exports.locationDataToBabylon = ({first_line, first_column, last_line, last_column, range}) -> {
   loc:
