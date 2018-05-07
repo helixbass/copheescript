@@ -233,3 +233,6 @@ exports.nameWhitespaceCharacter = (string) ->
     when '\r' then 'carriage return'
     when '\t' then 'tab'
     else string
+
+exports.normalizeStringObject = (str) ->
+  str?.valueOf?() ? str
