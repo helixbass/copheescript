@@ -1494,8 +1494,14 @@ exports.NullLiteral = class NullLiteral extends Literal
     super 'null'
 
 exports.BooleanLiteral = class BooleanLiteral extends Literal
-  astProps: ->
+  constructor: (value) ->
+    {original} = value
+    super value
+    @originalValue = original ? @value
+
+  astProps: (o) ->
     value: if @value is 'true' then yes else no
+    name: @originalValue
 
 exports.SuperLiteral = class SuperLiteral extends Literal
   astType: 'Super'
