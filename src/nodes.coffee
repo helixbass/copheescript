@@ -1235,6 +1235,7 @@ exports.Block = class Block extends Base
 exports.Literal = class Literal extends Base
   constructor: (@value) ->
     super()
+    @value = normalizeStringObject @value
 
   shouldCache: NO
 
