@@ -1483,6 +1483,10 @@ exports.UndefinedLiteral = class UndefinedLiteral extends Literal
   constructor: ->
     super 'undefined'
 
+  astType: 'Identifier'
+  astProps:
+    value: 'name'
+
   _compileToBabylon: (o) ->
     new Op('void', new NumberLiteral('0')).compileToBabylon o # TODO: capture LEVEL_ACCESS condition
 
@@ -2215,6 +2219,8 @@ exports.Range = class Range extends Base
 
     @exclusive = tag is 'exclusive'
     @equals = if @exclusive then '' else '='
+
+  astProps: ['exclusive']
 
   # Compiles the range's source variables -- where it starts and where it ends.
   # But only if they need to be cached to avoid double evaluation.
@@ -5013,7 +5019,7 @@ exports.Op = class Op extends Base
         if o.compiling
           @operator
         else
-          @originalOperator
+          "#{if @invertOperator then "#{@invertOperator} " else ''}#{@originalOperator}"
       ...(
         if @isUnary()
           prefix: !@flip
@@ -5700,6 +5706,17 @@ exports.For = class For extends While
           moveComments node, @[attribute]
       moveComments @[attribute], @
     this
+
+  astType: 'For'
+  astChildren:
+    source: 'source'
+    body:
+      level: LEVEL_TOP
+    guard: 'guard'
+
+  astProps: -> {
+    @postfix
+  }
 
   compileBodyToBabylon: (o) ->
     @body.compileToBabylon o, LEVEL_TOP
