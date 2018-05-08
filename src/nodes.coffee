@@ -3500,6 +3500,7 @@ exports.Assign = class Assign extends Base
   isAssignable: YES
 
   isStatement: (o) ->
+    return no unless o.compiling
     o?.level is LEVEL_TOP and @context? and (@moduleDeclaration or "?" in @context)
 
   checkAssignability: (o, varBase) ->
@@ -5708,14 +5709,23 @@ exports.For = class For extends While
     this
 
   astType: 'For'
-  astChildren:
-    source: 'source'
+  astChildren: (o) ->
+    source: @source?.toAst o
     body:
-      level: LEVEL_TOP
-    guard: 'guard'
+      if @postfix
+        @body.unwrap().toAst o
+      else
+        @body.toAst o, LEVEL_TOP
+    guard: @guard?.toAst o
+    name: @name?.toAst o
+    index: @index?.toAst o
 
   astProps: -> {
-    @postfix
+    @postfix, @step, @own
+    style: switch
+      when @from then 'from'
+      when @object then 'of'
+      when @name then 'in'
   }
 
   compileBodyToBabylon: (o) ->
