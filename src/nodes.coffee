@@ -5025,11 +5025,13 @@ exports.Op = class Op extends Base
     super o
 
   _compileToBabylon: (o) ->
+    if @originalOperator is 'in'
+      inNode = new In @first, @second
+      return (if @invertOperator then inNode.invert() else inNode).compileToBabylon o
     if @invertOperator
       @invertOperator = null
       return @invert().compileToBabylon o
     return Op::generateDo(@first).compileToBabylon o if @operator is 'do'
-    return new In(@first, @second).compileToBabylon o if @originalOperator is 'in'
     if @operator is '!' and @first instanceof Existence
       @first.negated = not @first.negated
       return @first.compileToBabylon o
