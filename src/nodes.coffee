@@ -4853,12 +4853,10 @@ exports.Op = class Op extends Base
     super()
 
     return new In first, second if op is 'in'
-    if op is 'do'
-      return Op::generateDo first
     if op is 'new'
       if ((firstCall = unwrapped = first.unwrap()) instanceof Call or (firstCall = unwrapped.base) instanceof Call) and not firstCall.do and not firstCall.isNew
         return new Value firstCall.newInstance(), if firstCall is unwrapped then [] else unwrapped.properties
-      first = new Parens first   if first instanceof Code and first.bound or first.do
+      first = new Parens first if first instanceof Code and first.bound or first instanceof Op and first.operator is 'do'
 
     @originalOperator = op.original
     op = normalizeStringObject op
@@ -4951,6 +4949,8 @@ exports.Op = class Op extends Base
     call
 
   compileNode: (o) ->
+    if @operator is 'do'
+      return Op::generateDo(@first).compileNode o
     isChain = @isChainable() and @first.isChainable()
     # In chains, there's no need to wrap bare obj literals in parens,
     # as the chained expression is wrapped.
@@ -5020,6 +5020,8 @@ exports.Op = class Op extends Base
     super o
 
   _compileToBabylon: (o) ->
+    if @operator is 'do'
+      return Op::generateDo(@first).compileToBabylon o
     if @operator is '!' and @first instanceof Existence
       @first.negated = not @first.negated
       return @first.compileToBabylon o
