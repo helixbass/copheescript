@@ -4849,22 +4849,22 @@ exports.While = class While extends Base
 # Simple Arithmetic and logical operations. Performs some conversion from
 # CoffeeScript operations into their JavaScript equivalents.
 exports.Op = class Op extends Base
-  constructor: (op, first, second, flip) ->
+  constructor: (op, first, second, flip, {@invertOperator} = {}) ->
     super()
 
-    return new In first, second if op is 'in'
+    @originalOperator = op.original
+    op = normalizeStringObject op
+    @originalOperator ?= op
     if op is 'new'
       if ((firstCall = unwrapped = first.unwrap()) instanceof Call or (firstCall = unwrapped.base) instanceof Call) and not firstCall.do and not firstCall.isNew
         return new Value firstCall.newInstance(), if firstCall is unwrapped then [] else unwrapped.properties
       first = new Parens first if first instanceof Code and first.bound or first instanceof Op and first.operator is 'do'
 
-    @originalOperator = op.original
-    op = normalizeStringObject op
-    @originalOperator ?= op
     @operator = CONVERSIONS[op] or op
     @first    = first
     @second   = second
     @flip     = !!flip
+    @invertOperator = @invertOperator?.original ? normalizeStringObject @invertOperator
     return this
 
   # The map of conversions from CoffeeScript to JavaScript symbols.
@@ -4949,8 +4949,11 @@ exports.Op = class Op extends Base
     call
 
   compileNode: (o) ->
-    if @operator is 'do'
-      return Op::generateDo(@first).compileNode o
+    if @invertOperator
+      @invertOperator = null
+      return @invert().compileNode(o)
+    return Op::generateDo(@first).compileNode o if @operator is 'do'
+    return new In(@first, @second).compileNode o if @originalOperator is 'in'
     isChain = @isChainable() and @first.isChainable()
     # In chains, there's no need to wrap bare obj literals in parens,
     # as the chained expression is wrapped.
@@ -5020,8 +5023,11 @@ exports.Op = class Op extends Base
     super o
 
   _compileToBabylon: (o) ->
-    if @operator is 'do'
-      return Op::generateDo(@first).compileToBabylon o
+    if @invertOperator
+      @invertOperator = null
+      return @invert().compileToBabylon o
+    return Op::generateDo(@first).compileToBabylon o if @operator is 'do'
+    return new In(@first, @second).compileToBabylon o if @originalOperator is 'in'
     if @operator is '!' and @first instanceof Existence
       @first.negated = not @first.negated
       return @first.compileToBabylon o
@@ -5457,7 +5463,7 @@ exports.Parens = class Parens extends Base
       return expr.compileToFragments o
     fragments = expr.compileToFragments o, LEVEL_PAREN
     bare = o.level < LEVEL_OP and not shouldWrapComment and (
-        expr instanceof Op or expr.unwrap() instanceof Call or
+        expr instanceof Op and expr.originalOperator isnt 'in' or expr.unwrap() instanceof Call or
         (expr instanceof For and expr.returns)
       ) and (o.level < LEVEL_COND or fragments.length <= 3)
     return @wrapInCommentBoundingBraces fragments if @csxAttribute
