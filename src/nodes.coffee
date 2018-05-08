@@ -3111,6 +3111,9 @@ exports.Op = class Op extends Base
     @operator in ['<', '>', '>=', '<=', '===', '!==']
 
   invert: ->
+    if @isIn()
+      @invertOperator = '!'
+      return @
     if @isChainable() and @first.isChainable()
       allInvertable = yes
       curr = this
@@ -3156,8 +3159,11 @@ exports.Op = class Op extends Base
     call.do = yes
     call
 
+  isIn: ->
+    @originalOperator is 'in'
+
   compileNode: (o) ->
-    if @originalOperator is 'in'
+    if @isIn()
       inNode = new In @first, @second
       return (if @invertOperator then inNode.invert() else inNode).compileNode o
     if @invertOperator
@@ -3435,7 +3441,7 @@ exports.Parens = class Parens extends Base
       return expr.compileToFragments o
     fragments = expr.compileToFragments o, LEVEL_PAREN
     bare = o.level < LEVEL_OP and not shouldWrapComment and (
-        expr instanceof Op and expr.originalOperator isnt 'in' or expr.unwrap() instanceof Call or
+        expr instanceof Op and not expr.isIn() or expr.unwrap() instanceof Call or
         (expr instanceof For and expr.returns)
       ) and (o.level < LEVEL_COND or fragments.length <= 3)
     return @wrapInBraces fragments if @csxAttribute
