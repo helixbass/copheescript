@@ -1275,6 +1275,10 @@ exports.NaNLiteral = class NaNLiteral extends NumberLiteral
   constructor: ->
     super 'NaN'
 
+  astType: 'Identifier'
+  astProps: ->
+    name: 'NaN'
+
   compileNode: (o) ->
     code = [@makeCode '0/0']
     if o.level >= LEVEL_OP then @wrapInParentheses code else code
@@ -5719,9 +5723,10 @@ exports.For = class For extends While
     guard: @guard?.toAst o
     name: @name?.toAst o
     index: @index?.toAst o
+    step: @step?.toAst o
 
   astProps: -> {
-    @postfix, @step, @own
+    @postfix, @own
     style: switch
       when @from then 'from'
       when @object then 'of'
