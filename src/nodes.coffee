@@ -1387,6 +1387,7 @@ exports.PassthroughLiteral = class PassthroughLiteral extends Literal
 
   _toAst: (o) ->
     return null unless @value.length
+    super o
 
   _compileToBabylon: (o) ->
     return null unless @value.length
@@ -3538,7 +3539,7 @@ exports.Assign = class Assign extends Base
       level: LEVEL_LIST
   astProps: ->
     return {} if @isDefault()
-    operator: @context or '='
+    operator: @originalContext or '='
 
   propagateLhs: ->
     return unless @variable?.isArray?() or @variable?.isObject?()
