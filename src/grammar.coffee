@@ -646,8 +646,8 @@ grammar =
   ]
 
   Loop: [
-    o 'LOOP Block',                             -> new While(LOC(1) new BooleanLiteral 'true').addBody $2
-    o 'LOOP Expression',                        -> new While(LOC(1) new BooleanLiteral 'true').addBody LOC(2) Block.wrap [$2]
+    o 'LOOP Block',                             -> new While(LOC(1)(new BooleanLiteral 'true'), isLoop: yes).addBody $2
+    o 'LOOP Expression',                        -> new While(LOC(1)(new BooleanLiteral 'true'), isLoop: yes).addBody LOC(2) Block.wrap [$2]
   ]
 
   # Array, object, and range comprehensions, at the most generic level.

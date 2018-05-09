@@ -4777,7 +4777,7 @@ exports.Elision = class Elision extends Base
 # it, all other loops can be manufactured. Useful in cases where you need more
 # flexibility or more speed than a comprehension can provide.
 exports.While = class While extends Base
-  constructor: (@condition, {@invert, @guard} = {}) ->
+  constructor: (@condition, {@invert, @guard, @isLoop} = {}) ->
     super()
 
     @processedCondition = if @invert then @condition.invert() else @condition
@@ -4815,6 +4815,7 @@ exports.While = class While extends Base
   astProps: -> {
     inverted: @invert
     @postfix
+    loop: @isLoop
   }
 
   wrapInResultAccumulatingBlock: ({o, resultsVar, cachedSourceVarAssign, cachedStepVarAssign}) -> (compiled) =>
@@ -5318,7 +5319,7 @@ exports.Try = class Try extends Base
       else if @recovery
         @recovery.withBabylonLocationData {
           type: 'CatchClause'
-          param: @errorVariable.toAst o
+          param: @errorVariable?.toAst o
           body: @recovery.toAst o
         }
     finalizer: @ensure?.toAst o, LEVEL_TOP
