@@ -91,7 +91,7 @@ test "basic splicing", ->
 test "unbounded splicing", ->
   ary = [0..9]
   ary[3..] = [9, 8, 7]
-  arrayEq [0, 1, 2, 9, 8, 7]. ary
+  arrayEq [0, 1, 2, 9, 8, 7], ary
 
   ary[...3] = [7, 8, 9]
   arrayEq [7, 8, 9, 9, 8, 7], ary

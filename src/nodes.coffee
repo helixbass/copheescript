@@ -1721,7 +1721,7 @@ exports.Value = class Value extends Base
     ret = @base.toAst o, if props.length then LEVEL_ACCESS else null
     for prop in props
       ret =
-        if prop instanceof Slice
+        if prop instanceof Slice and o.compiling
           prop.compileValueToBabylon o, ret
         else
           prop.withBabylonLocationData # TODO: should include location up through this prop
@@ -2430,6 +2430,9 @@ exports.Slice = class Slice extends Base
 
   constructor: (@range) ->
     super()
+
+  _toAst: (o) ->
+    @range.toAst o
 
   compileValueToBabylon: (o, compiledValue) ->
     {to, from, exclusive} = @range
