@@ -125,7 +125,7 @@ exports.Base = class Base
     return ast unless ast
     return ast if isArray ast
     return ast if ast.type
-    return ast unless do ->
+    return ast unless @emptyAst or do ->
       return yes for key in Object.keys(ast) when key not in ['comments', babylonLocationFields...]
 
     {
@@ -1394,6 +1394,10 @@ exports.PassthroughLiteral = class PassthroughLiteral extends Literal
       node.leading = yes
     compiled
 
+  astProps:
+    originalValue: 'value'
+    here: 'here'
+
   _toAst: (o) ->
     return null unless @value.length
     super o
@@ -1457,17 +1461,12 @@ exports.StatementLiteral = class StatementLiteral extends Literal
     return this if @value is 'break' and not (o?.loop or o?.block)
     return this if @value is 'continue' and not o?.loop
 
-  _compileToBabylon: (o) ->
+  astType: ->
     switch @value
-      when 'continue'
-        type: 'ContinueStatement'
-        label: null
-      when 'break'
-        type: 'BreakStatement'
-        label: null
+      when 'continue' then 'ContinueStatement'
+      when 'break'    then 'BreakStatement'
       # TODO: no tests broke without this, include test with debugger statement?
-      when 'debugger'
-        type: 'DebuggerStatement'
+      when 'debugger' then 'DebuggerStatement'
       # TODO: any others? throw error in else if we fall off the end of this switch?
 
   compileNode: (o) ->
@@ -2771,6 +2770,7 @@ exports.Arr = class Arr extends Base
     @lhs = yes if setLhs
     return unless @lhs
     for obj in @objects
+      obj.lhs = yes if obj instanceof Splat
       unwrappedObj = obj.unwrapAll()
       if unwrappedObj instanceof Arr or unwrappedObj instanceof Obj
         unwrappedObj.propagateLhs yes
@@ -4256,8 +4256,10 @@ exports.Code = class Code extends Base
     body: @body.toAst o, LEVEL_TOP
 
   paramsToAst: (o) ->
-    for {name, value, splat} in @params
-      (
+    for param in @params
+      (do ->
+        return param if param instanceof Expansion
+        {name, value, splat} = param
         if splat
           new Splat name, lhs: yes
         else if value?
@@ -4732,6 +4734,9 @@ exports.Splat = class Splat extends Base
 exports.Expansion = class Expansion extends Base
 
   shouldCache: NO
+
+  astType: 'RestElement'
+  emptyAst: yes
 
   compileNode: (o) ->
     @error 'Expansion must be used inside a destructuring assignment or parameter list'
@@ -5295,19 +5300,28 @@ exports.Try = class Try extends Base
     @recovery = @recovery.makeReturn res if @recovery
     this
 
-  _compileToBabylon: (o) ->
-    if @recovery or not @ensure
+  astType: 'TryStatement'
+  _toAst: (o) ->
+    {compiling} = o
+    if (@recovery or not @ensure) and compiling
       placeholder = new IdentifierLiteral(o.scope.freeVariable 'error', reserve: no).withEmptyLocationData()
       @recovery.unshift @recovery.withLocationData new Assign @errorVariable, placeholder if @errorVariable
 
-    type: 'TryStatement'
-    block: @attempt.compileToBabylon o, LEVEL_TOP
-    handler: (@recovery or @).withBabylonLocationData {
-      type: 'CatchClause'
-      param: placeholder.compileToBabylon o
-      body: (@recovery or @withLocationData new Block).compileToBabylon o, LEVEL_TOP
-    } if placeholder
-    finalizer: @ensure?.compileToBabylon o, LEVEL_TOP
+    block: @attempt.toAst o, LEVEL_TOP
+    handler:
+      if compiling
+        (@recovery or @).withBabylonLocationData {
+          type: 'CatchClause'
+          param: placeholder.compileToBabylon o
+          body: (@recovery or @withLocationData new Block).compileToBabylon o, LEVEL_TOP
+        } if placeholder
+      else if @recovery
+        @recovery.withBabylonLocationData {
+          type: 'CatchClause'
+          param: @errorVariable.toAst o
+          body: @recovery.toAst o
+        }
+    finalizer: @ensure?.toAst o, LEVEL_TOP
 
   # Compilation is more or less as you would expect -- the *finally* clause
   # is optional, the *catch* is not.
@@ -6027,10 +6041,11 @@ exports.Switch = class Switch extends Base
     @otherwise?.makeReturn res
     this
 
-  _compileToBabylon: (o) ->
+  astType: 'SwitchStatement'
+  astChildren: (o) ->
+    {compiling} = o
     lastCaseIndex = @cases.length - 1
-    type: 'SwitchStatement'
-    discriminant: (@subject ? new BooleanLiteral 'false').compileToBabylon o, LEVEL_PAREN
+    discriminant: (@subject ? if compiling then new BooleanLiteral 'false' else null)?.toAst o, LEVEL_PAREN
     cases: [
       ...flatten(
         for kase, caseIndex in @cases
@@ -6039,6 +6054,7 @@ exports.Switch = class Switch extends Base
           lastTestIndex = tests.length - 1
           test.withBabylonLocationData(do =>
             consequent.expressions.push new StatementLiteral 'break' if do =>
+              return no unless compiling
               return no if caseIndex is lastCaseIndex and not @otherwise
               lastExpr = @lastNode consequent.expressions
               return no if lastExpr instanceof Return
@@ -6047,10 +6063,10 @@ exports.Switch = class Switch extends Base
               yes
 
             type: 'SwitchCase'
-            test: (if @subject then test else test.invert()).compileToBabylon o, LEVEL_PAREN
+            test: (if @subject or not compiling then test else test.invert()).toAst o, LEVEL_PAREN
             consequent:
               if testIndex is lastTestIndex
-                consequent.compileToBabylon(o, LEVEL_TOP).body
+                consequent.toAst(o, LEVEL_TOP).body
               else []
           ) for test, testIndex in tests
       )
@@ -6058,7 +6074,7 @@ exports.Switch = class Switch extends Base
         if @otherwise?.expressions.length then [
           type: 'SwitchCase'
           test: null
-          consequent: @otherwise.compileToBabylon(o, LEVEL_TOP).body
+          consequent: @otherwise.toAst(o, LEVEL_TOP).body
         ] else [])
     ]
 
