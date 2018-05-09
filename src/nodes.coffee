@@ -3500,6 +3500,9 @@ exports.ExportSpecifier = class ExportSpecifier extends ModuleSpecifier
 exports.Assign = class Assign extends Base
   constructor: (@variable, @value, {@context, @param, @subpattern, @operatorToken, @moduleDeclaration, @shorthand} = {}) ->
     super()
+    @originalContext = @context?.original
+    @context = normalizeStringObject @context
+    @originalContext ?= @context
     @propagateLhs()
 
   children: ['variable', 'value']
