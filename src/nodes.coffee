@@ -3537,9 +3537,9 @@ exports.Assign = class Assign extends Base
     variable:
       key: 'left'
       level: LEVEL_LIST
-  astProps: ->
+  astProps: (o) ->
     return {} if @isDefault()
-    operator: @originalContext or '='
+    operator: (if o.compiling then @context else @originalContext) or '='
 
   propagateLhs: ->
     return unless @variable?.isArray?() or @variable?.isObject?()
