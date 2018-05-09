@@ -1378,6 +1378,15 @@ exports.RegexLiteral = class RegexLiteral extends Literal
     }
 
 exports.PassthroughLiteral = class PassthroughLiteral extends Literal
+  constructor: (@originalValue) ->
+    super ''
+    {@here} = @originalValue
+    @originalValue = normalizeStringObject @originalValue
+    @value = @originalValue.replace /\\+(`|$)/g, (string) ->
+      # `string` is always a value like '\`', '\\\`', '\\\\\`', etc.
+      # By reducing it to its latter half, we turn '\`' to '`', '\\\`' to '\`', etc.
+      string[-Math.ceil(string.length / 2)..]
+
   withEnhancedComments: (compiled) ->
     traverseBabylonAst compiled, (node) ->
       return unless node.start and not node.range
