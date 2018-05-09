@@ -2572,6 +2572,7 @@ exports.Obj = class Obj extends Base
     super o
 
   expandProperties: (o) ->
+    {compiling} = o
     for prop in @properties then do =>
       key = if prop instanceof Assign and prop.context is 'object'
         prop.variable
@@ -2611,7 +2612,7 @@ exports.Obj = class Obj extends Base
         else if prop instanceof Splat
           prop
         else
-          new Assign prop, prop, context: 'object', shorthand: prop.bareLiteral? IdentifierLiteral
+          new Assign prop, prop, context: 'object', shorthand: not compiling or prop.bareLiteral? IdentifierLiteral
       )
 
   propagateLhs: (setLhs) ->
