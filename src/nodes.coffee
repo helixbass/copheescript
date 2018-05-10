@@ -1268,6 +1268,10 @@ exports.InfinityLiteral = class InfinityLiteral extends NumberLiteral
   compileNode: ->
     [@makeCode '2e308']
 
+  astType: 'Identifier'
+  astProps: ->
+    name: 'Infinity'
+
   _compileToBabylon: (o) ->
     new NumberLiteral('2e308').compileToBabylon o
 
@@ -1365,7 +1369,7 @@ exports.StringLiteral = class StringLiteral extends Literal
 
 exports.RegexLiteral = class RegexLiteral extends Literal
   REGEX_REGEX: /^\/(.*)\/(\w*)$/
-  _compileToBabylon: (o) ->
+  _toAst: (o) ->
     [, pattern, flags] = @REGEX_REGEX.exec @value
     {
       type: 'RegExpLiteral'
@@ -1482,7 +1486,7 @@ exports.ThisLiteral = class ThisLiteral extends Literal
         o.scope.method.context
       else
         @value
-    if value is 'this'
+    if value is 'this' or not o.compiling
       type: 'ThisExpression'
     else
       type: 'Identifier' # TODO: refine/share code?
@@ -2584,9 +2588,12 @@ exports.Obj = class Obj extends Base
         prop
       if key instanceof Value and key.hasProperties()
         key.error 'invalid object key' unless prop.context isnt 'object' and key.this
-        key  = key.properties[0].name
-        prop.nestedLhs = yes
-        prop = prop.withLocationData new Assign key, prop, context: 'object'
+        if compiling
+          key  = key.properties[0].name
+          prop.nestedLhs = yes
+          prop = prop.withLocationData new Assign key, prop, context: 'object'
+        else
+          return new Assign prop, prop, context: 'object', shorthand: yes
       return prop unless key is prop
       prop.withLocationData(
         if prop.shouldCache()
@@ -5321,7 +5328,7 @@ exports.Try = class Try extends Base
         @recovery.withBabylonLocationData {
           type: 'CatchClause'
           param: @errorVariable?.toAst o
-          body: @recovery.toAst o
+          body: @recovery.toAst o, LEVEL_TOP
         }
     finalizer: @ensure?.toAst o, LEVEL_TOP
 
