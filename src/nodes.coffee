@@ -4763,7 +4763,7 @@ exports.Elision = class Elision extends Base
 
   shouldCache: NO
 
-  _compileToBabylon: (o) ->
+  _toAst: (o) ->
     null
 
   compileToFragments: (o, level) ->
