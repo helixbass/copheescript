@@ -1482,13 +1482,17 @@ exports.ThisLiteral = class ThisLiteral extends Literal
     @shorthand = yes if value is '@'
 
   _toAst: (o) ->
+    {compiling} = o
     value =
       if o.scope.method?.bound
         o.scope.method.context
       else
         @value
-    if value is 'this' or not o.compiling
-      type: 'ThisExpression'
+    if value is 'this' or not compiling
+      {
+        type: 'ThisExpression'
+        (if compiling then {} else {@shorthand})...
+      }
     else
       type: 'Identifier' # TODO: refine/share code?
       name: value
@@ -1744,6 +1748,7 @@ exports.Value = class Value extends Base
             property: prop.toAst o
             computed: prop instanceof Index or prop.name?.unwrap() not instanceof PropertyName
             optional: prop.soak
+            shorthand: prop.shorthand
     ret
 
   # Unfold a soak into an `If`: `a?.b` -> `a.b if a?`
@@ -2186,12 +2191,8 @@ exports.Extends = class Extends extends Base
 # A `.` access into a property of a value, or the `::` shorthand for
 # an access into the object's prototype.
 exports.Access = class Access extends Base
-  # constructor: (@name, {@soak, @shorthand} = {}) ->
-  constructor: (@name, opts) ->
+  constructor: (@name, {@soak, @shorthand} = {}) ->
     super()
-    opts = {soak: yes} if opts is 'soak'
-    opts ?= {}
-    {@soak, @shorthand} = opts
 
   children: ['name']
 
