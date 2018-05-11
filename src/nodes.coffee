@@ -1477,8 +1477,9 @@ exports.StatementLiteral = class StatementLiteral extends Literal
     [@makeCode "#{@tab}#{@value};"]
 
 exports.ThisLiteral = class ThisLiteral extends Literal
-  constructor: ->
+  constructor: (value) ->
     super 'this'
+    @shorthand = yes if value is '@'
 
   _toAst: (o) ->
     value =
@@ -2185,9 +2186,12 @@ exports.Extends = class Extends extends Base
 # A `.` access into a property of a value, or the `::` shorthand for
 # an access into the object's prototype.
 exports.Access = class Access extends Base
-  constructor: (@name, tag) ->
+  # constructor: (@name, {@soak, @shorthand} = {}) ->
+  constructor: (@name, opts) ->
     super()
-    @soak  = tag is 'soak'
+    opts = {soak: yes} if opts is 'soak'
+    opts ?= {}
+    {@soak, @shorthand} = opts
 
   children: ['name']
 
