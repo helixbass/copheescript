@@ -2567,7 +2567,9 @@ exports.Obj = class Obj extends Base
             else
               compiledValue
           shorthand: !!shorthand
-          computed: isComputedPropertyName or variable.shouldCache()
+          computed: do ->
+            return no if not o.compiling and variable.unwrap() instanceof StringWithInterpolations
+            isComputedPropertyName or variable.shouldCache()
 
   _toAst: (o) ->
     return @CSXAttributesToAst o if @csx
@@ -2593,9 +2595,9 @@ exports.Obj = class Obj extends Base
         prop
       if key instanceof Value and key.hasProperties()
         key.error 'invalid object key' unless prop.context isnt 'object' and key.this
+        prop.nestedLhs = yes
         if compiling
           key  = key.properties[0].name
-          prop.nestedLhs = yes
           prop = prop.withLocationData new Assign key, prop, context: 'object'
         else
           return new Assign prop, prop, context: 'object', shorthand: yes
@@ -3546,9 +3548,9 @@ exports.Assign = class Assign extends Base
   unfoldSoak: (o) ->
     unfoldSoak o, this, 'variable'
 
-  isDefault: -> @param or @nestedLhs
+  isDefaultAssignment: -> @param or @nestedLhs
   astType: ->
-    if @isDefault()
+    if @isDefaultAssignment()
       'AssignmentPattern'
     else
       'AssignmentExpression'
@@ -3560,7 +3562,7 @@ exports.Assign = class Assign extends Base
       key: 'left'
       level: LEVEL_LIST
   astProps: (o) ->
-    return {} if @isDefault()
+    return {} if @isDefaultAssignment()
     operator: (if o.compiling then @context else @originalContext) or '='
 
   propagateLhs: ->
@@ -6201,7 +6203,7 @@ exports.If = class If extends Base
     consequent: @bodyNode().toAst o, LEVEL_LIST
     alternate:
       if @elseBodyNode()
-        @elseBodyNode().toAst o, LEVEL_LIST
+        @elseBodyNode().toAst o, if o.compiling then LEVEL_LIST else LEVEL_TOP
       else if o.compiling
         new UndefinedLiteral().toAst o
     ...@astFields o
