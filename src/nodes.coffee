@@ -1533,8 +1533,8 @@ exports.SuperLiteral = class SuperLiteral extends Literal
   astType: 'Super'
 
 exports.DefaultLiteral = class DefaultLiteral extends Literal
-  _compileToBabylon: (o) ->
-    type: 'Identifier'
+  astType: 'Identifier'
+  astProps: ->
     name: 'default'
 
 exports.Directive = class Directive extends Base
@@ -6200,7 +6200,7 @@ exports.If = class If extends Base
 
   expressionToAst: (o) -> {
     test: @useCondition(o).toAst o, LEVEL_COND
-    consequent: @bodyNode().toAst o, LEVEL_LIST
+    consequent: @bodyNode().toAst o, if o.compiling then LEVEL_LIST else LEVEL_TOP
     alternate:
       if @elseBodyNode()
         @elseBodyNode().toAst o, if o.compiling then LEVEL_LIST else LEVEL_TOP
