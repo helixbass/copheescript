@@ -4274,7 +4274,7 @@ exports.Code = class Code extends Base
         return param if param instanceof Expansion
         {name, value, splat} = param
         if splat
-          new Splat name, lhs: yes
+          new Splat name, lhs: yes, postfix: splat.postfix
         else if value?
           new Assign name, value, param: yes
         else
@@ -4707,7 +4707,7 @@ exports.Param = class Param extends Base
 # A splat, either as a parameter to a function, an argument to a call,
 # or as part of a destructuring assignment.
 exports.Splat = class Splat extends Base
-  constructor: (name, {@lhs} = {}) ->
+  constructor: (name, {@lhs, @postfix = true} = {}) ->
     super()
     @name = if name.compile then name else new Literal name
 
@@ -4734,6 +4734,9 @@ exports.Splat = class Splat extends Base
     name:
       key: 'argument'
       level: LEVEL_OP
+
+  astProps: ->
+    {@postfix}
 
   compileNode: (o) ->
     [@makeCode('...'), @name.compileToFragments(o, LEVEL_OP)...]
