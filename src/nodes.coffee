@@ -1393,8 +1393,7 @@ exports.RegexLiteral = class RegexLiteral extends Literal
     {
       type: 'RegExpLiteral'
       value: undefined
-      pattern
-      @flags
+      pattern, @flags, @delimiter
       extra:
         raw:
           if o.compiling
@@ -2176,11 +2175,23 @@ exports.RegexWithInterpolations = class RegexWithInterpolations extends Base
   constructor: (@call) ->
     super()
 
-  compileNode: (o) ->
-    @call.compileNode o
+  children: ['call']
+
+  astType: 'RegExpLiteral'
+
+  astChildren: (o) ->
+    interpolatedPattern: @call.args[0].toAst o
+
+  astProps: (o) ->
+    flags: @call.args[1]?.unwrap().originalValue ? ''
+    delimiter: '///'
 
   _toAst: (o) ->
-    @call.toAst o
+    return @call.toAst o if o.compiling
+    super o
+
+  compileNode: (o) ->
+    @call.compileNode o
 
 #### TaggedTemplateCall
 
