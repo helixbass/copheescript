@@ -166,24 +166,33 @@ grammar =
   ]
 
   String: [
-    o 'STRING',                                 -> new StringLiteral $1, {quote: $1.quote, initialChunk: $1.initialChunk, finalChunk: $1.finalChunk, indent: $1.indent, double: $1.double}
+    o 'STRING', ->
+      new StringLiteral(
+        $1.slice 1, -1 # strip artificial quotes and unwrap to primitive string
+        quote:        $1.quote
+        initialChunk: $1.initialChunk
+        finalChunk:   $1.finalChunk
+        indent:       $1.indent
+        double:       $1.double
+        heregex:      $1.heregex
+      )
     o 'STRING_START Body STRING_END',           -> new StringWithInterpolations $2, quote: $1.quote, startQuote: LOC(1)(new Literal $1), endQuote: LOC(3)(new Literal $3)
   ]
 
   Regex: [
-    o 'REGEX',                                  -> new RegexLiteral $1
-    o 'REGEX_START Invocation REGEX_END',       -> new RegexWithInterpolations $2.args
+    o 'REGEX',                                  -> new RegexLiteral "#{$1}", delimiter: $1.delimiter
+    o 'REGEX_START Invocation REGEX_END',       -> new RegexWithInterpolations $2
   ]
 
   # All of our immediate values. Generally these can be passed straight
   # through and printed to JavaScript.
   Literal: [
     o 'AlphaNumeric'
-    o 'JS',                                     -> new PassthroughLiteral $1
+    o 'JS',                                     -> new PassthroughLiteral "#{$1}", here: $1.here
     o 'Regex'
     o 'UNDEFINED',                              -> new UndefinedLiteral $1
     o 'NULL',                                   -> new NullLiteral $1
-    o 'BOOL',                                   -> new BooleanLiteral $1
+    o 'BOOL',                                   -> new BooleanLiteral "#{$1}", originalValue: $1.original
     o 'INFINITY',                               -> new InfinityLiteral $1
     o 'NAN',                                    -> new NaNLiteral $1
   ]
@@ -805,7 +814,7 @@ grammar =
   ]
 
   Operation: [
-    o 'UNARY Expression',                       -> new Op $1 , $2
+    o 'UNARY Expression',                       -> new Op "#{$1}", $2, null, null, originalOperator: $1.original
     o 'UNARY_MATH Expression',                  -> new Op $1 , $2
     o '-     Expression',                      (-> new Op '-', $2), prec: 'UNARY_MATH'
     o '+     Expression',                      (-> new Op '+', $2), prec: 'UNARY_MATH'
@@ -826,21 +835,21 @@ grammar =
     o 'Expression MATH     Expression',         -> new Op $2, $1, $3
     o 'Expression **       Expression',         -> new Op $2, $1, $3
     o 'Expression SHIFT    Expression',         -> new Op $2, $1, $3
-    o 'Expression COMPARE  Expression',         -> new Op $2, $1, $3
+    o 'Expression COMPARE  Expression',         -> new Op "#{$2}", $1, $3, null, originalOperator: $2.original
     o 'Expression &        Expression',         -> new Op $2, $1, $3
     o 'Expression ^        Expression',         -> new Op $2, $1, $3
     o 'Expression |        Expression',         -> new Op $2, $1, $3
-    o 'Expression &&       Expression',         -> new Op $2, $1, $3
-    o 'Expression ||       Expression',         -> new Op $2, $1, $3
+    o 'Expression &&       Expression',         -> new Op "#{$2}", $1, $3, null, originalOperator: $2.original
+    o 'Expression ||       Expression',         -> new Op "#{$2}", $1, $3, null, originalOperator: $2.original
     o 'Expression BIN?     Expression',         -> new Op $2, $1, $3
-    o 'Expression RELATION Expression',         -> new Op $2, $1, $3, null, invertOperator: $2.invert
+    o 'Expression RELATION Expression',         -> new Op "#{$2}", $1, $3, null, invertOperator: $2.invert?.original ? $2.invert
 
     o 'SimpleAssignable COMPOUND_ASSIGN
-       Expression',                             -> new Assign $1, $3, context: $2
+       Expression',                             -> new Assign $1, $3, context: "#{$2}", originalContext: $2.original
     o 'SimpleAssignable COMPOUND_ASSIGN
-       INDENT Expression OUTDENT',              -> new Assign $1, $4, context: $2
+       INDENT Expression OUTDENT',              -> new Assign $1, $4, context: "#{$2}", originalContext: $2.original
     o 'SimpleAssignable COMPOUND_ASSIGN TERMINATOR
-       Expression',                             -> new Assign $1, $4, context: $2
+       Expression',                             -> new Assign $1, $4, context: "#{$2}", originalContext: $2.original
   ]
 
 # Precedence

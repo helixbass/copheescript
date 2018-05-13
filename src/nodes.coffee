@@ -16,7 +16,7 @@ addDataToNode, attachCommentsToNode, locationDataToString
 throwSyntaxError, getNumberValue, dump, locationDataToBabylon
 isArray, isBoolean, isPlainObject, mapValues, traverseBabylonAst
 babylonLocationFields, isFunction, makeDelimitedLiteral
-normalizeStringObject} = require './helpers'
+replaceUnicodeCodePointEscapes} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -1235,7 +1235,6 @@ exports.Block = class Block extends Base
 exports.Literal = class Literal extends Base
   constructor: (@value) ->
     super()
-    @value = normalizeStringObject @value
 
   shouldCache: NO
 
@@ -1291,34 +1290,38 @@ exports.NaNLiteral = class NaNLiteral extends NumberLiteral
     new Op('/', new NumberLiteral('0'), new NumberLiteral('0')).compileToBabylon o
 
 exports.StringLiteral = class StringLiteral extends Literal
-  constructor: (@originalValue, {@quote, @initialChunk, @finalChunk, @indent, @double} = {}) ->
+  constructor: (@originalValue, {@quote, @initialChunk, @finalChunk, @indent, @double, @heregex} = {}) ->
     super ''
     @fromSourceString = @quote?
     @quote ?= '"'
-    @originalValue = normalizeStringObject @originalValue
     @formatValue()
 
   formatValue: ->
     heredoc = @quote.length is 3
     @value = do =>
       val = @originalValue
-      val =
-        unless @fromSourceString
-          val
-        else if heredoc
-          indentRegex = /// \n#{@indent} ///g if @indent
+      if @heregex
+        val = val.replace HEREGEX_OMIT, '$1$2'
+        val = replaceUnicodeCodePointEscapes val, flags: @heregex.flags
+      else
+        val = val.replace STRING_OMIT, '$1'
+        val =
+          unless @fromSourceString
+            val
+          else if heredoc
+            indentRegex = /// \n#{@indent} ///g if @indent
 
-          val = val.replace indentRegex, '\n' if indentRegex
-          val = val.replace LEADING_BLANK_LINE,  '' if @initialChunk
-          val = val.replace TRAILING_BLANK_LINE, '' if @finalChunk
-          val
-        else
-          val.replace SIMPLE_STRING_OMIT, (match, offset) =>
-            if (@initialChunk and offset is 0) or
-               (@finalChunk and offset + match.length is val.length)
-              ''
-            else
-              ' '
+            val = val.replace indentRegex, '\n' if indentRegex
+            val = val.replace LEADING_BLANK_LINE,  '' if @initialChunk
+            val = val.replace TRAILING_BLANK_LINE, '' if @finalChunk
+            val
+          else
+            val.replace SIMPLE_STRING_OMIT, (match, offset) =>
+              if (@initialChunk and offset is 0) or
+                 (@finalChunk and offset + match.length is val.length)
+                ''
+              else
+                ' '
       @delimit val
 
   delimit: (val) ->
@@ -1329,7 +1332,6 @@ exports.StringLiteral = class StringLiteral extends Literal
 
   compileNode: (o) ->
     return [@makeCode @unquote(yes, yes)] if @csx
-    # @formatValue()
     super o
 
   CSXTextToAst: (o) ->
@@ -1368,24 +1370,43 @@ exports.StringLiteral = class StringLiteral extends Literal
     not @unquote().length
 
 exports.RegexLiteral = class RegexLiteral extends Literal
-  REGEX_REGEX: /^\/(.*)\/(\w*)$/
+  constructor: (value, {@delimiter = '/'} = {}) ->
+    super ''
+    @formatValue value
+
+  formatValue: (val) ->
+    heregex = @delimiter is '///'
+    endDelimiterIndex = val.lastIndexOf '/'
+    @flags = val[endDelimiterIndex + 1..]
+    @value = do =>
+      val = @originalValue = val[1...endDelimiterIndex]
+      val = val.replace HEREGEX_OMIT, '$1$2' if heregex
+      val = replaceUnicodeCodePointEscapes val, {@flags}
+      "#{makeDelimitedLiteral val, delimiter: '/'}#{@flags}"
+
+  REGEX_REGEX: /^\/(.*)\/$/
   _toAst: (o) ->
-    [, pattern, flags] = @REGEX_REGEX.exec @value
+    if o.compiling
+      [, pattern] = @REGEX_REGEX.exec @value
+    else
+      pattern = @originalValue
     {
       type: 'RegExpLiteral'
       value: undefined
       pattern
-      flags
+      @flags
       extra:
-        raw: @value
+        raw:
+          if o.compiling
+            @value
+          else
+            "#{@delimiter}#{@originalValue}#{@delimiter}#{@flags}"
         rawValue: undefined
     }
 
 exports.PassthroughLiteral = class PassthroughLiteral extends Literal
-  constructor: (@originalValue) ->
+  constructor: (@originalValue, {@here} = {}) ->
     super ''
-    {@here} = @originalValue
-    @originalValue = normalizeStringObject @originalValue
     @value = @originalValue.replace /\\+(`|$)/g, (string) ->
       # `string` is always a value like '\`', '\\\`', '\\\\\`', etc.
       # By reducing it to its latter half, we turn '\`' to '`', '\\\`' to '\`', etc.
@@ -1520,10 +1541,9 @@ exports.NullLiteral = class NullLiteral extends Literal
     super 'null'
 
 exports.BooleanLiteral = class BooleanLiteral extends Literal
-  constructor: (value) ->
-    {original} = value
+  constructor: (value, {@originalValue} = {}) ->
     super value
-    @originalValue = original ? @value
+    @originalValue ?= @value
 
   astProps: (o) ->
     value: if @value is 'true' then yes else no
@@ -2152,9 +2172,12 @@ exports.Super = class Super extends Base
 
 # Regexes with interpolations are in fact just a variation of a `Call` (a
 # `RegExp()` call to be precise) with a `StringWithInterpolations` inside.
-exports.RegexWithInterpolations = class RegexWithInterpolations extends Call
-  constructor: (args = []) ->
-    super (new Value new IdentifierLiteral 'RegExp'), args, false
+exports.RegexWithInterpolations = class RegexWithInterpolations extends Base
+  constructor: (@call) ->
+    super()
+
+  compileNode: (o) ->
+    @call.compileNode o
 
 #### TaggedTemplateCall
 
@@ -3523,10 +3546,8 @@ exports.ExportSpecifier = class ExportSpecifier extends ModuleSpecifier
 # The **Assign** is used to assign a local variable to value, or to set the
 # property of an object -- including within object literals.
 exports.Assign = class Assign extends Base
-  constructor: (@variable, @value, {@context, @param, @subpattern, @operatorToken, @moduleDeclaration, @shorthand} = {}) ->
+  constructor: (@variable, @value, {@context, @param, @subpattern, @operatorToken, @moduleDeclaration, @shorthand, @originalContext} = {}) ->
     super()
-    @originalContext = @context?.original
-    @context = normalizeStringObject @context
     @originalContext ?= @context
     @propagateLhs()
 
@@ -4900,12 +4921,9 @@ exports.While = class While extends Base
 # Simple Arithmetic and logical operations. Performs some conversion from
 # CoffeeScript operations into their JavaScript equivalents.
 exports.Op = class Op extends Base
-  constructor: (op, first, second, flip, {@invertOperator} = {}) ->
+  constructor: (op, first, second, flip, {@invertOperator, @originalOperator = op} = {}) ->
     super()
 
-    @originalOperator = op.original
-    op = normalizeStringObject op
-    @originalOperator ?= op
     if op is 'new'
       if ((firstCall = unwrapped = first.unwrap()) instanceof Call or (firstCall = unwrapped.base) instanceof Call) and not firstCall.do and not firstCall.isNew
         return new Value firstCall.newInstance(), if firstCall is unwrapped then [] else unwrapped.properties
@@ -4915,7 +4933,6 @@ exports.Op = class Op extends Base
     @first    = first
     @second   = second
     @flip     = !!flip
-    @invertOperator = @invertOperator?.original ? normalizeStringObject @invertOperator
     return this
 
   # The map of conversions from CoffeeScript to JavaScript symbols.
@@ -6326,6 +6343,15 @@ SIMPLENUM = /^[+-]?\d+$/
 SIMPLE_STRING_OMIT = /\s*\n\s*/g
 LEADING_BLANK_LINE  = /^[^\n\S]*\n/
 TRAILING_BLANK_LINE = /\n[^\n\S]*$/
+STRING_OMIT    = ///
+    ((?:\\\\)+)      # Consume (and preserve) an even number of backslashes.
+  | \\[^\S\n]*\n\s*  # Remove escaped newlines.
+///g
+HEREGEX_OMIT = ///
+    ((?:\\\\)+)     # Consume (and preserve) an even number of backslashes.
+  | \\(\s)          # Preserve escaped whitespace.
+  | \s+(?:#.*)?     # Remove whitespace and comments.
+///g
 
 BABYLON_STATEMENT_TYPES = ['ExpressionStatement', 'ClassMethod', 'ArrayExpression', 'ReturnStatement', 'TemplateElement', 'JSXEmptyExpression', 'ThrowStatement', 'IfStatement', 'ForStatement', 'ForInStatement', 'BlockStatement', 'ImportSpecifier', 'VariableDeclarator']
 

@@ -344,6 +344,7 @@ exports.traverseBabylonAsts = traverseBabylonAsts = (node, correspondingNode, fu
     return unless isPlainObject correspondingNode
     traverseBabylonAsts(child, correspondingNode[key], func) for own key, child of node when key not in locationFields
 
+# Constructs a string or regex by escaping certain characters.
 exports.makeDelimitedLiteral = (body, options = {}) ->
     body = '(?:)' if body is '' and options.delimiter is '/'
     regex = ///
@@ -365,5 +366,33 @@ exports.makeDelimitedLiteral = (body, options = {}) ->
       when other     then (if options.double then "\\#{other}" else other)
     "#{options.delimiter}#{body}#{options.delimiter}"
 
-exports.normalizeStringObject = (str) ->
-  str?.valueOf?() ? str
+unicodeCodePointToUnicodeEscapes = (codePoint) ->
+  toUnicodeEscape = (val) ->
+    str = val.toString 16
+    "\\u#{repeat '0', 4 - str.length}#{str}"
+  return toUnicodeEscape(codePoint) if codePoint < 0x10000
+  # surrogate pair
+  high = Math.floor((codePoint - 0x10000) / 0x400) + 0xD800
+  low = (codePoint - 0x10000) % 0x400 + 0xDC00
+  "#{toUnicodeEscape(high)}#{toUnicodeEscape(low)}"
+
+# Replace `\u{...}` with `\uxxxx[\uxxxx]` in regexes without `u` flag
+exports.replaceUnicodeCodePointEscapes = (str, {flags, error, delimiter = ''} = {}) ->
+  shouldReplace = flags? and 'u' not in flags
+  str.replace UNICODE_CODE_POINT_ESCAPE, (match, escapedBackslash, codePointHex, offset) ->
+    return escapedBackslash if escapedBackslash
+
+    codePointDecimal = parseInt codePointHex, 16
+    if codePointDecimal > 0x10ffff
+      error "unicode code point escapes greater than \\u{10ffff} are not allowed",
+        offset: offset + delimiter.length
+        length: codePointHex.length + 4
+    return match unless shouldReplace
+
+    unicodeCodePointToUnicodeEscapes codePointDecimal
+
+UNICODE_CODE_POINT_ESCAPE = ///
+  ( \\\\ )        # Make sure the escape isn’t escaped.
+  |
+  \\u\{ ( [\da-fA-F]+ ) \}
+///g
