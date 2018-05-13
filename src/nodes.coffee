@@ -1384,7 +1384,7 @@ exports.RegexLiteral = class RegexLiteral extends Literal
       val = replaceUnicodeCodePointEscapes val, {@flags}
       "#{makeDelimitedLiteral val, delimiter: '/'}#{@flags}"
 
-  REGEX_REGEX: /^\/(.*)\/$/
+  REGEX_REGEX: /^\/(.*)\/\w*$/
   _toAst: (o) ->
     if o.compiling
       [, pattern] = @REGEX_REGEX.exec @value
@@ -2178,6 +2178,9 @@ exports.RegexWithInterpolations = class RegexWithInterpolations extends Base
 
   compileNode: (o) ->
     @call.compileNode o
+
+  _toAst: (o) ->
+    @call.toAst o
 
 #### TaggedTemplateCall
 
