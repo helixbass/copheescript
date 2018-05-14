@@ -785,7 +785,7 @@ exports.Lexer = class Lexer
       rest = str[interpolationOffset..]
       {tokens: nested, index} =
         new Lexer().tokenize rest, {line, column, offset, untilBalanced: on}
-      # Account for the `#` in `#{`
+      # Account for the `#` in `#{`.
       index += interpolationOffset
 
       braceInterpolator = str[index - 1] is '}'
@@ -896,7 +896,7 @@ exports.Lexer = class Lexer
           locationToken = token
           tokensToPush = [token]
       if @tokens.length > firstIndex
-        # Create a 0-length "+" token.
+        # Create a 0-length `+` token.
         plusToken = @token '+', '+'
         plusToken[2] =
           first_line:   locationToken[2].first_line
@@ -974,8 +974,8 @@ exports.Lexer = class Lexer
     [locationData.first_line, locationData.first_column, locationData.range[0]] =
       @getLineAndColumnFromChunk offsetInChunk
 
-    # Use length - 1 for the final offset - we're supplying the last_line and the last_column,
-    # so if last_column == first_column, then we're looking at a character of length 1.
+    # Use length - 1 for the final offset - we’re supplying the last_line and the last_column,
+    # so if last_column == first_column, then we’re looking at a character of length 1.
     lastCharacter = if length > 0 then (length - 1) else 0
     [locationData.last_line, locationData.last_column, locationData.range[1]] =
       @getLineAndColumnFromChunk offsetInChunk + lastCharacter
@@ -984,8 +984,10 @@ exports.Lexer = class Lexer
 
   # Same as `token`, except this just returns the token without adding it
   # to the results.
-  makeToken: (tag, value, {offset: offsetInChunk = 0, length = value.length} = {}) ->
-    [tag, value, @makeLocationData {offsetInChunk, length}]
+  makeToken: (tag, value, {offset: offsetInChunk = 0, length = value.length, origin} = {}) ->
+    token = [tag, value, @makeLocationData {offsetInChunk, length}]
+    token.origin = origin if origin
+    token
 
   # Add a token to the results.
   # `offset` is the offset into the current `@chunk` where the token starts.
@@ -994,7 +996,7 @@ exports.Lexer = class Lexer
   #
   # Returns the new token.
   token: (tag, value, {offset, length, origin, data} = {}) ->
-    token = @makeToken tag, value, {offset, length}
+    token = @makeToken tag, value, {offset, length, origin}
     token.origin = origin if origin
     addTokenData token, data if data
     @tokens.push token
