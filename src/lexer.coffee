@@ -462,6 +462,7 @@ exports.Lexer = class Lexer
 
     size = indent.length - 1 - indent.lastIndexOf '\n'
     noNewlines = @unfinished()
+    noIndents = @shouldSuppressIndents()
 
     newIndentLiteral = if size > 0 then indent[-size..] else ''
     unless /^(.?)\1*$/.exec newIndentLiteral
@@ -481,6 +482,9 @@ exports.Lexer = class Lexer
       if noNewlines
         @indebt = size - @indent unless backslash
         @suppressNewlines()
+        return indent.length
+      if noIndents
+        @newlineToken 0
         return indent.length
       unless @tokens.length
         @baseIndent = @indent = size
@@ -995,6 +999,10 @@ exports.Lexer = class Lexer
     LINE_CONTINUER.test(@chunk) or
     @tag() in UNFINISHED
 
+  # Should an indent be treated as just a TERMINATOR?
+  shouldSuppressIndents: ->
+    INDENT_SUPPRESSOR.test @chunk
+
   formatString: (str, options) ->
     @replaceUnicodeCodePointEscapes str.replace(STRING_OMIT, '$1'), options
 
@@ -1294,6 +1302,7 @@ POSSIBLY_DIVISION   = /// ^ /=?\s ///
 HERECOMMENT_ILLEGAL = /\*\//
 
 LINE_CONTINUER      = /// ^ \s* (?: , | \??\.(?![.\d]) | \??:: ) ///
+INDENT_SUPPRESSOR   = /// ^ \s* (?: and\s+(?!:)\S | or\s+(?!:)\S | && | \|\| ) ///
 
 STRING_INVALID_ESCAPE = ///
   ( (?:^|[^\\]) (?:\\\\)* )        # Make sure the escape isn’t escaped.
