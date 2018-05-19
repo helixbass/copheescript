@@ -2546,7 +2546,7 @@ exports.Slice = class Slice extends Base
 
 # An object literal, nothing fancy.
 exports.Obj = class Obj extends Base
-  constructor: (@properties = [], {@generated = no} = {}) ->
+  constructor: (@properties = [], {@generated = no, @isClassBody} = {}) ->
     super()
 
     @objects = @properties
@@ -2604,9 +2604,11 @@ exports.Obj = class Obj extends Base
             else
               compiledValue
           shorthand: !!shorthand
-          computed: do ->
+          computed: do =>
+            return yes if isComputedPropertyName
+            return no if @isClassBody
             return no if not o.compiling and variable.unwrap() instanceof StringWithInterpolations
-            isComputedPropertyName or variable.shouldCache()
+            variable.shouldCache()
 
   _toAst: (o) ->
     return @CSXAttributesToAst o if @csx
@@ -2621,6 +2623,7 @@ exports.Obj = class Obj extends Base
 
   expandProperties: (o) ->
     {compiling} = o
+    return @properties if not compiling and @isClassBody
     for prop in @properties then do =>
       key = if prop instanceof Assign and prop.context is 'object'
         prop.variable
@@ -2983,6 +2986,7 @@ exports.Class = class Class extends Base
       level: LEVEL_TOP
 
   _toAst: (o) ->
+    @name = @determineName()
     @body.isClassBody = yes
     @walkBody o
     super o
@@ -3061,7 +3065,7 @@ exports.Class = class Class extends Base
         exprs     = []
         end       = 0
         start     = 0
-        pushSlice = -> exprs.push new Value new Obj properties[start...end], generated: true if end > start
+        pushSlice = -> exprs.push new Value new Obj properties[start...end], generated: true, isClassBody: true if end > start
 
         while assign = properties[end]
           if initializerExpression = @addInitializerExpression assign
