@@ -1703,8 +1703,9 @@ exports.Value = class Value extends Base
     lastProp instanceof Slice
 
   looksStatic: (className) ->
-    (@this or @base instanceof ThisLiteral or @base.value is className) and
+    return no unless (@this or @base instanceof ThisLiteral or (byClassName = @base.value is className)) and
       @properties.length is 1 and @properties[0].name?.value isnt 'prototype'
+    if byClassName then {className} else yes
 
   # The value can be unwrapped as its inner node, if there are no attached
   # properties.
@@ -3145,6 +3146,7 @@ exports.Class = class Class extends Base
       method.error 'Cannot define a constructor as a bound (fat arrow) function' if method.bound and method.ctor
 
     (method.name.comments ?= []).push operatorToken.comments... if operatorToken?.comments
+    method.operatorToken = operatorToken
     method
 
   makeDefaultConstructor: ->
@@ -4329,14 +4331,25 @@ exports.Code = class Code extends Base
     compiledName = @name.toAst o
     o.scope = methodScope
 
-    kind:
-      if @ctor
-        'constructor'
-      else
-        'method'
-    key: compiledName
-    computed: @name instanceof Index or @name instanceof Access and (@name.name instanceof ComputedPropertyName or @name.name instanceof NumberLiteral or @name.name instanceof StringLiteral)
-    static: @isStatic
+    fields =
+      kind:
+        if @ctor
+          'constructor'
+        else
+          'method'
+      key: compiledName
+      computed: do =>
+        return no if not o.compiling and @name instanceof Index and @name.index instanceof StringWithInterpolations
+        return yes if @name instanceof Index
+        return yes if @name instanceof Access and @name.name instanceof ComputedPropertyName
+        return no unless o.compiling
+        return yes if @name instanceof Access and (@name.name instanceof NumberLiteral or @name.name instanceof StringLiteral)
+        no
+      static: @isStatic
+    unless o.compiling
+      fields.staticClassName = @isStatic.className if @isStatic?.className
+      fields.operator = @operatorToken?.value ? '='
+    fields
 
   _toAst: (o) ->
     @updateOptions o
