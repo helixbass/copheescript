@@ -838,9 +838,9 @@ grammar =
     o 'Expression ^        Expression',         -> new Op $2, $1, $3
     o 'Expression |        Expression',         -> new Op $2, $1, $3
     o 'Expression &&       Expression',         -> new Op $2, $1, $3
-    o 'Expression LEADING_&& Expression',       -> new Op $2, $1, $3
+    o 'Expression LEADING_AND Expression',      -> new Op $2, $1, $3
     o 'Expression ||       Expression',         -> new Op $2, $1, $3
-    o 'Expression LEADING_|| Expression',       -> new Op $2, $1, $3
+    o 'Expression LEADING_OR Expression',       -> new Op $2, $1, $3
     o 'Expression BIN?     Expression',         -> new Op $2, $1, $3
     o 'Expression RELATION Expression',         ->
       if $2.charAt(0) is '!'
@@ -884,8 +884,8 @@ operators = [
   ['left',      '&']
   ['left',      '^']
   ['left',      '|']
-  ['left',      '&&', 'LEADING_&&']
-  ['left',      '||', 'LEADING_||']
+  ['left',      '&&', 'LEADING_AND']
+  ['left',      '||', 'LEADING_OR']
   ['left',      'BIN?']
   ['nonassoc',  'INDENT', 'OUTDENT']
   ['right',     'YIELD']
