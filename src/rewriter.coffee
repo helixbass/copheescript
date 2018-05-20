@@ -665,9 +665,17 @@ exports.Rewriter = class Rewriter
   # Convert TERMINATOR followed by && or || into a single LEADING_AND or
   # LEADING_OR token to disambiguate grammar.
   tagLeadingLogical: ->
+    leading =
+      '&&': 'AND'
+      '||': 'OR'
+      '.': 'DOT'
+      '?.': 'DOT_SOAK'
+      '::': 'PROTOTYPE'
+      '?::': 'PROTOTYPE_SOAK'
+    leadingTokens = Object.keys leading
     @scanTokens (token, i, tokens) ->
-      return 1 unless token[0] is 'TERMINATOR' and tokens.length >= i + 2 and (operatorToken = tokens[i + 1])[0] in ['&&', '||']
-      token[0] = "LEADING_#{if operatorToken[0] is '&&' then 'AND' else 'OR'}"
+      return 1 unless token[0] is 'TERMINATOR' and tokens.length >= i + 2 and (operatorToken = tokens[i + 1])[0] in leadingTokens
+      token[0] = "LEADING_#{leading[operatorToken[0]]}"
       token[1] = operatorToken[1]
       token[2].last_line = operatorToken[2].last_line
       token[2].last_column = operatorToken[2].last_column

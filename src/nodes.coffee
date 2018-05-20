@@ -2273,7 +2273,7 @@ exports.Assign = class Assign extends Base
     # if we’re destructuring without declaring, the destructuring assignment must be wrapped in parentheses.
     # The assignment is wrapped in parentheses if 'o.level' has lower precedence than LEVEL_LIST (3)
     # (i.e. LEVEL_COND (4), LEVEL_OP (5) or LEVEL_ACCESS (6)), or if we're destructuring object, e.g. {a,b} = obj.
-    if o.level > LEVEL_LIST or isValue and @variable.base instanceof Obj and not @nestedLhs and not (@param is yes)
+    if (o.level > LEVEL_LIST or isValue and @variable.base instanceof Obj and not @nestedLhs) and not (@param is yes)
       @wrapInParentheses answer
     else
       answer
