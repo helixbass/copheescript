@@ -3654,7 +3654,7 @@ exports.Assign = class Assign extends Base
     value: do =>
       val = @value.base
       val.csxAttribute = yes
-      compiled = val.toAst o
+      compiled = astAsBlock val, o
       return compiled if val instanceof StringLiteral
       type: 'JSXExpressionContainer'
       expression: compiled
@@ -5672,12 +5672,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
             value:
               raw: ''
               tail: no
-        expressions.push(
-          if o.compiling
-            element.toAst o, LEVEL_PAREN
-          else
-            element.unwrap().toAst o, LEVEL_TOP
-        )
+        expressions.push astAsBlock element, o
         lastElement = element
         justSawInterpolation = yes
 
@@ -5692,7 +5687,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
 
     for element in elements
       element.csx = yes
-      compiled = element.toAst o
+      compiled = astAsBlock element, o
       hasComment = do ->
         hasComment = no
         element.traverseChildren no, ({comments, csxAttribute}) ->
@@ -6435,6 +6430,13 @@ utilityBabylon = (name, o) ->
         [new Access new PropertyName if calledWithArgs then 'call' else 'apply']
     calledWithArgs ? appliedWithArgs ? invokedWithArgs
   )#.withEmptyLocationData()
+
+astAsBlock = (element, o) ->
+  unwrapped = element.unwrap()
+  if not o.compiling and unwrapped instanceof Block and unwrapped.expressions.length > 1
+    unwrapped.toAst o, LEVEL_TOP
+  else
+    element.toAst o, LEVEL_PAREN
 
 multident = (code, tab, includingFirstLine = yes) ->
   endsWithNewLine = code[code.length - 1] is '\n'
