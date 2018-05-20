@@ -5672,7 +5672,12 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
             value:
               raw: ''
               tail: no
-        expressions.push element.toAst o, LEVEL_PAREN
+        expressions.push(
+          if o.compiling
+            element.toAst o, LEVEL_PAREN
+          else
+            element.unwrap().toAst o, LEVEL_TOP
+        )
         lastElement = element
         justSawInterpolation = yes
 
