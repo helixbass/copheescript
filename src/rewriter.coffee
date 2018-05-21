@@ -359,7 +359,6 @@ exports.Rewriter = class Rewriter
 
       newLine = prevTag is 'OUTDENT' or prevToken.newLine
       if tag in IMPLICIT_END or
-          (tag in CALL_CLOSERS and newLine) or
           (tag in ['..', '...'] and @findTagsBackwards(i, ["INDEX_START"]))
         while inImplicit()
           [stackTag, stackIdx, {sameLine, startsLine}] = stackTop()
@@ -550,9 +549,7 @@ exports.Rewriter = class Rewriter
       not (token[0] is 'TERMINATOR' and @tag(i + 1) in EXPRESSION_CLOSE) and
       not (token[0] is 'ELSE' and
            (starter isnt 'THEN' or (leading_if_then or leading_switch_when))) and
-      not (token[0] in ['CATCH', 'FINALLY'] and starter in ['->', '=>']) or
-      token[0] in CALL_CLOSERS and
-      (@tokens[i - 1].newLine or @tokens[i - 1][0] is 'OUTDENT')
+      not (token[0] in ['CATCH', 'FINALLY'] and starter in ['->', '=>'])
 
     action = (token, i) ->
       ifThens.pop() if token[0] is 'ELSE' and starter is 'THEN'
@@ -731,9 +728,6 @@ SINGLE_CLOSERS   = ['TERMINATOR', 'CATCH', 'FINALLY', 'ELSE', 'OUTDENT', 'LEADIN
 # Tokens that end a line.
 LINEBREAKS       = ['TERMINATOR', 'INDENT', 'OUTDENT']
 
-# Tokens that close open calls when they follow a newline.
-CALL_CLOSERS     = ['.', '?.', '::', '?::']
-
 # Tokens that prevent a subsequent indent from ending implicit calls/objects
 CONTROL_IN_IMPLICIT = ['IF', 'TRY', 'FINALLY', 'CATCH', 'CLASS', 'SWITCH']
 
@@ -743,9 +737,10 @@ CONTROL_IN_IMPLICIT = ['IF', 'TRY', 'FINALLY', 'CATCH', 'CLASS', 'SWITCH']
 # `STRING_START` isn’t on this list because its `locationData` matches that of
 # the node that becomes `StringWithInterpolations`, and therefore
 # `addDataToNode` attaches `STRING_START`’s tokens to that node.
-DISCARDED = ['(', ')', '[', ']', '{', '}', '.', '..', '...', ',', '=', '++', '--', '?',
+DISCARDED = ['(', ')', '[', ']', '{', '}', '.', '?.', '::', '?::', '..', '...',
+  ',', '=', '++', '--', '?',
   'AS', 'AWAIT', 'CALL_START', 'CALL_END', 'DEFAULT', 'ELSE', 'EXTENDS', 'EXPORT',
   'FORIN', 'FOROF', 'FORFROM', 'IMPORT', 'INDENT', 'INDEX_SOAK', 'LEADING_WHEN',
   'OUTDENT', 'PARAM_END', 'REGEX_START', 'REGEX_END', 'RETURN', 'STRING_END', 'THROW',
   'UNARY', 'DO', 'DO_IIFE', 'YIELD'
-].concat IMPLICIT_UNSPACED_CALL.concat IMPLICIT_END.concat CALL_CLOSERS.concat CONTROL_IN_IMPLICIT
+].concat IMPLICIT_UNSPACED_CALL.concat IMPLICIT_END.concat CONTROL_IN_IMPLICIT
