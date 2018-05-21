@@ -478,16 +478,21 @@ exports.Block = class Block extends Base
   # ensures that the final expression is returned.
   makeReturn: (res) ->
     len = @expressions.length
+    [..., lastExp] = @expressions
+    lastExp = lastExp?.unwrap() or no
+    # We also need to check that we’re not returning a CSX tag if there’s an
+    # adjacent one at the same level; JSX doesn’t allow that.
+    if lastExp and lastExp instanceof Parens and lastExp.body.expressions.length > 1
+      {body:{expressions}} = lastExp
+      [..., penult, last] = expressions
+      penult = penult.unwrap()
+      last = last.unwrap()
+      if penult instanceof Call and penult.csx and last instanceof Call and last.csx
+        expressions[expressions.length - 1].error 'Adjacent JSX elements must be wrapped in an enclosing tag'
     while len--
       expr = @expressions[len]
       @expressions[len] = expr.makeReturn res
       @expressions.splice(len, 1) if expr instanceof Return and not expr.expression
-      # We also need to check that we’re not returning a CSX tag if there’s an
-      # adjacent one at the same level; JSX doesn’t allow that.
-      if expr.unwrapAll().csx
-        for csxCheckIndex in [len..0]
-          if @expressions[csxCheckIndex].unwrapAll().csx
-            expr.error 'Adjacent JSX elements must be wrapped in an enclosing tag'
       break
     this
 
@@ -3059,7 +3064,7 @@ exports.Op = class Op extends Base
     if op is 'new'
       if (firstCall = first.unwrap()) instanceof Call and not firstCall.do and not firstCall.isNew
         return firstCall.newInstance()
-      first = new Parens first   if first instanceof Code and first.bound or first.do
+      first = new Parens firstCall if firstCall instanceof Code and firstCall.bound or firstCall.do
 
     @operator = CONVERSIONS[op] or op
     @first    = first
