@@ -622,7 +622,8 @@ exports.Rewriter = class Rewriter
     condition = (token, i) ->
       [tag] = token
       [prevTag] = @tokens[i - 1]
-      tag is 'TERMINATOR' or (tag is 'INDENT' and prevTag not in SINGLE_LINERS)
+      [nextTag] = @tokens[i + 1] unless i is @tokens.length - 1
+      tag is 'TERMINATOR' and nextTag not in LEADING_LOGICAL or (tag is 'INDENT' and prevTag not in SINGLE_LINERS)
 
     action = (token, i) ->
       if token[0] isnt 'INDENT' or (token.generated and not token.fromThen)
@@ -637,17 +638,9 @@ exports.Rewriter = class Rewriter
   # Convert TERMINATOR followed by && or || into a single LEADING_AND or
   # LEADING_OR token to disambiguate grammar.
   tagLeadingLogical: ->
-    leading =
-      '&&': 'AND'
-      '||': 'OR'
-      '.': 'DOT'
-      '?.': 'DOT_SOAK'
-      '::': 'PROTOTYPE'
-      '?::': 'PROTOTYPE_SOAK'
-    leadingTokens = Object.keys leading
     @scanTokens (token, i, tokens) ->
-      return 1 unless token[0] is 'TERMINATOR' and tokens.length >= i + 2 and (operatorToken = tokens[i + 1])[0] in leadingTokens
-      token[0] = "LEADING_#{leading[operatorToken[0]]}"
+      return 1 unless token[0] is 'TERMINATOR' and tokens.length >= i + 2 and (operatorToken = tokens[i + 1])[0] in LEADING_LOGICAL
+      token[0] = "LEADING_#{LEADING_LOGICAL_NAMES[operatorToken[0]]}"
       token[1] = operatorToken[1]
       token[2].last_line = operatorToken[2].last_line
       token[2].last_column = operatorToken[2].last_column
@@ -744,3 +737,12 @@ DISCARDED = ['(', ')', '[', ']', '{', '}', '.', '?.', '::', '?::', '..', '...',
   'OUTDENT', 'PARAM_END', 'REGEX_START', 'REGEX_END', 'RETURN', 'STRING_END', 'THROW',
   'UNARY', 'DO', 'DO_IIFE', 'YIELD'
 ].concat IMPLICIT_UNSPACED_CALL.concat IMPLICIT_END.concat CONTROL_IN_IMPLICIT
+
+LEADING_LOGICAL_NAMES =
+  '&&': 'AND'
+  '||': 'OR'
+  '.': 'DOT'
+  '?.': 'DOT_SOAK'
+  '::': 'PROTOTYPE'
+  '?::': 'PROTOTYPE_SOAK'
+LEADING_LOGICAL = Object.keys LEADING_LOGICAL_NAMES
