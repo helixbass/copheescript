@@ -1862,3 +1862,13 @@ test "#3933: prevent implicit calls when cotrol flow is missing `THEN`", ->
       when a ->
              ^^
   '''
+
+test 'leading logical followed by :: should parse as continuation', ->
+  assertErrorFormat '''
+    a
+      and ::b
+  ''','''
+    [stdin]:2:7: error: unexpected ::
+      and ::b
+          ^^
+  '''
