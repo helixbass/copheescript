@@ -1618,10 +1618,16 @@ exports.Return = class Return extends Base
 # `yield return` works exactly like `return`, except that it turns the function
 # into a generator.
 exports.YieldReturn = class YieldReturn extends Return
-  _compileToBabylon: (o) ->
+  _toAst: (o) ->
     unless o.scope.parent?
       @error 'yield can only occur inside functions'
     super o
+
+  toAst: (o, level) ->
+    return super o, level if o.compiling
+    new Op 'yield', new Return @expression
+    .withLocationDataFrom @
+    .toAst o, level
 
   compileNode: (o) ->
     unless o.scope.parent?
