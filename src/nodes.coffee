@@ -1473,8 +1473,8 @@ exports.ComputedPropertyName = class ComputedPropertyName extends PropertyName
   compileNode: (o) ->
     [@makeCode('['), @value.compileToFragments(o, LEVEL_LIST)..., @makeCode(']')]
 
-  _compileToBabylon: (o) ->
-    @value.compileToBabylon o
+  _toAst: (o) ->
+    @value.toAst o
 
 exports.StatementLiteral = class StatementLiteral extends Literal
   isStatement: YES
@@ -2625,7 +2625,7 @@ exports.Obj = class Obj extends Base
           computed: do =>
             return yes if isComputedPropertyName
             return no if @isClassBody
-            return no if not o.compiling and variable.unwrap() instanceof StringWithInterpolations
+            return no if not o.compiling# and variable.unwrap() instanceof StringWithInterpolations
             variable.shouldCache()
 
   _toAst: (o) ->
@@ -2661,11 +2661,11 @@ exports.Obj = class Obj extends Base
           return new Assign prop, prop, context: 'object', shorthand: yes
       return prop unless key is prop
       prop.withLocationData(
-        if prop.shouldCache()
+        if prop.shouldCache() and compiling
           [key, value] = prop.base.cache o
           key  = key.withLocationData new PropertyName key.value if key instanceof IdentifierLiteral
           new Assign key, value, context: 'object'
-        else if prop instanceof Value and prop.base instanceof ComputedPropertyName
+        else if prop instanceof Value and prop.base instanceof ComputedPropertyName and compiling
           # `{ [foo()] }` output as `{ [ref = foo()]: ref }`.
           if prop.base.value.shouldCache()
             [key, value] = prop.base.value.cache o

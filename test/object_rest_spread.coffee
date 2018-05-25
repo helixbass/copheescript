@@ -335,7 +335,7 @@ test "rest element destructuring in function definition", ->
 
   (({a, b, r...}) ->
     eq 1, a
-    eq 2, b,
+    eq 2, b
     deepEqual r, {c: 3, d: 4, e: 5}
   ) obj
 
