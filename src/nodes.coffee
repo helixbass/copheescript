@@ -5085,9 +5085,11 @@ exports.Op = class Op extends Base
 
   astType: ->
     switch @operator
-      when 'new'      then 'NewExpression'
-      when '||', '&&' then 'LogicalExpression'
-      when '++', '--' then 'UpdateExpression'
+      when 'new'             then 'NewExpression'
+      when '||', '&&'        then 'LogicalExpression'
+      when '++', '--'        then 'UpdateExpression'
+      when 'await'           then 'AwaitExpression'
+      when 'yield', 'yield*' then 'YieldExpression'
       else
         if @isUnary()
           'UnaryExpression'
@@ -5100,13 +5102,18 @@ exports.Op = class Op extends Base
         callee: @first.toAst o
         arguments: []
       when @isUnary()
-        argument: @first.toAst o
+        argument:
+          if @isYield() or @isAwait()
+            @first.toAst o, LEVEL_OP unless @first.unwrap().value is ''
+          else
+            @first.toAst o
       else
         left: @first.toAst o, LEVEL_OP
         right: @second.toAst o, LEVEL_OP
 
   astProps: (o) ->
-    return {} if @operator is 'new'
+    return {} if @operator is 'new' or @isAwait()
+    return delegate: @operator is 'yield*' if @isYield()
     {
       operator:
         if o.compiling
@@ -5127,6 +5134,7 @@ exports.Op = class Op extends Base
     if @operator in ['--', '++']
       message = isUnassignable @first.unwrapAll().value
       @first.error message if message
+    @checkContinuation o if @isYield() or @isAwait()
     super o
 
   _compileToBabylon: (o) ->
@@ -5141,7 +5149,6 @@ exports.Op = class Op extends Base
       @first.negated = not @first.negated
       return @first.compileToBabylon o
     isChain = @isChainable() and @first.isChainable()
-    return @compileContinuationToBabylon o if @isYield() or @isAwait()
     return super o if @isUnary()
     return @compileChainToBabylon o if isChain
 
@@ -5216,19 +5223,11 @@ exports.Op = class Op extends Base
     parts.reverse() if @flip
     @joinFragmentArrays parts, ''
 
-  compileContinuationToBabylon: (o) ->
+  checkContinuation: (o) ->
     unless o.scope.parent?
       @error "#{@operator} can only occur inside functions"
     if o.scope.method?.bound and o.scope.method.isGenerator
       @error 'yield cannot occur inside bound (fat arrow) functions'
-
-    type:
-      if @operator is 'await'
-        'AwaitExpression'
-      else
-        'YieldExpression'
-    argument: @first.compileToBabylon o, LEVEL_OP unless @first.unwrap().value is ''
-    delegate: @operator is 'yield*'
 
   compileContinuation: (o) ->
     parts = []
