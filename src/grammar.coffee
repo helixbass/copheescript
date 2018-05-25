@@ -376,7 +376,7 @@ grammar =
     o ':: Property',                            -> [LOC(1)(new Access new PropertyName('prototype'), shorthand: yes), LOC(2)(new Access $2)]
     o '?:: Property',                           -> [LOC(1)(new Access new PropertyName('prototype'), shorthand: yes, soak: yes), LOC(2)(new Access $2)]
     o '::',                                     -> new Access new PropertyName('prototype'), shorthand: yes
-    o '?::',                                    -> new Access new PropertyName('prototype'), soak: yes
+    o '?::',                                    -> new Access new PropertyName('prototype'), shorthand: yes, soak: yes
     o 'Index'
   ]
 
