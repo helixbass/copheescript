@@ -1239,6 +1239,15 @@ test "cannot have `await` outside a function", ->
     ^^^^^^^
   '''
 
+test "cannot have `await return` outside a function", ->
+  assertErrorFormat '''
+    await return 1
+  ''', '''
+    [stdin]:1:1: error: await can only occur inside functions
+    await return 1
+    ^^^^^^^^^^^^^^
+  '''
+
 test "indexes are not supported in for-from loops", ->
   assertErrorFormat "x for x, i from [1, 2, 3]", '''
     [stdin]:1:10: error: cannot use index with for-from

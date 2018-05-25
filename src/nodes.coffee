@@ -1635,6 +1635,17 @@ exports.YieldReturn = class YieldReturn extends Return
     super o
 
 exports.AwaitReturn = class AwaitReturn extends Return
+  _toAst: (o) ->
+    unless o.scope.parent?
+      @error 'await can only occur inside functions'
+    super o
+
+  toAst: (o, level) ->
+    return super o, level if o.compiling
+    new Op 'await', new Return @expression
+    .withLocationDataFrom @
+    .toAst o, level
+
   compileNode: (o) ->
     unless o.scope.parent?
       @error 'await can only occur inside functions'
