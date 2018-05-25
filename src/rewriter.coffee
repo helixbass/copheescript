@@ -511,6 +511,7 @@ exports.Rewriter = class Rewriter
         {last_line: line, last_column: column, range} = prevLocation
       else
         line = column = 0
+        range = [0, 0]
       token[2] = {
         first_line:   line
         first_column: column

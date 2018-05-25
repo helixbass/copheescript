@@ -3,5 +3,6 @@
 - does x for [0..3] by y double-declare ref?
   - same for 0 for [1..2] double-declaring i
 - compilation of ([]) -> is broken
+- I think "chaining should work within spilling ternary" is confused about what it's compiling to (.a is chained against a: 3, not id(a: 3))
 
 - should localize generation of comment inside catch block?
