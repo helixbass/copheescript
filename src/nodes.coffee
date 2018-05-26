@@ -2999,7 +2999,9 @@ exports.Class = class Class extends Base
 
   astChildren:
     variable: 'id'
-    parent: 'superClass'
+    parent:
+      key: 'superClass'
+      level: LEVEL_PAREN
     body:
       level: LEVEL_TOP
 
