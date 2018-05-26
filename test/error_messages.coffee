@@ -1673,15 +1673,6 @@ test 'CSX error: invalid attributes', ->
 
 test '#5034: CSX error: Adjacent JSX elements must be wrapped in an enclosing tag', ->
   assertErrorFormat '''
-    render = ->
-      <Row>a</Row>
-      <Row>b</Row>
-  ''', '''
-    [stdin]:3:4: error: Adjacent JSX elements must be wrapped in an enclosing tag
-      <Row>b</Row>
-       ^^^^^^^^^^^
-  '''
-  assertErrorFormat '''
     render = -> (
       <Row>a</Row>
       <Row>b</Row>
@@ -1691,7 +1682,17 @@ test '#5034: CSX error: Adjacent JSX elements must be wrapped in an enclosing ta
       <Row>b</Row>
        ^^^^^^^^^^^
   '''
-
+  assertErrorFormat '''
+    render = -> (
+      a = "foo"
+      <Row>a</Row>
+      <Row>b</Row>
+    )
+  ''', '''
+    [stdin]:4:4: error: Adjacent JSX elements must be wrapped in an enclosing tag
+      <Row>b</Row>
+       ^^^^^^^^^^^
+  '''
 test 'Bound method called as callback before binding throws runtime error', ->
   class Base
     constructor: ->

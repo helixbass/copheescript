@@ -546,6 +546,10 @@ exports.Base = class Base
     @eachChild (child) ->
       child.updateLocationDataIfMissing locationData
 
+  # Add location data from another node
+  withLocationDataFrom: ({locationData}) ->
+    @updateLocationDataIfMissing locationData
+
   # Throw a SyntaxError associated with this node’s location.
   error: (message) ->
     throwSyntaxError message, @locationData
@@ -691,16 +695,21 @@ exports.Block = class Block extends Base
   # ensures that the final expression is returned.
   makeReturn: (res) ->
     len = @expressions.length
+    [..., lastExp] = @expressions
+    lastExp = lastExp?.unwrap() or no
+    # We also need to check that we’re not returning a CSX tag if there’s an
+    # adjacent one at the same level; JSX doesn’t allow that.
+    if lastExp and lastExp instanceof Parens and lastExp.body.expressions.length > 1
+      {body:{expressions}} = lastExp
+      [..., penult, last] = expressions
+      penult = penult.unwrap()
+      last = last.unwrap()
+      if penult instanceof Call and penult.csx and last instanceof Call and last.csx
+        expressions[expressions.length - 1].error 'Adjacent JSX elements must be wrapped in an enclosing tag'
     while len--
       expr = @expressions[len]
       @expressions[len] = expr.makeReturn res
       @expressions.splice(len, 1) if expr instanceof Return and not expr.expression
-      # We also need to check that we’re not returning a CSX tag if there’s an
-      # adjacent one at the same level; JSX doesn’t allow that.
-      if expr.unwrapAll().csx
-        for csxCheckIndex in [len..0]
-          if @expressions[csxCheckIndex].unwrapAll().csx
-            expr.error 'Adjacent JSX elements must be wrapped in an enclosing tag'
       break
     this
 
@@ -1404,7 +1413,7 @@ exports.RegexLiteral = class RegexLiteral extends Literal
     }
 
 exports.PassthroughLiteral = class PassthroughLiteral extends Literal
-  constructor: (@originalValue, {@here} = {}) ->
+  constructor: (@originalValue, {@here, @generated} = {}) ->
     super ''
     @value = @originalValue.replace /\\+(`|$)/g, (string) ->
       # `string` is always a value like '\`', '\\\`', '\\\\\`', etc.
@@ -5624,25 +5633,32 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
   shouldCache: -> @body.shouldCache()
 
   extractElements: ->
-    # Assumes that `expr` is `Value` » `StringLiteral` or `Op`
+    # Assumes that `expr` is `Block`
     expr = @body.unwrap()
 
     elements = []
     salvagedComments = []
-    expr.traverseChildren no, (node) ->
+    expr.traverseChildren no, (node) =>
       if node instanceof StringLiteral
         if node.comments
           salvagedComments.push node.comments...
           delete node.comments
         elements.push node
         return yes
-      else if node instanceof Parens
+      else if node instanceof Interpolation
         if salvagedComments.length isnt 0
           for comment in salvagedComments
             comment.unshift = yes
             comment.newLine = yes
           attachCommentsToNode salvagedComments, node
-        elements.push node
+        if (unwrapped = node.expression?.unwrapAll()) instanceof PassthroughLiteral and unwrapped.generated and not @csx
+          commentPlaceholder = new StringLiteral('').withLocationDataFrom node
+          commentPlaceholder.comments = unwrapped.comments
+          (commentPlaceholder.comments ?= []).push node.comments... if node.comments
+          elements.push new Value commentPlaceholder
+        else if node.expression
+          (node.expression.comments ?= []).push node.comments... if node.comments
+          elements.push node.expression
         return no
       else if node.comments
         # This node is getting discarded, but salvage its comments.
@@ -5766,9 +5782,14 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
     fragments
 
   isNestedTag: (element) ->
-    exprs = element.body?.expressions
-    call = exprs?[0].unwrap()
-    @csx and exprs and exprs.length is 1 and call instanceof Call and call.csx
+    call = element.unwrapAll?()
+    @csx and call instanceof Call and call.csx
+
+exports.Interpolation = class Interpolation extends Base
+  constructor: (@expression) ->
+    super()
+
+  children: ['expression']
 
 #### For
 
