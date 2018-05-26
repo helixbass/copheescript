@@ -5116,14 +5116,14 @@ exports.Op = class Op extends Base
   astChildren: (o) ->
     switch
       when @operator is 'new'
-        callee: @first.toAst o
+        callee: @first.toAst o, LEVEL_OP
         arguments: []
       when @isUnary()
         argument:
           if @isYield() or @isAwait()
             @first.toAst o, LEVEL_OP unless @first.unwrap().value is ''
           else
-            @first.toAst o
+            @first.toAst o, LEVEL_OP
       else
         left: @first.toAst o, LEVEL_OP
         right: @second.toAst o, LEVEL_OP
