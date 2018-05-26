@@ -5646,21 +5646,26 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
         elements.push node
         return yes
       else if node instanceof Interpolation
+        isEmpty = (unwrapped = node.expression?.unwrapAll()) instanceof PassthroughLiteral and unwrapped.generated
         if salvagedComments.length isnt 0
           for comment in salvagedComments
             comment.unshift = yes
             comment.newLine = yes
           attachCommentsToNode salvagedComments, node
-        if (unwrapped = node.expression?.unwrapAll()) instanceof PassthroughLiteral and unwrapped.generated and not @csx
+        if isEmpty and not @csx
           commentPlaceholder = new StringLiteral('').withLocationDataFrom node
           commentPlaceholder.comments = unwrapped.comments
           (commentPlaceholder.comments ?= []).push node.comments... if node.comments
           elements.push new Value commentPlaceholder
+        else if isEmpty and not o.compiling
+          empty = new Interpolation().withLocationDataFrom node
+          empty.comments = node.comments
+          elements.push empty
         else if node.expression
           (node.expression.comments ?= []).push node.comments... if node.comments
           elements.push node.expression
         else if not o.compiling
-          elements.push null
+          elements.push node
         return no
       else if node.comments
         # This node is getting discarded, but salvage its comments.
@@ -5708,12 +5713,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
             value:
               raw: ''
               tail: no
-        expressions.push(
-          if element
-            astAsBlock element, o
-          else
-            null
-        )
+        expressions.push astAsBlock element, o
         lastElement = element
         justSawInterpolation = yes
 
@@ -5795,6 +5795,18 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
 exports.Interpolation = class Interpolation extends Base
   constructor: (@expression) ->
     super()
+
+  astType: ->
+    if @csx
+      'JSXEmptyExpression'
+    else
+      'EmptyInterpolation'
+  astChildren: []
+  emptyAst: yes
+
+  _toAst: (o) ->
+    @error 'Interpolation::toAst() should only be called for empty interpolations' if @expression
+    super o
 
   children: ['expression']
 
