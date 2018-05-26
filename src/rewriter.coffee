@@ -451,6 +451,13 @@ exports.Rewriter = class Rewriter
         # The generated tokens were added to the end, not inline, so we don’t skip.
         return 1
 
+    dontShiftBackward = (i, tokens) ->
+      j = i - 1
+      while j isnt -1 and tokens[j][0] in DISCARDED
+        return yes if tokens[j][0] is 'REGEX_END'
+        j++
+      no
+
     shiftCommentsBackward = (token, i, tokens) ->
       # Find the last surviving token and attach this token’s comments to it.
       j = i
@@ -471,15 +478,16 @@ exports.Rewriter = class Rewriter
         # rescue its attached tokens and redistribute them to nearby tokens.
         # Comments that don’t start a new line can shift backwards to the last
         # safe token, while other tokens should shift forward.
-        dummyToken = comments: []
-        j = token.comments.length - 1
-        until j is -1
-          if token.comments[j].newLine is no and token.comments[j].here is no
-            dummyToken.comments.unshift token.comments[j]
-            token.comments.splice j, 1
-          j--
-        if dummyToken.comments.length isnt 0
-          ret = shiftCommentsBackward dummyToken, i - 1, tokens
+        unless dontShiftBackward i, tokens
+          dummyToken = comments: []
+          j = token.comments.length - 1
+          until j is -1
+            if token.comments[j].newLine is no and token.comments[j].here is no
+              dummyToken.comments.unshift token.comments[j]
+              token.comments.splice j, 1
+            j--
+          if dummyToken.comments.length isnt 0
+            ret = shiftCommentsBackward dummyToken, i - 1, tokens
         if token.comments.length isnt 0
           shiftCommentsForward token, i, tokens
       else unless token[0] is 'JS' and token.generated or dontShiftForward i, tokens
