@@ -5632,7 +5632,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
 
   shouldCache: -> @body.shouldCache()
 
-  extractElements: ->
+  extractElements: (o) ->
     # Assumes that `expr` is `Block`
     expr = @body.unwrap()
 
@@ -5659,6 +5659,8 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
         else if node.expression
           (node.expression.comments ?= []).push node.comments... if node.comments
           elements.push node.expression
+        else if not o.compiling
+          elements.push null
         return no
       else if node.comments
         # This node is getting discarded, but salvage its comments.
@@ -5676,7 +5678,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
 
   astType: 'TemplateLiteral'
   astChildren: (o) ->
-    elements = @extractElements()
+    elements = @extractElements o
     [first] = elements
     elements.unshift (@startQuote ? @).withLocationData new StringLiteral '' unless first instanceof StringLiteral
     [..., last] = elements
@@ -5706,7 +5708,12 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
             value:
               raw: ''
               tail: no
-        expressions.push astAsBlock element, o
+        expressions.push(
+          if element
+            astAsBlock element, o
+          else
+            null
+        )
         lastElement = element
         justSawInterpolation = yes
 
@@ -5717,7 +5724,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
     super o
 
   CSXContentToAst: (o) ->
-    elements = @extractElements()
+    elements = @extractElements o
 
     for element in elements
       element.csx = yes
@@ -5757,7 +5764,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
       wrapped.csxAttribute = yes
       return wrapped.compileNode o
 
-    elements = @extractElements()
+    elements = @extractElements o
 
     fragments = []
     fragments.push @makeCode '`' unless @csx
