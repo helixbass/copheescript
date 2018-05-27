@@ -47,7 +47,6 @@ printAssignment = (o) ->
   fragments.push " #{@operator ? '='} "
   fragments.push @print(@right, o)...
   fragments
-  # @wrapInParensIfAbove(LEVEL_LIST) fragments, o
 
 printObject = (o) ->
   fragments = []
@@ -87,7 +86,12 @@ printer =
       fragments.push @print(declaration, o)...
     fragments
   VariableDeclarator: (o) ->
-    @print @id, o
+    fragments = []
+    fragments.push @print(@id, o)...
+    if @init
+      fragments.push ' = '
+      fragments.push @print(@init, o)...
+    fragments
   ExpressionStatement: (o) ->
     @print @expression, merge o, front: yes
   AssignmentExpression: printAssignment
@@ -197,6 +201,15 @@ printer =
     fragments.push ') '
     fragments.push @print(@body, o)...
     fragments
+  ForInStatement: (o) ->
+    fragments = []
+    fragments.push 'for ('
+    fragments.push @print(@left, o)...
+    fragments.push ' in '
+    fragments.push @print(@right, o)...
+    fragments.push ') '
+    fragments.push @print(@body, o)...
+    fragments
   SequenceExpression: (o) ->
     fragments = []
     for expression, index in @expressions
@@ -208,6 +221,7 @@ printer =
   UnaryExpression: (o) ->
     fragments = []
     fragments.push @operator
+    fragments.push ' ' if /[a-z]$/.test @operator
     fragments.push @print(@argument, o)...
     fragments
   UpdateExpression: (o) ->
@@ -234,6 +248,8 @@ printer =
     fragments.push ' : '
     fragments.push print(@alternate, o)...
     fragments
+  ContinueStatement: (o) ->
+    ['continue']
 
 makeCode = (code) ->
   new CodeFragment @, code
@@ -290,6 +306,7 @@ needsParens = (node, o) ->
   )
   switch type
     when 'AssignmentExpression'
+      return yes if level > LEVEL_LIST
       switch parent.type
         when 'ReturnStatement'
           return yes
@@ -297,5 +314,6 @@ needsParens = (node, o) ->
       return yes if level >= LEVEL_ACCESS
     when 'BinaryExpression'
       return yes if parent.type is 'BinaryExpression' and node is parent.right
+      return yes if parent.type is 'UnaryExpression'
 
 dump = (obj) -> _dump merge obj, parent: null
