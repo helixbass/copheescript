@@ -7,6 +7,7 @@
 {parser}      = require './parser'
 helpers       = require './helpers'
 SourceMap     = require './sourcemap'
+printer       = require './printer'
 # Require `package.json`, which is two levels above this file, as this file is
 # evaluated from `lib/coffeescript`.
 packageJson   = require '../../package.json'
@@ -124,7 +125,11 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
           noReplace: yes)
       js = formatted
     else
-      fragments = parsed.compileToFragments options
+      fragments =
+        if options.usePrinter
+          printer.print parsed.compileToBabylon(options), options
+        else
+          parsed.compileToFragments options
 
       currentLine = 0
       currentLine += 1 if options.header

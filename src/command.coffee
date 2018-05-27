@@ -55,6 +55,7 @@ SWITCHES = [
   ['-w', '--watch',             'watch scripts for changes and rerun commands']
   [      '--babylon',           'print out Babylon AST']
   [      '--prettier',          'compile using Prettier']
+  [      '--ast-printer',       'generate JS via AST printer']
   ['-a', '--ast',               'print out AST']
 ]
 
@@ -509,6 +510,7 @@ compileOptions = (filename, base) ->
     sourceMap: opts.map
     inlineMap: opts['inline-map']
     usePrettier: opts.prettier
+    usePrinter: opts['ast-printer']
 
   if filename
     if base
