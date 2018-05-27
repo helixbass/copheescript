@@ -5882,7 +5882,7 @@ exports.For = class For extends While
     step: @step?.toAst o
 
   astProps: -> {
-    @postfix, @own
+    @postfix, @own, @await
     style: switch
       when @from then 'from'
       when @object then 'of'
@@ -5906,11 +5906,13 @@ exports.For = class For extends While
       body: @compileBodyToBabylon o
 
   compileFromToBabylon: ({o, sourceVar, keyVar, resultsVar, cachedSourceVarAssign}) ->
-    @wrapInResultAccumulatingBlock({o, resultsVar, cachedSourceVarAssign})
+    @wrapInResultAccumulatingBlock({o, resultsVar, cachedSourceVarAssign}) {
       type: 'ForOfStatement'
       left: keyVar.compileToBabylon o
       right: sourceVar.compileToBabylon o
       body: @compileBodyToBabylon o
+      @await
+    }
 
   _compileToBabylon: (o) ->
     {scope} = o
