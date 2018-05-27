@@ -1,4 +1,4 @@
-{merge, dump: _dump, extend, isString, del} = require './helpers'
+{merge, dump: _dump, extend, isString, isArray, del, flatten} = require './helpers'
 
 #### CodeFragment
 
@@ -21,17 +21,19 @@ fragmentsToText = (fragments) ->
   (fragment.code for fragment in fragments).join('')
 
 printStatementSequence = (body, o) ->
-  # o = merge o, level: LEVEL_TOP
   # TODO: directives
   fragments = []
   for stmt, index in body
     fragments.push '\n' if index and o.spaced
-    fragments.push @print(stmt, merge o, spaced: no, front: yes, asStatement: yes)...
+    fragments.push @print(stmt, merge o, spaced: no, front: yes, asStatement: yes, level: LEVEL_TOP)...
   fragments
+
+BLOCK = ['IfStatement', 'ForStatement', 'ForInStatement', 'WhileStatement', 'ClassStatement', 'TryStatement', 'SwitchStatement']
 
 asStatement = (fragments, o) ->
   fragments.unshift o.indent
-  fragments.push ';\n'
+  fragments.push ';' unless @type in BLOCK
+  fragments.push '\n'
   fragments
 
 wrapInParensIfAbove = (level) -> (fragments, o) ->
@@ -43,9 +45,9 @@ wrapInBraces = (fragments, o) ->
 
 printAssignment = (o) ->
   fragments = []
-  fragments.push @print(@left, o)...
+  fragments.push @print(@left, o, LEVEL_LIST)...
   fragments.push " #{@operator ? '='} "
-  fragments.push @print(@right, o)...
+  fragments.push @print(@right, o, LEVEL_LIST)...
   fragments
 
 printObject = (o) ->
@@ -71,6 +73,46 @@ printBinaryExpression = (o) ->
   fragments.push @print(@right, o, LEVEL_OP)...
   fragments
 
+printCall = (o) ->
+  fragments = []
+  fragments.push 'new ' if @type is 'NewExpression'
+  fragments.push @print(@callee, o, LEVEL_ACCESS)...
+  fragments.push '('
+  for arg, index in @arguments
+    fragments.push ', ' if index
+    fragments.push @print(arg, o, LEVEL_LIST)...
+  fragments.push ')'
+  fragments
+
+printArray = (o) ->
+  return ['[]'] unless @elements.length
+  fragments = []
+  fragments.push '['
+  for element, index in @elements
+    fragments.push ', ' if index
+    fragments.push @print(element, o)...
+  fragments.push ']'
+  fragments
+
+printParams = (o) ->
+  fragments = []
+  fragments.push '('
+  for param, index in @params
+    fragments.push ', ' if index
+    fragments.push @print(param, o)...
+  fragments.push ') '
+  fragments
+
+printBlock = (o) ->
+  return ['{}'] unless @body.length
+  fragments = []
+  fragments.push '{'
+  fragments.push '\n'
+  body = @printStatementSequence @body, indent o
+  fragments.push body...
+  fragments.push o.indent + '}'
+  fragments
+
 printer =
   File: (o) ->
     o.indent = if o.bare then '' else TAB
@@ -93,7 +135,7 @@ printer =
       fragments.push @print(@init, o)...
     fragments
   ExpressionStatement: (o) ->
-    @print @expression, merge o, front: yes
+    @print @expression, o
   AssignmentExpression: printAssignment
   AssignmentPattern: printAssignment
   Identifier: (o) ->
@@ -110,39 +152,37 @@ printer =
     ['null']
   ThisExpression: (o) ->
     ['this']
-  CallExpression: (o) ->
-    fragments = []
-    fragments.push @print(@callee, o, LEVEL_ACCESS)...
-    fragments.push '('
-    for arg, index in @arguments
-      fragments.push ', ' if index
-      fragments.push @print(arg, o)...
-    fragments.push ')'
-    fragments
+  Super: (o) ->
+    ['super']
+  NewExpression: printCall
+  CallExpression: printCall
   FunctionExpression: (o) ->
     fragments = []
+    fragments.push 'async ' if @async
     fragments.push 'function'
-    fragments.push '('
-    for param, index in @params
-      fragments.push ', ' if index
-      fragments.push @print(param, o)...
-    fragments.push ')'
-    fragments.push ' '
+    fragments.push @printParams(o)...
     fragments.push @print(@body, o)...
     fragments
-  BlockStatement: (o) ->
-    return ['{}'] unless @body.length
+  ArrowFunctionExpression: (o) ->
     fragments = []
-    fragments.push '{'
-    fragments.push '\n'
-    body = @printStatementSequence @body, indent o
-    fragments.push body...
-    fragments.push o.indent + '}'
+    fragments.push 'async ' if @async
+    fragments.push @printParams(o)...
+    fragments.push '=> '
+    fragments.push @print(@body, o)...
     fragments
+  ClassMethod: (o) ->
+    fragments = []
+    fragments.push 'static ' if @static
+    fragments.push 'async ' if @async
+    fragments.push @print(@key, o)...
+    fragments.push @printParams(o)...
+    fragments.push @print(@body, o)...
+    fragments
+  BlockStatement: printBlock
   ReturnStatement: (o) ->
     fragments = ['return']
     if @argument
-      fragments.push ' ', @print(@argument, o)...
+      fragments.push ' ', @print(@argument, o, LEVEL_PAREN)...
     fragments
   MemberExpression: (o) ->
     fragments = []
@@ -167,15 +207,8 @@ printer =
     fragments.push ': '
     fragments.push @print(@value, o)...
     fragments
-  ArrayExpression: (o) ->
-    return ['[]'] unless @elements.length
-    fragments = []
-    fragments.push '['
-    for element, index in @elements
-      fragments.push ', ' if index
-      fragments.push @print(element, o)...
-    fragments.push ']'
-    fragments
+  ArrayExpression: printArray
+  ArrayPattern: printArray
   TemplateLiteral: (o) ->
     fragments = []
     fragments.push '`'
@@ -250,6 +283,65 @@ printer =
     fragments
   ContinueStatement: (o) ->
     ['continue']
+  BreakStatement: (o) ->
+    ['break']
+  AwaitExpression: (o) ->
+    fragments = ['await ']
+    fragments.push @print(@argument, o)...
+    fragments
+  SwitchStatement: (o) ->
+    fragments = ['switch (']
+    fragments.push @print(@discriminant, o)...
+    fragments.push ') {\n'
+    for kase in @cases
+      fragments.push @print(kase, indent o)...
+    fragments.push '}'
+    fragments
+  SwitchCase: (o) ->
+    fragments = []
+    fragments.push o.indent
+    if @test
+      fragments.push 'case '
+      fragments.push @print(@test, o)...
+    else
+      fragments.push 'default'
+    fragments.push ':'
+    fragments.push '\n'
+    fragments.push @printStatementSequence(@consequent, indent o)...
+    fragments
+  TryStatement: (o) ->
+    fragments = []
+    fragments.push 'try '
+    fragments.push @print(@block, o)...
+    fragments.push ' ', @print(@handler, o)... if @handler
+    fragments
+  CatchClause: (o) ->
+    fragments = []
+    fragments.push 'catch ('
+    fragments.push @print(@param, o)...
+    fragments.push ') '
+    fragments.push @print(@body, o)...
+    fragments
+  ThrowStatement: (o) ->
+    fragments = []
+    fragments.push 'throw '
+    fragments.push @print(@argument, o)...
+    fragments
+  ClassExpression: (o) ->
+    fragments = []
+    fragments.push 'class'
+    if @id
+      fragments.push ' '
+      fragments.push @print(@id, o)...
+    if @superClass
+      fragments.push ' extends '
+      fragments.push @print(@superClass, o)...
+    if @body
+      fragments.push ' '
+      fragments.push @print(@body, o)...
+    fragments
+  ClassBody: (o) ->
+    printBlock.call @, merge o, spaced: yes
 
 makeCode = (code) ->
   new CodeFragment @, code
@@ -263,6 +355,7 @@ fragmentize = (fragments, node) ->
 
 nodePrint = (node, o, level) ->
   o = merge o, {level} if level
+  # return flatten(@print child, o for child in node) if isArray node
   node.parent = @
   printed = fragmentize print(node, merge o, front: no), node
   return printed unless needsParens node, o
@@ -271,7 +364,7 @@ nodePrint = (node, o, level) ->
 exports.print = print = (node, o) ->
   _asStatement = del o, 'asStatement'
   extend node, {
-    makeCode, printStatementSequence, wrapInBraces, asStatement
+    makeCode, printStatementSequence, wrapInBraces, asStatement, printParams
     print: nodePrint
   }
   # node.tab = o.indent
@@ -307,13 +400,16 @@ needsParens = (node, o) ->
   switch type
     when 'AssignmentExpression'
       return yes if level > LEVEL_LIST
+      return yes if node.left.type is 'ObjectPattern'
       switch parent.type
         when 'ReturnStatement'
           return yes
-    when 'FunctionExpression'
+    when 'FunctionExpression', 'ArrowFunctionExpression'
       return yes if level >= LEVEL_ACCESS
     when 'BinaryExpression'
       return yes if parent.type is 'BinaryExpression' and node is parent.right
       return yes if parent.type is 'UnaryExpression'
+    when 'AwaitExpression'
+      return yes if level >= LEVEL_PAREN
 
 dump = (obj) -> _dump merge obj, parent: null
