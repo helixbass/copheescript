@@ -372,7 +372,7 @@ task 'bench', 'quick benchmark of compilation time', ->
 
 
 # Run the CoffeeScript test suite.
-runTests = (CoffeeScript, {justTestFile, usePrettier} = {}) ->
+runTests = (CoffeeScript, {justTestFile, usePrettier, usePrinter} = {}) ->
   CoffeeScript.register() unless global.testingBrowser
 
   # These are attached to `global` so that they’re accessible from within
@@ -390,14 +390,14 @@ runTests = (CoffeeScript, {justTestFile, usePrettier} = {}) ->
   _eval = CoffeeScript.eval
   _run = CoffeeScript.run
   global.CoffeeScript.compile = (code, options = {}) ->
-    _compile code, {...options, usePrettier}
+    _compile code, {...options, usePrettier, usePrinter}
   global.CoffeeScript.eval = (code, options = {}) ->
-    _eval code, {...options, usePrettier}
+    _eval code, {...options, usePrettier, usePrinter}
   global.CoffeeScript.run = (code, options = {}) ->
-    _run code, {...options, usePrettier}
+    _run code, {...options, usePrettier, usePrinter}
   _repl         = require './lib/coffeescript/repl'
   global.Repl   =
-    start: (opts) -> _repl.start {...opts, usePrettier}
+    start: (opts) -> _repl.start {...opts, usePrettier, usePrinter}
   global.bold   = bold
   global.red    = red
   global.green  = green
@@ -466,7 +466,7 @@ runTests = (CoffeeScript, {justTestFile, usePrettier} = {}) ->
     currentFile = filename = path.join 'test', file
     code = fs.readFileSync filename
     try
-      CoffeeScript.run code.toString(), {filename, literate, usePrettier}
+      CoffeeScript.run code.toString(), {filename, literate, usePrettier, usePrinter}
     catch error
       failures.push {filename, error}
 
@@ -489,6 +489,11 @@ task 'test:prettier', 'run the CoffeeScript language test suite', ->
     'slicing_and_splicing', 'soaks', 'sourcemap', 'strict', 'strings'
     'tagged_template_literals'
   ], usePrettier: yes).catch -> process.exit 1
+
+task 'test:printer', 'run the CoffeeScript language test suite', ->
+  runTests(CoffeeScript, justTestFile: [
+    'booleans', 'numbers'
+  ], usePrinter: yes).catch -> process.exit 1
 
 task 'test:browser', 'run the test suite against the merged browser script', ->
   source = fs.readFileSync "docs/v#{majorVersion}/browser-compiler/coffeescript.js", 'utf-8'

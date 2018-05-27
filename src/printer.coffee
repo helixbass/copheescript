@@ -17,6 +17,9 @@ exports.CodeFragment = class CodeFragment
     # This is only intended for debugging.
     "#{@code}#{if @locationData then ": " + locationDataToString(@locationData) else ''}"
 
+fragmentsToText = (fragments) ->
+  (fragment.code for fragment in fragments).join('')
+
 printStatementSequence = (body, o) ->
   # o = merge o, level: LEVEL_TOP
   # TODO: directives
@@ -62,6 +65,13 @@ printObject = (o) ->
   fragments.push '\n' + o.indent unless isCompact
   @wrapInBraces fragments
 
+printBinaryExpression = (o) ->
+  fragments = []
+  fragments.push @print(@left, o, LEVEL_OP)...
+  fragments.push " #{@operator} "
+  fragments.push @print(@right, o, LEVEL_OP)...
+  fragments
+
 printer =
   File: (o) ->
     o.indent = if o.bare then '' else TAB
@@ -94,6 +104,8 @@ printer =
     [if @value then 'true' else 'false']
   NullLiteral: (o) ->
     ['null']
+  ThisExpression: (o) ->
+    ['this']
   CallExpression: (o) ->
     fragments = []
     fragments.push @print(@callee, o, LEVEL_ACCESS)...
@@ -132,6 +144,8 @@ printer =
     fragments = []
     fragments.push @print(@object, o, LEVEL_ACCESS)...
     property = @print @property, o
+    if SIMPLENUM.test fragmentsToText fragments
+      fragments.push '.'
     if @computed
       fragments.push '[', property..., ']'
     else
@@ -189,12 +203,8 @@ printer =
       fragments.push ', ' if index
       fragments.push @print(expression, o)...
     fragments
-  BinaryExpression: (o) ->
-    fragments = []
-    fragments.push @print(@left, o)...
-    fragments.push " #{@operator} "
-    fragments.push @print(@right, o)...
-    fragments
+  BinaryExpression: printBinaryExpression
+  LogicalExpression: printBinaryExpression
   UnaryExpression: (o) ->
     fragments = []
     fragments.push @operator
@@ -259,6 +269,8 @@ indent = (o) ->
 
 TAB = '  '
 
+SIMPLENUM = /^[+-]?\d+$/
+
 # Levels indicate a node's position in the AST. Useful for knowing if
 # parens are necessary or superfluous.
 LEVEL_TOP    = 1  # ...;
@@ -283,5 +295,7 @@ needsParens = (node, o) ->
           return yes
     when 'FunctionExpression'
       return yes if level >= LEVEL_ACCESS
+    when 'BinaryExpression'
+      return yes if parent.type is 'BinaryExpression' and node is parent.right
 
 dump = (obj) -> _dump merge obj, parent: null
