@@ -28,7 +28,7 @@ printStatementSequence = (body, o) ->
     fragments.push @print(stmt, merge o, spaced: no, front: yes, asStatement: yes, level: LEVEL_TOP)...
   fragments
 
-BLOCK = ['IfStatement', 'ForStatement', 'ForInStatement', 'WhileStatement', 'ClassStatement', 'TryStatement', 'SwitchStatement']
+BLOCK = ['IfStatement', 'ForStatement', 'ForInStatement', 'ForOfStatement', 'WhileStatement', 'ClassStatement', 'TryStatement', 'SwitchStatement']
 
 asStatement = (fragments, o) ->
   fragments.unshift o.indent
@@ -160,6 +160,7 @@ printer =
     fragments = []
     fragments.push 'async ' if @async
     fragments.push 'function'
+    fragments.push '*' if @generator
     fragments.push @printParams(o)...
     fragments.push @print(@body, o)...
     fragments
@@ -174,6 +175,7 @@ printer =
     fragments = []
     fragments.push 'static ' if @static
     fragments.push 'async ' if @async
+    fragments.push '*' if @generator
     fragments.push @print(@key, o)...
     fragments.push @printParams(o)...
     fragments.push @print(@body, o)...
@@ -243,6 +245,17 @@ printer =
     fragments.push ') '
     fragments.push @print(@body, o)...
     fragments
+  ForOfStatement: (o) ->
+    fragments = []
+    fragments.push 'for '
+    fragments.push 'await ' if @await
+    fragments.push '('
+    fragments.push @print(@left, o)...
+    fragments.push ' of '
+    fragments.push @print(@right, o)...
+    fragments.push ') '
+    fragments.push @print(@body, o)...
+    fragments
   SequenceExpression: (o) ->
     fragments = []
     for expression, index in @expressions
@@ -287,6 +300,10 @@ printer =
     ['break']
   AwaitExpression: (o) ->
     fragments = ['await ']
+    fragments.push @print(@argument, o)...
+    fragments
+  YieldExpression: (o) ->
+    fragments = ['yield ']
     fragments.push @print(@argument, o)...
     fragments
   SwitchStatement: (o) ->
@@ -409,7 +426,7 @@ needsParens = (node, o) ->
     when 'BinaryExpression'
       return yes if parent.type is 'BinaryExpression' and node is parent.right
       return yes if parent.type is 'UnaryExpression'
-    when 'AwaitExpression'
+    when 'AwaitExpression', 'YieldExpression'
       return yes if level >= LEVEL_PAREN
 
 dump = (obj) -> _dump merge obj, parent: null
