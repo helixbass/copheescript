@@ -496,7 +496,7 @@ task 'test:printer', 'run the CoffeeScript language test suite', ->
     'exponentiation', 'generators', 'helpers', 'importing', 'interpolation'
     'numbers', 'ranges'
     #'regex'
-    'regex_dotall', 'slicing_and_splicing', 'strict'
+    'regex_dotall', 'slicing_and_splicing', 'soaks', 'strict'
   ], usePrinter: yes).catch -> process.exit 1
 
 task 'test:browser', 'run the test suite against the merged browser script', ->

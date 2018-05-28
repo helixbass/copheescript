@@ -259,7 +259,7 @@ printer =
   UnaryExpression: (o) ->
     @push @operator
     @push ' ' if /[a-z]$/.test @operator
-    @print @argument
+    @print @argument, o, LEVEL_OP
   UpdateExpression: (o) ->
     @push @operator if @prefix
     @print @argument
