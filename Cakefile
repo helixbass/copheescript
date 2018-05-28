@@ -492,8 +492,8 @@ task 'test:prettier', 'run the CoffeeScript language test suite', ->
 
 task 'test:printer', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript, justTestFile: [
-    'async', 'async_iterators', 'booleans', 'generators', 'helpers'
-    'interpolation', 'numbers'
+    'async', 'async_iterators', 'booleans', 'eval', 'exponentiation'
+    'generators', 'helpers', 'interpolation', 'numbers', 'strict'
   ], usePrinter: yes).catch -> process.exit 1
 
 task 'test:browser', 'run the test suite against the merged browser script', ->

@@ -126,6 +126,11 @@ printBlock = (o) ->
   fragments.push o.indent + '}'
   fragments
 
+printSplat = (o) ->
+  fragments = ['...']
+  fragments.push @print(@argument, o)...
+  fragments
+
 printer =
   File: (o) ->
     o.indent = if o.bare then '' else TAB
@@ -375,10 +380,8 @@ printer =
     fragments
   ClassBody: (o) ->
     printBlock.call @, merge o, spaced: yes
-  SpreadElement: (o) ->
-    fragments = ['...']
-    fragments.push @print(@argument, o)...
-    fragments
+  SpreadElement: printSplat
+  RestElement: printSplat
   WhileStatement: (o) ->
     fragments = []
     fragments.push 'while ('
@@ -484,6 +487,8 @@ needsParens = (node, o) ->
         return yes unless nodePrecedence? and parentPrecedence?
         nodePrecedence < parentPrecedence
       return yes if parent.type is 'UnaryExpression'
+    when 'UnaryExpression'
+      return yes if parent.type is 'BinaryExpression' and parent.operator is '**'
     when 'AwaitExpression', 'YieldExpression'
       return yes if level >= LEVEL_PAREN
     when 'ConditionalExpression'
