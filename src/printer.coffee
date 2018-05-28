@@ -25,10 +25,14 @@ printStatementSequence = (body, o) ->
   fragments = []
   for stmt, index in body
     fragments.push '\n' if index and o.spaced
-    fragments.push @print(stmt, merge o, spaced: no, front: yes, asStatement: yes, level: LEVEL_TOP)...
+    fragments.push @print(stmt, merge o, spaced: no, asStatement: yes, level: LEVEL_TOP)...
   fragments
 
-BLOCK = ['IfStatement', 'ForStatement', 'ForInStatement', 'ForOfStatement', 'WhileStatement', 'ClassStatement', 'TryStatement', 'SwitchStatement']
+BLOCK = [
+  'IfStatement', 'ForStatement', 'ForInStatement', 'ForOfStatement'
+  'WhileStatement', 'ClassStatement', 'TryStatement', 'SwitchStatement'
+  'ClassMethod'
+]
 
 asStatement = (fragments, o) ->
   fragments.unshift o.indent
@@ -88,9 +92,18 @@ printArray = (o) ->
   return ['[]'] unless @elements.length
   fragments = []
   fragments.push '['
-  for element, index in @elements
-    fragments.push ', ' if index
-    fragments.push @print(element, o)...
+  elements = (@print(element, o) for element, index in @elements)
+  shouldBreak = '\n' in fragmentsToText flatten elements
+  if shouldBreak
+    closingNewline = '\n' + o.indent
+    o = indent o
+    elements = (@print(element, o) for element, index in @elements)
+    fragments.push '\n' + o.indent
+  separator = if shouldBreak then ',\n' + o.indent else ', '
+  for element, index in elements
+    fragments.push separator if index
+    fragments.push element...
+  fragments.push closingNewline if closingNewline?
   fragments.push ']'
   fragments
 
@@ -135,7 +148,7 @@ printer =
       fragments.push @print(@init, o)...
     fragments
   ExpressionStatement: (o) ->
-    @print @expression, o
+    @print @expression, merge o, front: yes
   AssignmentExpression: printAssignment
   AssignmentPattern: printAssignment
   Identifier: (o) ->
@@ -288,11 +301,11 @@ printer =
     fragments
   ConditionalExpression: (o) ->
     fragments = []
-    fragments.push print(@test, o)...
+    fragments.push print(@test, o, LEVEL_COND)...
     fragments.push ' ? '
-    fragments.push print(@consequent, o)...
+    fragments.push print(@consequent, o, LEVEL_LIST)...
     fragments.push ' : '
-    fragments.push print(@alternate, o)...
+    fragments.push print(@alternate, o, LEVEL_LIST)...
     fragments
   ContinueStatement: (o) ->
     ['continue']
@@ -300,11 +313,14 @@ printer =
     ['break']
   AwaitExpression: (o) ->
     fragments = ['await ']
-    fragments.push @print(@argument, o)...
+    fragments.push @print(@argument, o, LEVEL_OP)...
     fragments
   YieldExpression: (o) ->
-    fragments = ['yield ']
-    fragments.push @print(@argument, o)...
+    fragments = ['yield']
+    fragments.push '*' if @delegate
+    if @argument
+      fragments.push ' '
+      fragments.push @print(@argument, o, LEVEL_OP)...
     fragments
   SwitchStatement: (o) ->
     fragments = ['switch (']
@@ -312,7 +328,7 @@ printer =
     fragments.push ') {\n'
     for kase in @cases
       fragments.push @print(kase, indent o)...
-    fragments.push '}'
+    fragments.push o.indent + '}'
     fragments
   SwitchCase: (o) ->
     fragments = []
@@ -342,7 +358,7 @@ printer =
   ThrowStatement: (o) ->
     fragments = []
     fragments.push 'throw '
-    fragments.push @print(@argument, o)...
+    fragments.push @print(@argument, o, LEVEL_LIST)...
     fragments
   ClassExpression: (o) ->
     fragments = []
@@ -359,6 +375,17 @@ printer =
     fragments
   ClassBody: (o) ->
     printBlock.call @, merge o, spaced: yes
+  SpreadElement: (o) ->
+    fragments = ['...']
+    fragments.push @print(@argument, o)...
+    fragments
+  WhileStatement: (o) ->
+    fragments = []
+    fragments.push 'while ('
+    fragments.push print(@test, o)...
+    fragments.push ') '
+    fragments.push print(@body, o)...
+    fragments
 
 makeCode = (code) ->
   new CodeFragment @, code
@@ -406,6 +433,27 @@ LEVEL_COND   = 4  # ... ? x : y
 LEVEL_OP     = 5  # !...
 LEVEL_ACCESS = 6  # ...[0]
 
+PRECEDENCE = {}
+PRECEDENCE_LEVELS = [
+  ["|>"]
+  ["||", "??"]
+  ["&&"]
+  ["|"]
+  ["^"]
+  ["&"]
+  ["==", "===", "!=", "!=="]
+  ["<", ">", "<=", ">=", "in", "instanceof"]
+  [">>", "<<", ">>>"]
+  ["+", "-"]
+  ["*", "/", "%"]
+  ["**"]
+]
+for tier, i in PRECEDENCE_LEVELS
+  for op in tier
+    PRECEDENCE[op] = i
+
+getPrecedence = (op) -> PRECEDENCE[op]
+
 needsParens = (node, o) ->
   {type, parent} = node
   {level} = o
@@ -424,9 +472,21 @@ needsParens = (node, o) ->
     when 'FunctionExpression', 'ArrowFunctionExpression'
       return yes if level >= LEVEL_ACCESS
     when 'BinaryExpression'
-      return yes if parent.type is 'BinaryExpression' and node is parent.right
+      return yes if parent.type is 'BinaryExpression' and do ->
+        isLeft = node is parent.left
+        associatesLeft = node.operator isnt '**'
+        if node.operator is parent.operator
+          return no if isLeft and associatesLeft
+          return no if not isLeft and not associatesLeft
+          return yes
+        nodePrecedence = getPrecedence node.operator
+        parentPrecedence = getPrecedence parent.operator
+        return yes unless nodePrecedence? and parentPrecedence?
+        nodePrecedence < parentPrecedence
       return yes if parent.type is 'UnaryExpression'
     when 'AwaitExpression', 'YieldExpression'
       return yes if level >= LEVEL_PAREN
+    when 'ConditionalExpression'
+      return yes if level >= LEVEL_COND
 
 dump = (obj) -> _dump merge obj, parent: null
