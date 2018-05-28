@@ -123,6 +123,13 @@ printClass = (o) ->
     @push ' '
     @print @body
 
+printFunction = (o) ->
+  @push 'async ' if @async
+  @push 'function'
+  @push '*' if @generator
+  @printParams o
+  @print @body
+
 printer =
   File: (o) ->
     o.indent = if o.bare then '' else TAB
@@ -134,7 +141,7 @@ printer =
   VariableDeclaration: (o) ->
     @push 'var '
     for declaration, index in @declarations
-      if declaration.init
+      if declaration.init and index
         indented = indent o
         leadingSpace = '\n' + indented.indent
       else
@@ -168,12 +175,8 @@ printer =
     @push 'super'
   NewExpression: printCall
   CallExpression: printCall
-  FunctionExpression: (o) ->
-    @push 'async ' if @async
-    @push 'function'
-    @push '*' if @generator
-    @printParams o
-    @print @body
+  FunctionExpression: printFunction
+  FunctionDeclaration: printFunction
   ArrowFunctionExpression: (o) ->
     @push 'async ' if @async
     @printParams o
@@ -336,6 +339,73 @@ printer =
     @print @test
     @push ') '
     @print @body
+  TaggedTemplateExpression: (o) ->
+    @print @tag
+    @print @quasi
+  ImportDeclaration: (o) ->
+    @push 'import '
+    leading = []
+    named = []
+    if @specifiers
+      if @specifiers.length
+        for specifier in @specifiers
+          (if specifier.type in ['ImportDefaultSpecifier', 'ImportNamespaceSpecifier']
+            leading
+           else
+             named
+          ).push specifier
+        for specifier, index in leading
+          @push ', ' if index
+          @print specifier
+        if named.length
+          @push ', ' if leading.length
+          indented = indent o
+          @push '{\n' + indented.indent
+          for specifier, index in named
+            @push ',\n' + indented.indent if index
+            @print specifier, indented
+          @push '\n' + o.indent + '}'
+      else
+        @push '{}'
+      @push ' from '
+    @print @source
+  ImportDefaultSpecifier: (o) ->
+    @print @local
+  ImportNamespaceSpecifier: (o) ->
+    @push '* as '
+    @print @local
+  ImportSpecifier: (o) ->
+    @print @imported
+    unless @local.name is @imported.name
+      @push ' as '
+      @print @local
+  ExportNamedDeclaration: (o) ->
+    @push 'export '
+    if @specifiers.length
+      indented = indent o
+      @push '{\n' + indented.indent
+      for specifier, index in @specifiers
+        @push ',\n' + indented.indent if index
+        @print specifier, indented
+      @push '\n' + o.indent + '}'
+    else if @declaration
+      @print @declaration
+    else
+      @push '{}'
+    if @source
+      @push ' from '
+      @print @source
+  ExportDefaultDeclaration: (o) ->
+    @push 'export default '
+    @print @declaration
+  ExportAllDeclaration: (o) ->
+    @push 'export * from '
+    @print @source
+  ExportSpecifier: (o) ->
+    @print @local
+    unless @local.name is @exported.name
+      @push ' as '
+      @print @exported
 
 makeCode = (code) ->
   new CodeFragment @, code
