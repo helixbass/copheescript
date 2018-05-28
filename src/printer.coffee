@@ -430,10 +430,17 @@ nodePrinted = (node, o, level) ->
   keepFront = del o, 'keepFront'
   setFront = del o, 'setFront'
   o = merge o, {level} if level
-  o = merge o, front: yes if setFront
+  o = merge o,
+    front:
+      if setFront
+        yes
+      else if keepFront
+        o.front
+      else
+        no
   # return flatten(@print child, o for child in node) if isArray node
   node.parent = @
-  printed = fragmentize print(node, merge o, front: if setFront then yes else if keepFront then o.front else no), node
+  printed = fragmentize print(node, o), node
   return printed unless needsParens node, o
   [node.makeCode('('), printed..., node.makeCode(')')]
 

@@ -496,10 +496,10 @@ task 'test:printer', 'run the CoffeeScript language test suite', ->
     'booleans', 'eval', 'exception_handling', 'exponentiation', 'generators'
     'helpers', 'importing', 'interpolation'
     #'modules'
-    'numbers', 'ranges'
+    'numbers', 'option_parser', 'parser', 'ranges'
     #'regex'
-    'regex_dotall', 'repl', 'slicing_and_splicing', 'soaks', 'strict', 'strings'
-    'tagged_template_literals'
+    'regex_dotall', 'repl', 'scope', 'slicing_and_splicing', 'soaks', 'strict'
+    'strings', 'tagged_template_literals'
   ], usePrinter: yes).catch -> process.exit 1
 
 task 'test:browser', 'run the test suite against the merged browser script', ->
