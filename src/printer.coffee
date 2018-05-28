@@ -142,8 +142,13 @@ printer =
   VariableDeclaration: (o) ->
     fragments = ['var ']
     for declaration, index in @declarations
-      fragments.push ', ' if index
-      fragments.push @print(declaration, o)...
+      if declaration.init
+        indented = indent o
+        leadingSpace = '\n' + indented.indent
+      else
+        leadingSpace = ' '
+      fragments.push ',' + leadingSpace if index
+      fragments.push @print(declaration, indented ? o)...
     fragments
   VariableDeclarator: (o) ->
     fragments = []
@@ -352,6 +357,7 @@ printer =
     fragments.push 'try '
     fragments.push @print(@block, o)...
     fragments.push ' ', @print(@handler, o)... if @handler
+    fragments.push ' finally ', @print(@finalizer, o)... if @finalizer
     fragments
   CatchClause: (o) ->
     fragments = []
@@ -474,8 +480,8 @@ needsParens = (node, o) ->
           return yes
     when 'FunctionExpression', 'ArrowFunctionExpression'
       return yes if level >= LEVEL_ACCESS
-    when 'BinaryExpression'
-      return yes if parent.type is 'BinaryExpression' and do ->
+    when 'BinaryExpression', 'LogicalExpression'
+      return yes if parent.type in ['BinaryExpression', 'LogicalExpression'] and do ->
         isLeft = node is parent.left
         associatesLeft = node.operator isnt '**'
         if node.operator is parent.operator
@@ -493,5 +499,7 @@ needsParens = (node, o) ->
       return yes if level >= LEVEL_PAREN
     when 'ConditionalExpression'
       return yes if level >= LEVEL_COND
+    when 'SequenceExpression'
+      return yes if level >= LEVEL_PAREN
 
 dump = (obj) -> _dump merge obj, parent: null
