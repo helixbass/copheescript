@@ -22,15 +22,13 @@ fragmentsToText = (fragments) ->
 
 printStatementSequence = (body, o) ->
   # TODO: directives
-  fragments = []
   for stmt, index in body
-    fragments.push '\n' if index and o.spaced
-    fragments.push @print(stmt, merge o, spaced: no, asStatement: yes, level: LEVEL_TOP)...
-  fragments
+    @push '\n' if index and o.spaced
+    @print stmt, merge o, spaced: no, asStatement: yes, level: LEVEL_TOP
 
 BLOCK = [
   'IfStatement', 'ForStatement', 'ForInStatement', 'ForOfStatement'
-  'WhileStatement', 'ClassStatement', 'TryStatement', 'SwitchStatement'
+  'WhileStatement', 'ClassDeclaration', 'TryStatement', 'SwitchStatement'
   'ClassMethod'
 ]
 
@@ -40,361 +38,304 @@ asStatement = (fragments, o) ->
   fragments.push '\n'
   fragments
 
-wrapInParensIfAbove = (level) -> (fragments, o) ->
-  return fragments unless o.level > level
-  [@makeCode('('), fragments..., @makeCode(')')]
-
-wrapInBraces = (fragments, o) ->
-  ['{', fragments..., '}']
+wrapInBraces = (o) ->
+  @unshift '{'
+  @push '}'
 
 printAssignment = (o) ->
-  fragments = []
-  fragments.push @print(@left, o, LEVEL_LIST)...
-  fragments.push " #{@operator ? '='} "
-  fragments.push @print(@right, o, LEVEL_LIST)...
-  fragments
+  @print @left, o, LEVEL_LIST
+  @push " #{@operator ? '='} "
+  @print @right, o, LEVEL_LIST
 
 printObject = (o) ->
-  fragments = []
   isCompact = yes
   for {shorthand} in @properties when not shorthand
     isCompact = no
     break
-  fragments.push '\n' unless isCompact
+  @push '\n' unless isCompact
   for prop, index in @properties
     if index
-      fragments.push ','
-      fragments.push if isCompact then ' ' else '\n'
-    fragments.push o.indent + TAB unless isCompact
-    fragments.push @print(prop, if isCompact then o else indent o)...
-  fragments.push '\n' + o.indent unless isCompact
-  @wrapInBraces fragments
+      @push ','
+      @push if isCompact then ' ' else '\n'
+    @push o.indent + TAB unless isCompact
+    @print prop, if isCompact then o else indent o
+  @push '\n' + o.indent unless isCompact
+  @wrapInBraces()
 
 printBinaryExpression = (o) ->
-  fragments = []
-  fragments.push @print(@left, o, LEVEL_OP)...
-  fragments.push " #{@operator} "
-  fragments.push @print(@right, o, LEVEL_OP)...
-  fragments
+  @print @left, o, LEVEL_OP
+  @push " #{@operator} "
+  @print @right, o, LEVEL_OP
 
 printCall = (o) ->
-  fragments = []
-  fragments.push 'new ' if @type is 'NewExpression'
-  fragments.push @print(@callee, o, LEVEL_ACCESS)...
-  fragments.push '('
+  @push 'new ' if @type is 'NewExpression'
+  @print @callee, o, LEVEL_ACCESS
+  @push '('
   for arg, index in @arguments
-    fragments.push ', ' if index
-    fragments.push @print(arg, o, LEVEL_LIST)...
-  fragments.push ')'
-  fragments
+    @push ', ' if index
+    @print arg, o, LEVEL_LIST
+  @push ')'
 
 printArray = (o) ->
-  return ['[]'] unless @elements.length
-  fragments = []
-  fragments.push '['
-  elements = (@print(element, o) for element, index in @elements)
+  return @push '[]' unless @elements.length
+  @push '['
+  elements = (@printed(element, o) for element, index in @elements)
   shouldBreak = '\n' in fragmentsToText flatten elements
   if shouldBreak
     closingNewline = '\n' + o.indent
     o = indent o
-    elements = (@print(element, o) for element, index in @elements)
-    fragments.push '\n' + o.indent
+    elements = (@printed(element, o) for element, index in @elements)
+    @push '\n' + o.indent
   separator = if shouldBreak then ',\n' + o.indent else ', '
   for element, index in elements
-    fragments.push separator if index
-    fragments.push element...
-  fragments.push closingNewline if closingNewline?
-  fragments.push ']'
-  fragments
+    @push separator if index
+    @push element
+  @push closingNewline if closingNewline?
+  @push ']'
 
 printParams = (o) ->
-  fragments = []
-  fragments.push '('
+  @push '('
   for param, index in @params
-    fragments.push ', ' if index
-    fragments.push @print(param, o)...
-  fragments.push ') '
-  fragments
+    @push ', ' if index
+    @print param
+  @push ') '
 
 printBlock = (o) ->
-  return ['{}'] unless @body.length
-  fragments = []
-  fragments.push '{'
-  fragments.push '\n'
-  body = @printStatementSequence @body, indent o
-  fragments.push body...
-  fragments.push o.indent + '}'
-  fragments
+  return @push '{}' unless @body.length
+  @push '{'
+  @push '\n'
+  @printStatementSequence @body, indent o
+  @push o.indent + '}'
 
 printSplat = (o) ->
-  fragments = ['...']
-  fragments.push @print(@argument, o)...
-  fragments
+  @push '...'
+  @print @argument
+
+printClass = (o) ->
+  @push 'class'
+  if @id
+    @push ' '
+    @print @id
+  if @superClass
+    @push ' extends '
+    @print @superClass
+  if @body
+    @push ' '
+    @print @body
 
 printer =
   File: (o) ->
     o.indent = if o.bare then '' else TAB
     o.spaced = yes
 
-    @print @program, o
+    @print @program
   Program: (o) ->
     @printStatementSequence @body, o
   VariableDeclaration: (o) ->
-    fragments = ['var ']
+    @push 'var '
     for declaration, index in @declarations
       if declaration.init
         indented = indent o
         leadingSpace = '\n' + indented.indent
       else
         leadingSpace = ' '
-      fragments.push ',' + leadingSpace if index
-      fragments.push @print(declaration, indented ? o)...
-    fragments
+      @push ',' + leadingSpace if index
+      @print declaration, indented ? o
   VariableDeclarator: (o) ->
-    fragments = []
-    fragments.push @print(@id, o)...
+    @print @id
     if @init
-      fragments.push ' = '
-      fragments.push @print(@init, o)...
-    fragments
+      @push ' = '
+      @print @init
   ExpressionStatement: (o) ->
     @print @expression, merge o, front: yes
   AssignmentExpression: printAssignment
   AssignmentPattern: printAssignment
   Identifier: (o) ->
-    [@name]
+    @push @name
   NumericLiteral: (o) ->
-    [@extra.raw]
+    @push @extra.raw
   StringLiteral: (o) ->
-    [@extra.raw]
+    @push @extra.raw
   RegExpLiteral: (o) ->
-    [@extra.raw]
+    @push @extra.raw
   BooleanLiteral: (o) ->
-    [if @value then 'true' else 'false']
+    @push if @value then 'true' else 'false'
   NullLiteral: (o) ->
-    ['null']
+    @push 'null'
   ThisExpression: (o) ->
-    ['this']
+    @push 'this'
   Super: (o) ->
-    ['super']
+    @push 'super'
   NewExpression: printCall
   CallExpression: printCall
   FunctionExpression: (o) ->
-    fragments = []
-    fragments.push 'async ' if @async
-    fragments.push 'function'
-    fragments.push '*' if @generator
-    fragments.push @printParams(o)...
-    fragments.push @print(@body, o)...
-    fragments
+    @push 'async ' if @async
+    @push 'function'
+    @push '*' if @generator
+    @printParams o
+    @print @body
   ArrowFunctionExpression: (o) ->
-    fragments = []
-    fragments.push 'async ' if @async
-    fragments.push @printParams(o)...
-    fragments.push '=> '
-    fragments.push @print(@body, o)...
-    fragments
+    @push 'async ' if @async
+    @printParams o
+    @push '=> '
+    @print @body
   ClassMethod: (o) ->
-    fragments = []
-    fragments.push 'static ' if @static
-    fragments.push 'async ' if @async
-    fragments.push '*' if @generator
-    fragments.push @print(@key, o)...
-    fragments.push @printParams(o)...
-    fragments.push @print(@body, o)...
-    fragments
+    @push 'static ' if @static
+    @push 'async ' if @async
+    @push '*' if @generator
+    @print @key
+    @printParams o
+    @print @body
   BlockStatement: printBlock
   ReturnStatement: (o) ->
-    fragments = ['return']
+    @push 'return'
     if @argument
-      fragments.push ' ', @print(@argument, o, LEVEL_PAREN)...
-    fragments
+      @push ' '
+      @print @argument, o, LEVEL_PAREN
   MemberExpression: (o) ->
-    fragments = []
-    fragments.push @print(@object, o, LEVEL_ACCESS)...
-    property = @print @property, o
-    if SIMPLENUM.test fragmentsToText fragments
-      fragments.push '.'
+    @print @object, o, LEVEL_ACCESS
+    property = @printed @property, o
+    if SIMPLENUM.test @fragmentsToText()
+      @push '.'
     if @computed
-      fragments.push '[', property..., ']'
+      @push '[', property, ']'
     else
-      fragments.push '.', property...
-    fragments
+      @push '.', property
   ObjectPattern: printObject
   ObjectExpression: printObject
   ObjectProperty: (o) ->
-    fragments = []
-    key = @print @key, o
-    return key if @shorthand
-    fragments.push '[' if @computed
-    fragments.push key...
-    fragments.push ']' if @computed
-    fragments.push ': '
-    fragments.push @print(@value, o)...
-    fragments
+    key = @printed @key, o
+    return @push key if @shorthand
+    @push '[' if @computed
+    @push key
+    @push ']' if @computed
+    @push ': '
+    @print @value
   ArrayExpression: printArray
   ArrayPattern: printArray
   TemplateLiteral: (o) ->
-    fragments = []
-    fragments.push '`'
+    @push '`'
     for quasi, index in @quasis
-      fragments.push @print(quasi, o)...
+      @print quasi
       expression = @expressions[index]
       if expression
-        fragments.push '${'
-        fragments.push @print(expression, o)...
-        fragments.push '}'
-    fragments.push '`'
-    fragments
+        @push '${'
+        @print expression
+        @push '}'
+    @push '`'
   TemplateElement: (o) ->
-    [@value.raw]
+    @push @value.raw
   ForStatement: (o) ->
-    fragments = []
-    fragments.push 'for ('
-    fragments.push @print(@init, o)...
-    fragments.push '; '
-    fragments.push @print(@test, o)...
-    fragments.push '; '
-    fragments.push @print(@update, o)...
-    fragments.push ') '
-    fragments.push @print(@body, o)...
-    fragments
+    @push 'for ('
+    @print @init
+    @push '; '
+    @print @test
+    @push '; '
+    @print @update
+    @push ') '
+    @print @body
   ForInStatement: (o) ->
-    fragments = []
-    fragments.push 'for ('
-    fragments.push @print(@left, o)...
-    fragments.push ' in '
-    fragments.push @print(@right, o)...
-    fragments.push ') '
-    fragments.push @print(@body, o)...
-    fragments
+    @push 'for ('
+    @print @left
+    @push ' in '
+    @print @right
+    @push ') '
+    @print @body
   ForOfStatement: (o) ->
-    fragments = []
-    fragments.push 'for '
-    fragments.push 'await ' if @await
-    fragments.push '('
-    fragments.push @print(@left, o)...
-    fragments.push ' of '
-    fragments.push @print(@right, o)...
-    fragments.push ') '
-    fragments.push @print(@body, o)...
-    fragments
+    @push 'for '
+    @push 'await ' if @await
+    @push '('
+    @print @left
+    @push ' of '
+    @print @right
+    @push ') '
+    @print @body
   SequenceExpression: (o) ->
-    fragments = []
     for expression, index in @expressions
-      fragments.push ', ' if index
-      fragments.push @print(expression, o)...
-    fragments
+      @push ', ' if index
+      @print expression
   BinaryExpression: printBinaryExpression
   LogicalExpression: printBinaryExpression
   UnaryExpression: (o) ->
-    fragments = []
-    fragments.push @operator
-    fragments.push ' ' if /[a-z]$/.test @operator
-    fragments.push @print(@argument, o)...
-    fragments
+    @push @operator
+    @push ' ' if /[a-z]$/.test @operator
+    @print @argument
   UpdateExpression: (o) ->
-    fragments = []
-    fragments.push @operator if @prefix
-    fragments.push @print(@argument, o)...
-    fragments.push @operator unless @prefix
-    fragments
+    @push @operator if @prefix
+    @print @argument
+    @push @operator unless @prefix
   IfStatement: (o) ->
-    fragments = []
-    fragments.push 'if ('
-    fragments.push print(@test, o)...
-    fragments.push ') '
-    fragments.push print(@consequent, o)...
+    @push 'if ('
+    @print @test
+    @push ') '
+    @print @consequent
     if @alternate
-      fragments.push ' else '
-      fragments.push print(@alternate, o)...
-    fragments
+      @push ' else '
+      @print @alternate
   ConditionalExpression: (o) ->
-    fragments = []
-    fragments.push print(@test, o, LEVEL_COND)...
-    fragments.push ' ? '
-    fragments.push print(@consequent, o, LEVEL_LIST)...
-    fragments.push ' : '
-    fragments.push print(@alternate, o, LEVEL_LIST)...
-    fragments
+    @print @test, o, LEVEL_COND
+    @push ' ? '
+    @print @consequent, o, LEVEL_LIST
+    @push ' : '
+    @print @alternate, o, LEVEL_LIST
   ContinueStatement: (o) ->
-    ['continue']
+    @push 'continue'
   BreakStatement: (o) ->
-    ['break']
+    @push 'break'
   AwaitExpression: (o) ->
-    fragments = ['await ']
-    fragments.push @print(@argument, o, LEVEL_OP)...
-    fragments
+    @push 'await '
+    @print @argument, o, LEVEL_OP
   YieldExpression: (o) ->
-    fragments = ['yield']
-    fragments.push '*' if @delegate
+    @push 'yield'
+    @push '*' if @delegate
     if @argument
-      fragments.push ' '
-      fragments.push @print(@argument, o, LEVEL_OP)...
-    fragments
+      @push ' '
+      @print @argument, o, LEVEL_OP
   SwitchStatement: (o) ->
-    fragments = ['switch (']
-    fragments.push @print(@discriminant, o)...
-    fragments.push ') {\n'
+    @push 'switch ('
+    @print @discriminant
+    @push ') {\n'
     for kase in @cases
-      fragments.push @print(kase, indent o)...
-    fragments.push o.indent + '}'
-    fragments
+      @print kase, indent o
+    @push o.indent + '}'
   SwitchCase: (o) ->
-    fragments = []
-    fragments.push o.indent
+    @push o.indent
     if @test
-      fragments.push 'case '
-      fragments.push @print(@test, o)...
+      @push 'case '
+      @print @test
     else
-      fragments.push 'default'
-    fragments.push ':'
-    fragments.push '\n'
-    fragments.push @printStatementSequence(@consequent, indent o)...
-    fragments
+      @push 'default'
+    @push ':'
+    @push '\n'
+    @printStatementSequence @consequent, indent o
   TryStatement: (o) ->
-    fragments = []
-    fragments.push 'try '
-    fragments.push @print(@block, o)...
-    fragments.push ' ', @print(@handler, o)... if @handler
-    fragments.push ' finally ', @print(@finalizer, o)... if @finalizer
-    fragments
+    @push 'try '
+    @print @block
+    if @handler
+      @push ' '
+      @print @handler
+    if @finalizer
+      @push ' finally '
+      @print @finalizer
   CatchClause: (o) ->
-    fragments = []
-    fragments.push 'catch ('
-    fragments.push @print(@param, o)...
-    fragments.push ') '
-    fragments.push @print(@body, o)...
-    fragments
+    @push 'catch ('
+    @print @param
+    @push ') '
+    @print @body
   ThrowStatement: (o) ->
-    fragments = []
-    fragments.push 'throw '
-    fragments.push @print(@argument, o, LEVEL_LIST)...
-    fragments
-  ClassExpression: (o) ->
-    fragments = []
-    fragments.push 'class'
-    if @id
-      fragments.push ' '
-      fragments.push @print(@id, o)...
-    if @superClass
-      fragments.push ' extends '
-      fragments.push @print(@superClass, o)...
-    if @body
-      fragments.push ' '
-      fragments.push @print(@body, o)...
-    fragments
+    @push 'throw '
+    @print @argument, o, LEVEL_LIST
+  ClassExpression: printClass
+  ClassDeclaration: printClass
   ClassBody: (o) ->
     printBlock.call @, merge o, spaced: yes
   SpreadElement: printSplat
   RestElement: printSplat
   WhileStatement: (o) ->
-    fragments = []
-    fragments.push 'while ('
-    fragments.push print(@test, o)...
-    fragments.push ') '
-    fragments.push print(@body, o)...
-    fragments
+    @push 'while ('
+    @print @test
+    @push ') '
+    @print @body
 
 makeCode = (code) ->
   new CodeFragment @, code
@@ -406,7 +347,7 @@ fragmentize = (fragments, node) ->
     else
       fragment
 
-nodePrint = (node, o, level) ->
+nodePrinted = (node, o, level) ->
   o = merge o, {level} if level
   # return flatten(@print child, o for child in node) if isArray node
   node.parent = @
@@ -414,15 +355,30 @@ nodePrint = (node, o, level) ->
   return printed unless needsParens node, o
   [node.makeCode('('), printed..., node.makeCode(')')]
 
+nodePrint = (defaultOpts) -> (node, o = defaultOpts, level) ->
+  @push @printed node, o, level
+
+push = (fragments...) ->
+  @fragments.push fragments...
+unshift = (fragments...) ->
+  @fragments.unshift fragments...
+
+nodeFragmentsToText = ->
+  fragmentsToText flatten @fragments
+
 exports.print = print = (node, o) ->
   _asStatement = del o, 'asStatement'
   extend node, {
     makeCode, printStatementSequence, wrapInBraces, asStatement, printParams
-    print: nodePrint
+    printed: nodePrinted, print: nodePrint(o)
+    fragments: []
+    push, unshift
+    fragmentsToText: nodeFragmentsToText
   }
   # node.tab = o.indent
   console.log {missing: node} unless printer[node.type]
   printed = printer[node.type].call node, o
+  printed = flatten node.fragments
   return printed unless _asStatement
   node.asStatement printed, o
 

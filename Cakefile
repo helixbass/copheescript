@@ -494,7 +494,7 @@ task 'test:printer', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript, justTestFile: [
     'async', 'async_iterators', 'booleans', 'eval', 'exception_handling'
     'exponentiation', 'generators', 'helpers', 'importing', 'interpolation'
-    'numbers'
+    'numbers', 'ranges'
     #'regex'
     'regex_dotall', 'slicing_and_splicing', 'strict'
   ], usePrinter: yes).catch -> process.exit 1
