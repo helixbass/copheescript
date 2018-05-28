@@ -141,6 +141,7 @@ If called without options, `coffee` will run your script.
   -w, --watch        watch scripts for changes and rerun commands
       --babylon      print out Babylon AST
       --prettier     compile using Prettier
+      --ast-printer  generate JS via AST printer
   -a, --ast          print out AST
 
   '''

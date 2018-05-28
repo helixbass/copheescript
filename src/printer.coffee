@@ -1,4 +1,4 @@
-{merge, dump: _dump, extend, isString, isArray, del, flatten} = require './helpers'
+{merge, dump: _dump, extend, isString, isArray, del, flatten, compact} = require './helpers'
 
 #### CodeFragment
 
@@ -62,8 +62,11 @@ printObject = (o) ->
   @push '\n' + o.indent unless isCompact
   @wrapInBraces()
 
+fronts = (o) ->
+  merge o, keepFront: yes
+
 printBinaryExpression = (o) ->
-  @print @left, o, LEVEL_OP
+  @print @left, fronts(o), LEVEL_OP
   @push " #{@operator} "
   @print @right, o, LEVEL_OP
 
@@ -79,17 +82,23 @@ printCall = (o) ->
 printArray = (o) ->
   return @push '[]' unless @elements.length
   @push '['
-  elements = (@printed(element, o) for element, index in @elements)
-  shouldBreak = '\n' in fragmentsToText flatten elements
+  printElements = =>
+    for element, index in @elements
+      if element
+        @printed element, o
+  elements = printElements()
+  shouldBreak = '\n' in fragmentsToText compact flatten elements
   if shouldBreak
     closingNewline = '\n' + o.indent
     o = indent o
-    elements = (@printed(element, o) for element, index in @elements)
+    elements = printElements()
     @push '\n' + o.indent
   separator = if shouldBreak then ',\n' + o.indent else ', '
+  lastIndex = elements.length - 1
   for element, index in elements
     @push separator if index
-    @push element
+    @push element if element
+    @push ', ' if index is lastIndex and not element
   @push closingNewline if closingNewline?
   @push ']'
 
@@ -109,7 +118,7 @@ printBlock = (o) ->
 
 printSplat = (o) ->
   @push '...'
-  @print @argument
+  @print @argument, o, LEVEL_OP
 
 printClass = (o) ->
   @push 'class'
@@ -154,7 +163,7 @@ printer =
       @push ' = '
       @print @init
   ExpressionStatement: (o) ->
-    @print @expression, merge o, front: yes
+    @print @expression, merge o, setFront: yes
   AssignmentExpression: printAssignment
   AssignmentPattern: printAssignment
   Identifier: (o) ->
@@ -196,7 +205,7 @@ printer =
       @push ' '
       @print @argument, o, LEVEL_PAREN
   MemberExpression: (o) ->
-    @print @object, o, LEVEL_ACCESS
+    @print @object, fronts(o), LEVEL_ACCESS
     property = @printed @property, o
     if SIMPLENUM.test @fragmentsToText()
       @push '.'
@@ -207,13 +216,13 @@ printer =
   ObjectPattern: printObject
   ObjectExpression: printObject
   ObjectProperty: (o) ->
-    key = @printed @key, o
-    return @push key if @shorthand
+    value = @printed @value, o
+    return @push value if @shorthand
     @push '[' if @computed
-    @push key
+    @print @key
     @push ']' if @computed
     @push ': '
-    @print @value
+    @push value
   ArrayExpression: printArray
   ArrayPattern: printArray
   TemplateLiteral: (o) ->
@@ -265,7 +274,7 @@ printer =
     @print @argument, o, LEVEL_OP
   UpdateExpression: (o) ->
     @push @operator if @prefix
-    @print @argument
+    @print @argument, if @prefix then o else fronts o
     @push @operator unless @prefix
   IfStatement: (o) ->
     @push 'if ('
@@ -418,10 +427,13 @@ fragmentize = (fragments, node) ->
       fragment
 
 nodePrinted = (node, o, level) ->
+  keepFront = del o, 'keepFront'
+  setFront = del o, 'setFront'
   o = merge o, {level} if level
+  o = merge o, front: yes if setFront
   # return flatten(@print child, o for child in node) if isArray node
   node.parent = @
-  printed = fragmentize print(node, merge o, front: no), node
+  printed = fragmentize print(node, merge o, front: if setFront then yes else if keepFront then o.front else no), node
   return printed unless needsParens node, o
   [node.makeCode('('), printed..., node.makeCode(')')]
 
@@ -489,13 +501,18 @@ for tier, i in PRECEDENCE_LEVELS
 
 getPrecedence = (op) -> PRECEDENCE[op]
 
+leadsWithObject = (node) ->
+  while node.type is 'MemberExpression'
+    return yes if node.object.type is 'ObjectExpression'
+    node = node.object
+
 needsParens = (node, o) ->
   {type, parent} = node
   {level} = o
 
   return yes if o.front and (
     type in ['FunctionExpression', 'ObjectExpression'] or
-    type is 'AssignmentExpression' and node.left.type is 'ObjectPattern'
+    type is 'AssignmentExpression' and (node.left.type is 'ObjectPattern' or node.left.type is 'MemberExpression' and leadsWithObject(node.left))
   )
   switch type
     when 'AssignmentExpression'

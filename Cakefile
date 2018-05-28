@@ -492,8 +492,9 @@ task 'test:prettier', 'run the CoffeeScript language test suite', ->
 
 task 'test:printer', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript, justTestFile: [
-    'async', 'async_iterators', 'booleans', 'eval', 'exception_handling'
-    'exponentiation', 'generators', 'helpers', 'importing', 'interpolation'
+    'argument_parsing', 'arrays', 'assignment', 'async', 'async_iterators'
+    'booleans', 'eval', 'exception_handling', 'exponentiation', 'generators'
+    'helpers', 'importing', 'interpolation'
     #'modules'
     'numbers', 'ranges'
     #'regex'
