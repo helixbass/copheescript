@@ -763,7 +763,7 @@ exports.Block = class Block extends Base
     code = del o, 'code'
     returnWithAst = del o, 'returnWithAst'
     { opts } = prettier.__debug.parse ''
-    ast = @compileToBabylon o
+    ast = @compileToBabylon merge o, forPrettier: yes
     prettier.__debug.attachComments code, ast, opts
     formatted = prettier.__debug.formatAST(ast, merge opts, originalText: code).formatted
     return formatted unless returnWithAst
@@ -1427,9 +1427,10 @@ exports.PassthroughLiteral = class PassthroughLiteral extends Literal
       node.leading = yes
     compiled
 
-  astProps:
-    originalValue: 'value'
-    here: 'here'
+  astProps: (o) -> {
+    value: if o.compiling then @value else @originalValue
+    @here
+  }
 
   _toAst: (o) ->
     return null unless @value.length
@@ -1437,19 +1438,22 @@ exports.PassthroughLiteral = class PassthroughLiteral extends Literal
 
   _compileToBabylon: (o) ->
     return null unless @value.length
-    @withEnhancedComments do =>
-      # TODO: location data is incorrect (starts from 0 at beginning of backticked JS)
-      try
-        parsed = babylon.parse(@value, sourceType: 'module', ranges: yes).program.body
-        if parsed?.length
-          return parsed[0].expression if parsed.length is 1 and parsed[0].type is 'ExpressionStatement'
-          return parsed
-      catch
-      try
-        return babylon.parseExpression @value, ranges: yes
-      catch
-      babylon.parse("class A {#{@value}}", sourceType: 'module', ranges: yes).program.body[0].body.body[0]
-      # TODO: wrap this last one in a try and if it fails throw a useful error about not being able to parse backticked JS as an expression
+    return @withEnhancedComments @parsedJS() if o.forPrettier
+    super o
+
+  parsedJS: ->
+    # TODO: location data is incorrect (starts from 0 at beginning of backticked JS)
+    try
+      parsed = babylon.parse(@value, sourceType: 'module', ranges: yes).program.body
+      if parsed?.length
+        return parsed[0].expression if parsed.length is 1 and parsed[0].type is 'ExpressionStatement'
+        return parsed
+    catch
+    try
+      return babylon.parseExpression @value, ranges: yes
+    catch
+    babylon.parse("class A {#{@value}}", sourceType: 'module', ranges: yes).program.body[0].body.body[0]
+    # TODO: wrap this last one in a try and if it fails throw a useful error about not being able to parse backticked JS as an expression
 
 exports.IdentifierLiteral = class IdentifierLiteral extends Literal
   isAssignable: YES

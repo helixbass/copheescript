@@ -21,7 +21,6 @@ fragmentsToText = (fragments) ->
   (fragment.code for fragment in fragments).join('')
 
 printStatementSequence = (body, o) ->
-  # TODO: directives
   for stmt, index in body
     @push '\n' if index and o.spaced
     @print stmt, merge o, spaced: no, asStatement: yes, level: LEVEL_TOP
@@ -29,7 +28,7 @@ printStatementSequence = (body, o) ->
 BLOCK = [
   'IfStatement', 'ForStatement', 'ForInStatement', 'ForOfStatement'
   'WhileStatement', 'ClassDeclaration', 'TryStatement', 'SwitchStatement'
-  'ClassMethod'
+  'ClassMethod'#, 'FunctionDeclaration'
 ]
 
 asStatement = (fragments, o) ->
@@ -110,10 +109,10 @@ printParams = (o) ->
   @push ') '
 
 printBlock = (o) ->
-  return @push '{}' unless @body.length
+  return @push '{}' unless @body.length or @directives.length
   @push '{'
   @push '\n'
-  @printStatementSequence @body, indent o
+  @printStatementSequence [@directives..., @body...], indent o
   @push o.indent + '}'
 
 printSplat = (o) ->
@@ -136,6 +135,9 @@ printFunction = (o) ->
   @push 'async ' if @async
   @push 'function'
   @push '*' if @generator
+  # if @id
+  #   @push ' '
+  #   @print @id
   @printParams o
   @print @body
 
@@ -174,10 +176,14 @@ printer =
     @push @extra.raw
   RegExpLiteral: (o) ->
     @push @extra.raw
+  DirectiveLiteral: (o) ->
+    @push @extra.raw
   BooleanLiteral: (o) ->
     @push if @value then 'true' else 'false'
   NullLiteral: (o) ->
     @push 'null'
+  PassthroughLiteral: (o) ->
+    @push @value
   ThisExpression: (o) ->
     @push 'this'
   Super: (o) ->
@@ -185,7 +191,7 @@ printer =
   NewExpression: printCall
   CallExpression: printCall
   FunctionExpression: printFunction
-  FunctionDeclaration: printFunction
+  # FunctionDeclaration: printFunction
   ArrowFunctionExpression: (o) ->
     @push 'async ' if @async
     @printParams o
@@ -195,7 +201,9 @@ printer =
     @push 'static ' if @static
     @push 'async ' if @async
     @push '*' if @generator
+    @push '[' if @computed
     @print @key
+    @push ']' if @computed
     @printParams o
     @print @body
   BlockStatement: printBlock
@@ -415,6 +423,8 @@ printer =
     unless @local.name is @exported.name
       @push ' as '
       @print @exported
+  Directive: (o) ->
+    @print @value
 
 makeCode = (code) ->
   new CodeFragment @, code
@@ -513,6 +523,8 @@ leadsWithObject = (node) ->
     return yes if node.object.type is 'ObjectExpression'
     node = node.object
 
+isClass = ({type}) -> type in ['ClassExpression', 'ClassDeclaration']
+
 needsParens = (node, o) ->
   {type, parent} = node
   {level} = o
@@ -553,5 +565,8 @@ needsParens = (node, o) ->
       return yes if level >= LEVEL_PAREN
     when 'CallExpression'
       return yes if parent.type is 'NewExpression' and node is parent.callee
+    when 'ClassExpression'
+      return yes if level >= LEVEL_ACCESS
+      return yes if isClass(parent) and node is parent.superClass
 
 dump = (obj) -> _dump merge obj, parent: null
