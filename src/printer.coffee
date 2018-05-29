@@ -551,5 +551,7 @@ needsParens = (node, o) ->
       return yes if level >= LEVEL_COND
     when 'SequenceExpression'
       return yes if level >= LEVEL_PAREN
+    when 'CallExpression'
+      return yes if parent.type is 'NewExpression' and node is parent.callee
 
 dump = (obj) -> _dump merge obj, parent: null

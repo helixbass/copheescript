@@ -5,5 +5,6 @@
 - compilation of ([]) -> is broken
 - I think "chaining should work within spilling ternary" is confused about what it's compiling to (.a is chained against a: 3, not id(a: 3))
 - do func = (x) -> shouldn't get confused by parens around (func = (x) ->)
+- shouldn't this declare var b in the func (that's how it's compiling with Babylon)? obj.bar(-> b = 2).foo(b = 1)
 
 - should localize generation of comment inside catch block?
