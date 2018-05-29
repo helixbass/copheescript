@@ -10,7 +10,13 @@ exports.CodeFragment = class CodeFragment
   constructor: (parent, code) ->
     @code = "#{code}"
     @type = parent?.constructor?.name or 'unknown'
-    @locationData = parent?.locationData
+    @locationData =
+      if parent?.loc
+        first_line: parent.loc.start.line - 1
+        first_column: parent.loc.start.column
+        last_line: parent.loc.end.line - 1
+        first_column: parent.loc.end.column
+        range: parent.range
     @comments = parent?.comments
 
   toString: ->
