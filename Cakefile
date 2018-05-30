@@ -498,7 +498,7 @@ task 'test:printer', 'run the CoffeeScript language test suite', ->
     'helpers', 'importing', 'interpolation', 'invocation_argument_parsing'
     'javascript_literals'
     #'modules'
-    'numbers', 'option_parser', 'parser', 'ranges'
+    'numbers', 'option_parser', 'operators', 'parser', 'ranges'
     #'regex'
     'regex_dotall', 'repl', 'scope', 'slicing_and_splicing', 'soaks'
     'sourcemap', 'strict', 'strings', 'tagged_template_literals'

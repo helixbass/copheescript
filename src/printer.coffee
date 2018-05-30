@@ -563,6 +563,9 @@ needsParens = (node, o) ->
       return yes if parent.type is 'UnaryExpression'
     when 'UnaryExpression'
       return yes if parent.type is 'BinaryExpression' and parent.operator is '**'
+      return yes if node.operator in ['+', '-'] and parent.type is 'UnaryExpression' and parent.operator is node.operator
+    when 'UpdateExpression'
+      return yes if node.prefix and parent.type is 'UnaryExpression' and (node.operator is '++' and parent.operator is '+' or node.operator is '--' and parent.operator is '-')
     when 'AwaitExpression', 'YieldExpression'
       return yes if level >= LEVEL_PAREN
     when 'ConditionalExpression'
