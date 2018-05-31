@@ -494,8 +494,8 @@ task 'test:printer', 'run the CoffeeScript language test suite', ->
   runTests(CoffeeScript, justTestFile: [
     'argument_parsing', 'arrays', 'assignment', 'async', 'async_iterators'
     'booleans', 'classes', 'cluster', 'compilation', 'comprehensions'
-    'control_flow', 'eval', 'exception_handling', 'exponentiation'
-    'function_invocation', 'generators', 'helpers', 'importing'
+    'control_flow', 'eval', 'exception_handling', 'exponentiation', 'formatting'
+    'function_invocation', 'functions', 'generators', 'helpers', 'importing'
     'interpolation', 'invocation_argument_parsing', 'javascript_literals'
     'literate', 'literate_tabbed', 'location'
     #'modules'

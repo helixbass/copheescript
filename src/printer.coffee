@@ -27,9 +27,11 @@ fragmentsToText = (fragments) ->
   (fragment.code for fragment in fragments).join('')
 
 printStatementSequence = (body, o) ->
+  prevWasDirective = no
   for stmt, index in body
-    @push '\n' if index and o.spaced
+    @push '\n' if index and o.spaced and not prevWasDirective
     @print stmt, merge o, spaced: no, asStatement: yes, level: LEVEL_TOP
+    prevWasDirective = stmt.type is 'Directive'
 
 BLOCK = [
   'IfStatement', 'ForStatement', 'ForInStatement', 'ForOfStatement'
@@ -154,7 +156,7 @@ printer =
 
     @print @program
   Program: (o) ->
-    @printStatementSequence @body, o
+    @printStatementSequence [@directives..., @body...], o
   VariableDeclaration: (o) ->
     @push 'var '
     for declaration, index in @declarations

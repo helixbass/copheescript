@@ -243,6 +243,20 @@ exports.Base = class Base
   withEmptyLocationData: ->
     @withLocationDataFrom emptyLocationData
 
+  sniffDirectives: (expressions, {replace} = {}) ->
+    directives = []
+    index = 0
+    while expr = expressions[index]
+      break unless expr instanceof Value and expr.isString()
+      if expr.hoisted
+        index++
+      else
+        if replace
+          expressions[index++] = expr.withLocationData new Directive expr
+        else
+          directives.push expressions.splice(index, 1)...
+    directives
+
   compileClosureToBabylon: (o) ->
     if jumpNode = @jumps()
       jumpNode.error 'cannot use a pure statement in an expression'
@@ -795,8 +809,10 @@ exports.Block = class Block extends Base
       'ClassBody'
     else
       'BlockStatement'
-  astChildren: (o) ->
+  astChildren: (o) -> {
     body: @bodyToAst o
+    @directives
+  }
 
   initializeScope: (o) ->
     o.scope   = new Scope null, this, null, o.referencedVars ? []
@@ -820,7 +836,8 @@ exports.Block = class Block extends Base
     @initializeScope o
     o.compilingBabylon = o.compiling = yes
 
-    compiledBody = @hoistBabylonComments HoistTarget.expandBabylon @compileWithDeclarationsToBabylon merge o, root: yes
+    compiledBody = HoistTarget.expandBabylon @compileWithDeclarationsToBabylon merge o, root: yes
+    compiledBody = @hoistBabylonComments compiledBody if compiledBody.length
     if compiledBody.length is 1 and not compiledBody[0].type
       programComments =
         for comment in compiledBody[0].comments
@@ -857,7 +874,7 @@ exports.Block = class Block extends Base
     program = @withBabylonLocationData {
       type: 'Program'
       sourceType: 'module'
-      body
+      body, @directives
     }
 
     @withCopiedBabylonLocationData {
@@ -868,13 +885,18 @@ exports.Block = class Block extends Base
   bodyToAst: (o) ->
     root = del o, 'root'
 
+    @directives = []
+    @sniffDirectives @expressions, replace: yes
+
     flatten(
       for node in @expressions then do =>
         node.topLevel = root
         ast = node.toAst o
         return [] unless ast
-        return ast.body if node instanceof Block or ast.type is 'BlockStatement'
+        return @extractDirectives ast.body, o if node instanceof Block or ast.type is 'BlockStatement'
         return ast if node.isStatement o
+        ast = @extractDirectives ast, o
+        return [] unless ast
         return @asExpressionStatement ast unless isArray ast
         @asExpressionStatement item for item in ast
     )
@@ -889,6 +911,7 @@ exports.Block = class Block extends Base
       return @wrapInParensIf(o.level >= LEVEL_LIST)(new Sequence(@expressions)).compileToBabylon o
 
     @directives = []
+    @sniffDirectives @expressions, replace: yes
     if root and not o.bare
       code = new Code [], this
       code.noReturn = true
@@ -1573,10 +1596,9 @@ exports.Directive = class Directive extends Base
   constructor: (@value) ->
     super()
   
-  _compileToBabylon: (o) ->
-    type: 'Directive'
+  astChildren: (o) ->
     value: {
-      ...@value.compileToBabylon o
+      ...@value.toAst o
       type: 'DirectiveLiteral'
     }
 
@@ -3244,7 +3266,7 @@ exports.ExecutableClassBody = class ExecutableClassBody extends Base
       else
         @class
     )
-    @body.expressions.unshift (new Directive(directive) for directive in directives)...
+    @body.expressions.unshift (new Directive(directive).withLocationDataFrom(directive) for directive in directives)...
     @body.expressions.push ident
 
     new Parens(new Call(
@@ -3299,16 +3321,7 @@ exports.ExecutableClassBody = class ExecutableClassBody extends Base
   # - Hoist static assignments into `@properties`
   # - Convert invalid ES properties into class or prototype assignments
   walkBody: ->
-    directives  = []
-
-    index = 0
-    while expr = @body.expressions[index]
-      break unless expr instanceof Value and expr.isString()
-      if expr.hoisted
-        index++
-      else
-        directives.push @body.expressions.splice(index, 1)...
-
+    directives = @sniffDirectives @body.expressions
     @traverseChildren false, (child) =>
       return false if child instanceof Class or child instanceof HoistTarget
 
