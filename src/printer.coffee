@@ -439,6 +439,53 @@ printer =
       @print @exported
   Directive: (o) ->
     @print @value
+  JSXElement: (o) ->
+    @print @openingElement
+    return if @openingElement.selfClosing
+    for child in @children
+      @print child
+    @print @closingElement
+  JSXOpeningElement: (o) ->
+    @push '<'
+    @print @name
+    if @attributes.length
+      for attribute in @attributes
+        @push ' '
+        @print attribute
+    if @selfClosing
+      @push ' />'
+      return
+    @push '>'
+  JSXClosingElement: (o) ->
+    @push '</'
+    @print @name
+    @push '>'
+  JSXIdentifier: (o) ->
+    @push @name
+  JSXAttribute: (o) ->
+    @print @name
+    if @value
+      @push '='
+      @print @value
+  JSXExpressionContainer: (o) ->
+    @push '{'
+    @print @expression
+    @push '}'
+  JSXText: (o) ->
+    @push @value
+  JSXSpreadAttribute: (o) ->
+    @push '{...'
+    @print @argument
+    @push '}'
+  JSXFragment: (o) ->
+    @print @openingFragment
+    for child in @children
+      @print child
+    @print @closingFragment
+  JSXOpeningFragment: (o) ->
+    @push '<>'
+  JSXClosingFragment: (o) ->
+    @push '</>'
 
 makeCode = (code) ->
   new CodeFragment @, code
