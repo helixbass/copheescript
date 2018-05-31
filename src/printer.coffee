@@ -56,7 +56,7 @@ printAssignment = (o) ->
 
 printObject = (o) ->
   isCompact = yes
-  for {shorthand} in @properties when not shorthand
+  for {type, shorthand} in @properties when type is 'ObjectProperty' and not shorthand
     isCompact = no
     break
   @push '\n' unless isCompact
@@ -78,8 +78,14 @@ printBinaryExpression = (o) ->
   @print @right, o, LEVEL_OP
 
 printCall = (o) ->
-  @push 'new ' if @type is 'NewExpression'
-  @print @callee, o, LEVEL_ACCESS
+  isNew = @type is 'NewExpression'
+  @push 'new ' if isNew
+  @print @callee,
+    if isNew
+      o
+    else
+      fronts o
+    LEVEL_ACCESS
   @push '('
   for arg, index in @arguments
     @push ', ' if index
