@@ -243,10 +243,12 @@ exports.Base = class Base
   withEmptyLocationData: ->
     @withLocationDataFrom emptyLocationData
 
-  sniffDirectives: (expressions, {replace} = {}) ->
+  sniffDirectives: (expressions, {replace, notFinalExpression} = {}) ->
     directives = []
     index = 0
+    lastIndex = expressions.length - 1
     while expr = expressions[index]
+      break if index is lastIndex and notFinalExpression
       break unless expr instanceof Value and expr.isString()
       if expr.hoisted
         index++
@@ -884,9 +886,10 @@ exports.Block = class Block extends Base
 
   bodyToAst: (o) ->
     root = del o, 'root'
+    checkForDirectives = del o, 'checkForDirectives'
 
     @directives = []
-    @sniffDirectives @expressions, replace: yes
+    @sniffDirectives @expressions, replace: yes, notFinalExpression: checkForDirectives if root or checkForDirectives
 
     flatten(
       for node in @expressions then do =>
@@ -911,7 +914,7 @@ exports.Block = class Block extends Base
       return @wrapInParensIf(o.level >= LEVEL_LIST)(new Sequence(@expressions)).compileToBabylon o
 
     @directives = []
-    @sniffDirectives @expressions, replace: yes
+    @sniffDirectives @expressions, replace: yes if withDeclarations
     if root and not o.bare
       code = new Code [], this
       code.noReturn = true
@@ -3044,6 +3047,7 @@ exports.Class = class Class extends Base
     @name = @determineName()
     @body.isClassBody = yes
     @walkBody o
+    @sniffDirectives @body.expressions, replace: yes
     super o
 
   compileClassDeclarationToBabylon: (o) ->
@@ -4354,7 +4358,7 @@ exports.Code = class Code extends Base
   }
   astChildren: (o) ->
     params: @paramsToAst o
-    body: @body.toAst o, LEVEL_TOP
+    body: @body.toAst merge(o, checkForDirectives: yes), LEVEL_TOP
 
   paramsToAst: (o) ->
     for param in @params
