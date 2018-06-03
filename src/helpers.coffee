@@ -312,6 +312,20 @@ exports.locationDataToBabylon = ({first_line, first_column, last_line, last_colu
   end: range[1] + 1
 }
 
+exports.mergeBabylonLocationData = (intoNode, fromNode) ->
+  {range: intoRange} = intoNode
+  {range: fromRange} = fromNode
+  return intoNode unless intoRange and fromRange # TODO: should figure out why don't have location data?
+  if fromRange[0] < intoRange[0]
+    intoRange[0] = fromRange[0]
+    intoNode.start = fromNode.start
+    intoNode.loc.start = fromNode.loc.start
+  if fromRange[1] > intoRange[1]
+    intoRange[1] = fromRange[1]
+    intoNode.end = fromNode.end
+    intoNode.loc.end = fromNode.loc.end
+  intoNode
+
 exports.isArray = isArray = (obj) -> Array.isArray obj
 exports.isNumber = isNumber = (obj) -> Object::toString.call(obj) is '[object Number]'
 exports.isString = isString = (obj) -> Object::toString.call(obj) is '[object String]'

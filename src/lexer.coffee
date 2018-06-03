@@ -51,6 +51,7 @@ exports.Lexer = class Lexer
     @exportSpecifierList = no    # Used to identify when in an `EXPORT {...} FROM? ...`.
     @csxDepth = 0                # Used to optimize CSX checks, how deep in CSX we are.
     @csxObjAttribute = {}        # Used to detect if CSX attributes is wrapped in {} (<div {props...} />).
+    @comments = opts.comments ? [] # The list of all found comments
 
     @chunkLine =
       opts.line or 0             # The start line for the current @chunk.
@@ -87,7 +88,7 @@ exports.Lexer = class Lexer
     @closeIndentation()
     @error "missing #{end.tag}", (end.origin ? end)[2] if end = @ends.pop()
     return @tokens if opts.rewrite is off
-    (new Rewriter).rewrite @tokens
+    {tokens: (new Rewriter).rewrite({@tokens, @comments}), @comments}
 
   # Preprocess the code to remove leading and trailing whitespace, carriage
   # returns, etc. If we’re lexing literate CoffeeScript, strip external Markdown
@@ -307,15 +308,23 @@ exports.Lexer = class Lexer
   # everything has been parsed and the JavaScript code generated.
   commentToken: (chunk = @chunk, {offsetInChunk = 0, nonInitial, dontShift} = {}) ->
     return 0 unless match = chunk.match COMMENT
-    [withLeadingWhitespace, leadingWhitespace, comment, here] = match
+    [withLeadingWhitespace, hereLeadingWhitespace, here, nonHere] = match
     contents = null
     # Does this comment follow code on the same line?
     leadingNewLine = /^\s*\n+\s*#/.test withLeadingWhitespace
-    if here
-      matchIllegal = HERECOMMENT_ILLEGAL.exec comment
+    isIndented = (leadingWhitespace) =>
+      lastNewlineIndex = leadingWhitespace.lastIndexOf '\n'
+      if here?
+        return no unless lastNewlineIndex > -1
+      else
+        lastNewlineIndex ?= -1
+      indentSize = leadingWhitespace.length - 1 - lastNewlineIndex
+      indentSize > @indent
+    if here?
+      matchIllegal = HERECOMMENT_ILLEGAL.exec here
       if matchIllegal
         @error "block comments cannot contain #{matchIllegal[0]}",
-          offset: matchIllegal.index, length: matchIllegal[0].length
+          offset: 3 + matchIllegal.index, length: matchIllegal[0].length
 
       # Parse indentation or outdentation as if this block comment didn’t exist.
       chunk = chunk.replace "####{here}###", ''
@@ -328,34 +337,54 @@ exports.Lexer = class Lexer
       content = here
       if '\n' in content
         content = content.replace /// \n #{repeat ' ', @indent} ///g, '\n'
-      contents = [{content, length: comment.length}]
+      contents = [{
+        content
+        length: withLeadingWhitespace.length - hereLeadingWhitespace.length
+        leadingWhitespace: hereLeadingWhitespace
+      }]
     else
       # The `COMMENT` regex captures successive line comments as one token.
       # Remove any leading newlines before the first comment, but preserve
       # blank lines between line comments.
       leadingNewlinesLength = 0
-      content = comment.replace /^(\n*)/, ({length}) ->
+      content = nonHere.replace /^(\n*)/, ({length}) ->
         leadingNewlinesLength = length
         ''
+      precedingNonCommentLines = ''
       contents =
         content.split '\n'
         .map (line, index) ->
-          {length} = line
-          {length, content: line.replace /^([ |\t]*)#/gm, ''}
+          unless line.indexOf('#') > -1
+            precedingNonCommentLines += "\n#{line}"
+            return
+          leadingWhitespace = ''
+          content = line.replace /^([ |\t]*)#/, (_, whitespace) ->
+            leadingWhitespace = whitespace
+            ''
+          ret = {length: content.length + 1, content, leadingWhitespace: "#{precedingNonCommentLines}#{leadingWhitespace}"}
+          precedingNonCommentLines = ''
+          ret
+        .filter (comment) -> comment
 
-    offsetInChunk += leadingWhitespace.length + (leadingNewlinesLength ? 0)
+    offsetInChunk += hereLeadingWhitespace.length if here?
+    offsetInChunk += leadingNewlinesLength ? 0
     nonInitial ?= no
-    commentAttachments = for {content, length}, i in contents
+    commentAttachments = for {content, length, leadingWhitespace}, i in contents
       nonInitial = yes if i isnt 0
       leadingNewlineOffset = if nonInitial then 1 else 0
-      commentAttachment =
-        content: content
+      offsetInChunk += leadingNewlineOffset + leadingWhitespace.length
+      commentAttachment = {
+        content
         here: here?
         newLine: leadingNewLine or nonInitial # Line comments after the first one start new lines, by definition.
-        locationData: @makeLocationData {offsetInChunk: offsetInChunk + leadingNewlineOffset, length}
+        locationData: @makeLocationData {offsetInChunk, length}
+        indented: isIndented leadingWhitespace
+      }
       commentAttachment.dontShift = yes if dontShift
-      offsetInChunk += length + leadingNewlineOffset
+      offsetInChunk += length
       commentAttachment
+
+    @comments.push commentAttachments...
 
     prev = @prev()
     unless prev
@@ -781,7 +810,7 @@ exports.Lexer = class Lexer
       [line, column, offset] = @getLineAndColumnFromChunk offsetInChunk + interpolationOffset
       rest = str[interpolationOffset..]
       {tokens: nested, index} =
-        new Lexer().tokenize rest, {line, column, offset, untilBalanced: on}
+        new Lexer().tokenize rest, {line, column, offset, untilBalanced: on, @comments}
       # Account for the `#` in `#{`.
       index += interpolationOffset
 
@@ -1164,7 +1193,7 @@ OPERATOR   = /// ^ (
 
 WHITESPACE = /^[^\n\S]+/
 
-COMMENT    = /^(\s*)(###([^#][\s\S]*?)(?:###[^\n\S]*|###$)|^(?:\s*#(?!##[^#]).*)+)/
+COMMENT    = /^(\s*)###([^#][\s\S]*?)(?:###[^\n\S]*|###$)|^((?:\s*#(?!##[^#]).*)+)/
 
 CODE       = /^[-=]>/
 

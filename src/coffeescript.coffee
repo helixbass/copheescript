@@ -87,7 +87,7 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
   sources[filename].push code
   map = new SourceMap if generateSourceMap
 
-  tokens = lexer.tokenize code, options
+  {tokens, comments} = lexer.tokenize code, options
   # dump {tokens}
 
   # Pass a list of referenced variables, so that generated variables won’t get
@@ -104,6 +104,7 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
         break
 
   parsed = parser.parse tokens
+  parsed.allComments = comments
   # dump {parsed}
   return parsed.toAst options if options.ast
   js = do =>
@@ -206,33 +207,28 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
 
 # Tokenize a string of CoffeeScript code, and return the array of tokens.
 exports.tokens = withPrettyErrors (code, options) ->
-  lexer.tokenize code, options
+  {tokens} = lexer.tokenize code, options
+  tokens
 
 # Parse a string of CoffeeScript code or an array of lexed tokens, and
 # return the AST. You can then compile it by calling `.compile()` on the root,
 # or traverse it by using `.traverseChildren()` with a callback.
 exports.nodes = withPrettyErrors (source, options) ->
   if typeof source is 'string'
-    parser.parse lexer.tokenize source, options
+    parser.parse lexer.tokenize(source, options).tokens
   else
     parser.parse source
 exports.babylon = compileToBabylon = withPrettyErrors (source, options) ->
-  tokens =
-    if typeof source is 'string'
-      lexer.tokenize source, options
-    else
-      source
+  {tokens, comments} = lexer.tokenize source, options
   parsed = parser.parse tokens
+  parsed.allComments = comments
   ast = parsed.compileToBabylon options
   return ast unless options.withTokens
   {ast, tokens}
 exports.ast = withPrettyErrors (source, options) ->
-  tokens =
-    if typeof source is 'string'
-      lexer.tokenize source, options
-    else
-      source
+  {tokens, comments} = lexer.tokenize source, options
   parsed = parser.parse tokens
+  parsed.allComments = comments
   parsed.toAst options
 
 {dump, flatten, isPlainObject, merge, traverseBabylonAst, traverseBabylonAsts} = helpers

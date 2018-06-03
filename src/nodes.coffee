@@ -16,7 +16,7 @@ addDataToNode, attachCommentsToNode, locationDataToString
 throwSyntaxError, getNumberValue, dump, locationDataToBabylon
 isArray, isBoolean, isPlainObject, mapValues, traverseBabylonAst
 babylonLocationFields, isFunction, makeDelimitedLiteral
-replaceUnicodeCodePointEscapes} = require './helpers'
+mergeBabylonLocationData, replaceUnicodeCodePointEscapes} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -882,7 +882,22 @@ exports.Block = class Block extends Base
     @withCopiedBabylonLocationData {
       type: 'File'
       program
+      comments: @commentsToAst()
     }, program
+
+  commentsToAst: ->
+    return [] unless @allComments?.length
+
+    for {here, content, locationData} in @allComments
+      {
+        type:
+          if here
+            'CommentBlock'
+          else
+            'CommentLine'
+        value: content
+        locationDataToBabylon(locationData)...
+      }
 
   bodyToAst: (o) ->
     root = del o, 'root'
@@ -1810,13 +1825,16 @@ exports.Value = class Value extends Base
         if prop instanceof Slice and o.compiling
           prop.compileValueToBabylon o, ret
         else
-          prop.withBabylonLocationData # TODO: should include location up through this prop
-            type: 'MemberExpression'
-            object: ret
-            property: prop.toAst o
-            computed: prop instanceof Index or prop.name?.unwrap() not instanceof PropertyName
-            optional: prop.soak
-            shorthand: prop.shorthand
+          mergeBabylonLocationData(
+            prop.withBabylonLocationData
+              type: 'MemberExpression'
+              object: ret
+              property: prop.toAst o
+              computed: prop instanceof Index or prop.name?.unwrap() not instanceof PropertyName
+              optional: prop.soak
+              shorthand: prop.shorthand
+            ret
+          )
     ret
 
   # Unfold a soak into an `If`: `a?.b` -> `a.b if a?`

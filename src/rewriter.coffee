@@ -5,7 +5,7 @@
 # shorthand into the unambiguous long form, add implicit indentation and
 # parentheses, and generally clean things up.
 
-{throwSyntaxError} = require './helpers'
+{throwSyntaxError, dump} = require './helpers'
 
 # Move attached comments from one token to another.
 moveComments = (fromToken, toToken) ->
@@ -40,7 +40,7 @@ exports.Rewriter = class Rewriter
   # stream, with a big ol’ efficient switch, but it’s much nicer to work with
   # like this. The order of these passes matters—indentation must be
   # corrected before implicit parentheses can be wrapped around blocks of code.
-  rewrite: (@tokens) ->
+  rewrite: ({@tokens, @comments}) ->
     # Set environment variable `DEBUG_TOKEN_STREAM` to `true` to output token
     # debugging info. Also set `DEBUG_REWRITTEN_TOKEN_STREAM` to `true` to
     # output the token stream after it has been rewritten by this file.
@@ -57,7 +57,7 @@ exports.Rewriter = class Rewriter
     @rescueStowawayComments()
     @addLocationDataToGeneratedTokens()
     @enforceValidCSXAttributes()
-    @fixOutdentLocationData()
+    @fixIndentationLocationData()
     @exposeTokenDataToGrammar()
     if process?.env?.DEBUG_REWRITTEN_TOKEN_STREAM
       console.log 'Rewritten token stream:' if process.env.DEBUG_TOKEN_STREAM
@@ -539,12 +539,29 @@ exports.Rewriter = class Rewriter
   # `OUTDENT` tokens should always be positioned at the last character of the
   # previous token, so that AST nodes ending in an `OUTDENT` token end up with a
   # location corresponding to the last “real” token under the node.
-  fixOutdentLocationData: ->
+  fixIndentationLocationData: ->
     @scanTokens (token, i, tokens) ->
-      return 1 unless token[0] is 'OUTDENT' or
+      return 1 unless token[0] in ['INDENT', 'OUTDENT'] or
         (token.generated and token[0] is 'CALL_END') or
         (token.generated and token[0] is '}')
       prevLocationData = tokens[i - 1][2]
+      # addLocationDataToGeneratedTokens() set the outdent's location data
+      # to the preceding token's, but in order to detect comments inside an
+      # empty "block" we want to look for comments preceding the next token
+      useNextToken = (token.explicit or token.generated) and i isnt tokens.length - 1
+      precedingComment = @findPrecedingComment(
+        if useNextToken
+          tokens[i + 1]
+        else
+          token
+        indented: useNextToken# or token[0] is 'INDENT'
+        first: token[0] is 'INDENT'
+        afterPos: prevLocationData.range[0]
+      )
+      # dump {token, precedingComment, useNextToken, commentPrecedes, next: tokens[i + 1]}
+      if token[0] is 'INDENT'
+        return 1 unless precedingComment?
+      prevLocationData = precedingComment.locationData if precedingComment?
       token[2] =
         first_line:   prevLocationData.last_line
         first_column: prevLocationData.last_column
@@ -552,6 +569,22 @@ exports.Rewriter = class Rewriter
         last_column:  prevLocationData.last_column
         range:        prevLocationData.range
       return 1
+
+  findPrecedingComment: (token, {indented, first, afterPos}) ->
+    tokenStart = token[2].range[0]
+    # TODO: optimize? eg binary search?
+    matches = (comment) -> comment.locationData.range[0] < tokenStart and comment.locationData.range[0] > afterPos and (if indented then comment.indented else yes)
+    if first
+      lastMatching = null
+      for comment in @comments by -1
+        if matches comment
+          lastMatching = comment
+        else if lastMatching
+          return lastMatching
+      return lastMatching
+
+    for comment in @comments when matches comment by -1
+      return comment
 
   # Add parens around a `do` IIFE followed by a chained `.` so that the
   # chaining applies to the executed function rather than the function
