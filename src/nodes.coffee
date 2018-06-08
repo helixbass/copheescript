@@ -888,7 +888,7 @@ exports.Block = class Block extends Base
   commentsToAst: ->
     return [] unless @allComments?.length
 
-    for {here, content, locationData} in @allComments
+    for {here, content, locationData, heregex} in @allComments when not heregex
       {
         type:
           if here

@@ -573,7 +573,7 @@ exports.Rewriter = class Rewriter
   findPrecedingComment: (token, {indented, first, afterPos}) ->
     tokenStart = token[2].range[0]
     # TODO: optimize? eg binary search?
-    matches = (comment) -> comment.locationData.range[0] < tokenStart and comment.locationData.range[0] > afterPos and (if indented then comment.indented else yes)
+    matches = (comment) -> not comment.outdented and comment.locationData.range[0] < tokenStart and comment.locationData.range[0] > afterPos and (if indented then comment.indented else yes)
     if first
       lastMatching = null
       for comment in @comments by -1

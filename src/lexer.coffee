@@ -306,7 +306,7 @@ exports.Lexer = class Lexer
   # Matches and consumes comments. The comments are taken out of the token
   # stream and saved for later, to be reinserted into the output after
   # everything has been parsed and the JavaScript code generated.
-  commentToken: (chunk = @chunk, {offsetInChunk = 0, nonInitial, dontShift} = {}) ->
+  commentToken: (chunk = @chunk, {offsetInChunk = 0, nonInitial, dontShift, heregex} = {}) ->
     return 0 unless match = chunk.match COMMENT
     [withLeadingWhitespace, hereLeadingWhitespace, here, nonHere] = match
     contents = null
@@ -320,6 +320,14 @@ exports.Lexer = class Lexer
         lastNewlineIndex ?= -1
       indentSize = leadingWhitespace.length - 1 - lastNewlineIndex
       indentSize > @indent
+    isOutdented = (leadingWhitespace) =>
+      lastNewlineIndex = leadingWhitespace.lastIndexOf '\n'
+      if here?
+        return no unless lastNewlineIndex > -1
+      else
+        lastNewlineIndex ?= -1
+      indentSize = leadingWhitespace.length - 1 - lastNewlineIndex
+      indentSize < @indent
     if here?
       matchIllegal = HERECOMMENT_ILLEGAL.exec here
       if matchIllegal
@@ -366,7 +374,6 @@ exports.Lexer = class Lexer
           ret
         .filter (comment) -> comment
 
-    offsetInChunk += hereLeadingWhitespace.length if here?
     offsetInChunk += leadingNewlinesLength ? 0
     nonInitial ?= no
     commentAttachments = for {content, length, leadingWhitespace}, i in contents
@@ -379,8 +386,10 @@ exports.Lexer = class Lexer
         newLine: leadingNewLine or nonInitial # Line comments after the first one start new lines, by definition.
         locationData: @makeLocationData {offsetInChunk, length}
         indented: isIndented leadingWhitespace
+        outdented: isOutdented leadingWhitespace
       }
       commentAttachment.dontShift = yes if dontShift
+      commentAttachment.heregex = yes if heregex
       offsetInChunk += length
       commentAttachment
 
@@ -470,7 +479,7 @@ exports.Lexer = class Lexer
         @token 'REGEX_END', ')',              offset: end - 1,   length: 0
 
     if comments?.length
-      @commentToken comment, opts for {comment, ...opts} in comments
+      @commentToken comment, {...opts, heregex: yes} for {comment, ...opts} in comments
     end
 
   # Matches newlines, indents, and outdents, and determines which is which.
