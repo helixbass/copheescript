@@ -6212,23 +6212,26 @@ exports.Switch = class Switch extends Base
           [tests, consequent] = kase
           tests = flatten [tests]
           lastTestIndex = tests.length - 1
-          test.withBabylonLocationData(do =>
-            consequent.expressions.push new StatementLiteral 'break' if do =>
-              return no unless compiling
-              return no if caseIndex is lastCaseIndex and not @otherwise
-              lastExpr = @lastNode consequent.expressions
-              return no if lastExpr instanceof Return
-              return no if lastExpr instanceof Throw
-              return no if lastExpr instanceof Literal and lastExpr.jumps() and lastExpr.value isnt 'debugger'
-              yes
+          for test, testIndex in tests
+            compiledCase = test.withBabylonLocationData(do =>
+              consequent.expressions.push new StatementLiteral 'break' if do =>
+                return no unless compiling
+                return no if caseIndex is lastCaseIndex and not @otherwise
+                lastExpr = @lastNode consequent.expressions
+                return no if lastExpr instanceof Return
+                return no if lastExpr instanceof Throw
+                return no if lastExpr instanceof Literal and lastExpr.jumps() and lastExpr.value isnt 'debugger'
+                yes
 
-            type: 'SwitchCase'
-            test: (if @subject or not compiling then test else test.invert()).toAst o, LEVEL_PAREN
-            consequent:
-              if testIndex is lastTestIndex
-                consequent.toAst(o, LEVEL_TOP).body
-              else []
-          ) for test, testIndex in tests
+              type: 'SwitchCase'
+              test: (if @subject or not compiling then test else test.invert()).toAst o, LEVEL_PAREN
+              consequent:
+                if testIndex is lastTestIndex
+                  consequent.toAst(o, LEVEL_TOP).body
+                else []
+            )
+            mergeBabylonLocationData compiledCase, compiledCase.consequent[compiledCase.consequent.length - 1] if compiledCase.consequent.length
+            compiledCase
       )
       ...(
         if @otherwise?.expressions.length then [
