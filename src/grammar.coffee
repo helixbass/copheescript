@@ -771,8 +771,8 @@ grammar =
   Switch: [
     o 'SWITCH Expression INDENT Whens OUTDENT',                -> new Switch $2, $4
     o 'SWITCH ExpressionLine INDENT Whens OUTDENT',            -> new Switch $2, $4
-    o 'SWITCH Expression INDENT Whens ELSE Block OUTDENT',     -> new Switch $2, $4, $6
-    o 'SWITCH ExpressionLine INDENT Whens ELSE Block OUTDENT', -> new Switch $2, $4, $6
+    o 'SWITCH Expression INDENT Whens ELSE Block OUTDENT',     -> new Switch $2, $4, LOC(5,6) $6
+    o 'SWITCH ExpressionLine INDENT Whens ELSE Block OUTDENT', -> new Switch $2, $4, LOC(5,6) $6
     o 'SWITCH INDENT Whens OUTDENT',                           -> new Switch null, $3
     o 'SWITCH INDENT Whens ELSE Block OUTDENT',                -> new Switch null, $3, $5
   ]

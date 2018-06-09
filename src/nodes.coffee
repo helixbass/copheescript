@@ -6232,9 +6232,10 @@ exports.Switch = class Switch extends Base
       )
       ...(
         if @otherwise?.expressions.length then [
-          type: 'SwitchCase'
-          test: null
-          consequent: @otherwise.toAst(o, LEVEL_TOP).body
+          @otherwise.withBabylonLocationData
+            type: 'SwitchCase'
+            test: null
+            consequent: @otherwise.toAst(o, LEVEL_TOP).body
         ] else [])
     ]
 
