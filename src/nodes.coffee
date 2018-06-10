@@ -16,7 +16,7 @@ addDataToNode, attachCommentsToNode, locationDataToString
 throwSyntaxError, getNumberValue, dump, locationDataToBabylon
 isArray, isBoolean, isPlainObject, mapValues, traverseBabylonAst
 babylonLocationFields, isFunction, makeDelimitedLiteral
-mergeBabylonLocationData, replaceUnicodeCodePointEscapes} = require './helpers'
+mergeBabylonLocationData, mergeLocationData, replaceUnicodeCodePointEscapes} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -239,6 +239,9 @@ exports.Base = class Base
   withLocationDataFrom: ({locationData}, {force} = {}) ->
     @forceUpdateLocation = yes if force
     @updateLocationDataIfMissing locationData
+
+  mergeLocationDataFrom: (node) ->
+    mergeLocationData @, node
 
   withEmptyLocationData: ->
     @withLocationDataFrom emptyLocationData
@@ -4378,8 +4381,11 @@ exports.Code = class Code extends Base
         {name, value, splat} = param
         if splat
           new Splat name, lhs: yes, postfix: splat.postfix
+          .withLocationDataFrom name
         else if value?
           new Assign name, value, param: yes
+          .withLocationDataFrom name
+          .mergeLocationDataFrom value
         else
           name
       ).toAst o
