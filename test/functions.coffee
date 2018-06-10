@@ -496,3 +496,25 @@ test "#4657: destructured array parameters", ->
   eq result.b, 4
 
 # TODO: add tests for newly supported shouldCache() params with default eg ([..., last] = 1) ->, (..., [..., last] = 1) ->
+
+test "allow linebreak/indentation before default param value", ->
+  a = {}
+  b = {}
+  obj = f: (
+    q =
+    a,
+    @p =
+      b
+  ) -> q
+  eq a, obj.f()
+  eq b, obj.p
+
+  obj = f: (
+    q = # trailing comment
+    a
+    @p =
+      # preceding comment
+      b
+  ) -> q
+  eq a, obj.f()
+  eq b, obj.p
