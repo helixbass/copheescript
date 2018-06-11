@@ -548,10 +548,14 @@ exports.Rewriter = class Rewriter
       # addLocationDataToGeneratedTokens() set the outdent's location data
       # to the preceding token's, but in order to detect comments inside an
       # empty "block" we want to look for comments preceding the next token
-      useNextToken = (token.explicit or token.generated) and i isnt tokens.length - 1
+      useNextToken = token.explicit or token.generated
+      if useNextToken
+        nextToken = token
+        nextTokenIndex = i
+        nextToken = tokens[nextTokenIndex++] while (nextToken.explicit or nextToken.generated) and nextTokenIndex isnt tokens.length - 1
       precedingComment = @findPrecedingComment(
         if useNextToken
-          tokens[i + 1]
+          nextToken
         else
           token
         indented: useNextToken# or token[0] is 'INDENT'

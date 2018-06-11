@@ -2075,32 +2075,38 @@ exports.Call = class Call extends Base
           closingFragment: tagName.withBabylonLocationData
             type: 'JSXClosingFragment'
         else
-          type: 'JSXElement'
-          openingElement:
-            type: 'JSXOpeningElement'
-            name: tagName.toAst o#, LEVEL_ACCESS
-            attributes: flatten(
-              if attributes.base instanceof Arr
-                for obj in attributes.base.objects
-                  {base: attr} = obj
-                  attrProps = attr?.properties or []
-                  if not (attr instanceof Obj or attr instanceof IdentifierLiteral) or (attr instanceof Obj and not attr.generated and (attrProps.length > 1 or not (attrProps[0] instanceof Splat)))
-                    obj.error """
-                      Unexpected token. Allowed CSX attributes are: id="val", src={source}, {props...} or attribute.
-                    """
-                  attr.csx = yes
-                  compiled = attr.toAst o#, LEVEL_PAREN
-                  if attr instanceof IdentifierLiteral
+          openingElement =
+            tagName.withBabylonLocationData
+              type: 'JSXOpeningElement'
+              name: tagName.toAst o#, LEVEL_ACCESS
+              selfClosing: not content
+          openingElement.attributes = flatten(
+            if attributes.base instanceof Arr
+              for obj in attributes.base.objects
+                {base: attr} = obj
+                attrProps = attr?.properties or []
+                if not (attr instanceof Obj or attr instanceof IdentifierLiteral) or (attr instanceof Obj and not attr.generated and (attrProps.length > 1 or not (attrProps[0] instanceof Splat)))
+                  obj.error """
+                    Unexpected token. Allowed CSX attributes are: id="val", src={source}, {props...} or attribute.
+                  """
+                attr.csx = yes
+                compiled = attr.toAst o#, LEVEL_PAREN
+                mergeBabylonLocationData openingElement, compiled
+                if attr instanceof IdentifierLiteral
+                  attr.withBabylonLocationData
                     type: 'JSXAttribute'
                     name: compiled
-                  else
-                    compiled
-              else [])
-            selfClosing: not content
-          closingElement:
-            if content
-              type: 'JSXClosingElement'
-              name: tagName.toAst o
+                else
+                  compiled
+            else [])
+          {
+            type: 'JSXElement'
+            openingElement
+            closingElement:
+              if content
+                type: 'JSXClosingElement'
+                name: tagName.toAst o
+          }
       )
       children:
         if content and not content.base.isEmpty?()
@@ -3719,8 +3725,9 @@ exports.Assign = class Assign extends Base
       val.csxAttribute = yes
       compiled = astAsBlock val, o
       return compiled if val instanceof StringLiteral
-      type: 'JSXExpressionContainer'
-      expression: compiled
+      val.withBabylonLocationData
+        type: 'JSXExpressionContainer'
+        expression: compiled
 
   addScopeVariables: (o) ->
     varBase = @variable.unwrapAll()
@@ -4372,7 +4379,10 @@ exports.Code = class Code extends Base
   }
   astChildren: (o) ->
     params: @paramsToAst o
-    body: @body.toAst merge(o, checkForDirectives: yes), LEVEL_TOP
+    body: {
+      ...@body.toAst merge(o, checkForDirectives: yes), LEVEL_TOP
+      indented: @body.locationData.first_line > @funcGlyph.locationData.first_line
+    }
 
   paramsToAst: (o) ->
     for param in @params

@@ -312,7 +312,10 @@ exports.locationDataToBabylon = ({first_line, first_column, last_line, last_colu
   end: range[1] + 1
 }
 
-exports.mergeBabylonLocationData = (intoNode, fromNode) ->
+exports.mergeBabylonLocationData = mergeBabylonLocationData = (intoNode, fromNode) ->
+  if isArray fromNode
+    mergeBabylonLocationData intoNode, fromItem for fromItem in fromNode
+    return intoNode
   {range: intoRange} = intoNode
   {range: fromRange} = fromNode
   return intoNode unless intoRange and fromRange # TODO: should figure out why don't have location data?
