@@ -347,6 +347,17 @@ exports.mergeLocationData = (intoNode, fromNode) ->
     intoLocationData.last_column = fromLocationData.last_column
   intoNode
 
+exports.assignEmptyTrailingLocationData = (intoNode, fromNode) ->
+  {locationData: fromLocationData} = fromNode
+  {range: fromRange} = fromLocationData
+  intoNode.locationData =
+    range: [fromRange[1] + 1, fromRange[1]]
+    first_line: fromLocationData.last_line
+    first_column: fromLocationData.last_column + 1 # TODO: refine?
+    last_line: fromLocationData.last_line
+    last_column: fromLocationData.last_column + 1
+  intoNode
+
 exports.isArray = isArray = (obj) -> Array.isArray obj
 exports.isNumber = isNumber = (obj) -> Object::toString.call(obj) is '[object Number]'
 exports.isString = isString = (obj) -> Object::toString.call(obj) is '[object String]'

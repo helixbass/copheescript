@@ -16,7 +16,8 @@ addDataToNode, attachCommentsToNode, locationDataToString
 throwSyntaxError, getNumberValue, dump, locationDataToBabylon
 isArray, isBoolean, isPlainObject, mapValues, traverseBabylonAst
 babylonLocationFields, isFunction, makeDelimitedLiteral
-mergeBabylonLocationData, mergeLocationData, replaceUnicodeCodePointEscapes} = require './helpers'
+mergeBabylonLocationData, mergeLocationData, replaceUnicodeCodePointEscapes
+assignEmptyTrailingLocationData} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -239,6 +240,9 @@ exports.Base = class Base
   withLocationDataFrom: ({locationData}, {force} = {}) ->
     @forceUpdateLocation = yes if force
     @updateLocationDataIfMissing locationData
+
+  withEmptyTrailingLocationDataFrom: (other) ->
+    assignEmptyTrailingLocationData @, other
 
   mergeLocationDataFrom: (node) ->
     mergeLocationData @, node
@@ -2989,8 +2993,11 @@ exports.Arr = class Arr extends Base
 exports.Class = class Class extends Base
   children: ['variable', 'parent', 'body']
 
-  constructor: (@variable, @parent, @body = new Block) ->
+  constructor: (@variable, @parent, @body) ->
     super()
+    unless @body
+      @body = new Block
+      @generatedBody = yes
 
   compileNode: (o) ->
     @name          = @determineName()
@@ -3064,11 +3071,17 @@ exports.Class = class Class extends Base
       level: LEVEL_TOP
 
   _toAst: (o) ->
+    @fixBodyLocationData()
     @name = @determineName()
     @body.isClassBody = yes
     @walkBody o
     @sniffDirectives @body.expressions, replace: yes
     super o
+
+  fixBodyLocationData: ->
+    return unless @generatedBody
+
+    @body.withEmptyTrailingLocationDataFrom @
 
   compileClassDeclarationToBabylon: (o) ->
     @prepareConstructor()
