@@ -1,14 +1,27 @@
-valid-typeof
+don't apply:
 prefer-const (trivially, since only looks for let)
 no-const-assign (trivially, since we don't generate const)
+func-style (trivially, since we only output function expressions I think)
+
+usable against CS AST:
+spaced-comment
+no-warning-comments
+capitalized-comments
+prefer-rest-params
+id-length
+no-multi-assign
+
+partially usable against CS AST:
+no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
+
+usable:
+valid-typeof
 no-new-object
-object-shorthand properties
 array-callback-return
 prefer-template
 no-useless-concat
 no-eval
 no-implied-eval
-func-style (trivially, since we only output function expressions I think)
 no-new-func
 no-param-reassign
 no-useless-constructor
@@ -17,6 +30,10 @@ no-duplicate-imports
 import/prefer-default-export
 import/no-webpack-loader-syntax
 no-iterator
+
+partially usable:
+object-shorthand properties
+
 no-restricted-syntax (depending on what AST types are disallowed, we may generate them, but looks like airbnb blacklist are not generated)
 dot-notation
 no-restricted-properties (like no-restricted-syntax, depending on what's disallowed we may generate it)
@@ -140,22 +157,20 @@ no-restricted-modules
 no-sync
 
 need visibility of top-level ast.comments (should be doable to "hoist" comments just for eslint):
-spaced-comment
-no-warning-comments
-capitalized-comments
-line-comment-position
-multiline-comment-style
-no-inline-comments
+multiline-comment-style (can't run against CS AST since it looks for eg generated * in block comments)
+
+not working:
+line-comment-position (against CS AST, seems to hang on eg:
+  a = # b
+    module
+)
+no-inline-comments (false positives)
 require-jsdoc
 
 not usable (could get triggered by generated code):
-prefer-rest-params (we could presumably get rid of our generate uses of arguments to free up this rule)
 import/no-mutable-export (since you can't control whether an exported member is const)
 import/first (since var declarations get generated before imports - this seems fixable? absolute-first works)
 yoda (we generate for loop conditions that violate - should be fixable)
-no-else-return (we generate if { return } else { return } when making if return - would be nice to support this)
-id-length (eg for loops generate one-character variable names)
-no-multi-assign (eg for loops can generate multi-assigns)
 no-self-compare (seems to rely on location data, so generated comparisons with identical location data on each side can trigger this, eg y.z?.a)
 prefer-destructuring (we generate eg indexOf = [].indexOf - this seems like we could change to allow this useful rule)
 no-sequences (we generate sequences)
