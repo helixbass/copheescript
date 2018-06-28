@@ -452,8 +452,8 @@ exports.Rewriter = class Rewriter
         return 1
 
     dontShiftBackward = (i, tokens) ->
-      j = i - 1
-      while j isnt -1 and tokens[j][0] in DISCARDED
+      j = i
+      while j isnt tokens.length and tokens[j][0] in DISCARDED
         return yes if tokens[j][0] is 'REGEX_END'
         j++
       no
