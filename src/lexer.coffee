@@ -339,7 +339,7 @@ exports.Lexer = class Lexer
       # Remove leading newlines, like `Rewriter::removeLeadingNewlines`, to
       # avoid the creation of unwanted `TERMINATOR` tokens.
       chunk = chunk.replace /^\n+/, ''
-      @lineToken chunk
+      @lineToken {chunk}
 
       # Pull out the ###-style comment’s content, and format it.
       content = here
@@ -400,12 +400,12 @@ exports.Lexer = class Lexer
       # If there’s no previous token, create a placeholder token to attach
       # this comment to; and follow with a newline.
       commentAttachments[0].newLine = yes
-      @lineToken @chunk[withLeadingWhitespace.length..] # Set the indent.
-      placeholderToken = @makeToken 'JS', ''
+      @lineToken chunk: @chunk[withLeadingWhitespace.length..], offset: withLeadingWhitespace.length # Set the indent.
+      placeholderToken = @makeToken 'JS', '', offset: withLeadingWhitespace.length
       placeholderToken.generated = yes
       placeholderToken.comments = commentAttachments
       @tokens.push placeholderToken
-      @newlineToken 0
+      @newlineToken offset: withLeadingWhitespace.length
     else
       attachCommentsToNode commentAttachments, prev
 
@@ -492,7 +492,7 @@ exports.Lexer = class Lexer
   #
   # Keeps track of the level of indentation, because a single outdent token
   # can close multiple indents, so we need to know how far in we happen to be.
-  lineToken: (chunk = @chunk) ->
+  lineToken: ({chunk = @chunk, offset = 0} = {}) ->
     return 0 unless match = MULTI_DENT.exec chunk
     indent = match[0]
 
@@ -516,7 +516,7 @@ exports.Lexer = class Lexer
       return indent.length
 
     if size - @indebt is @indent
-      if noNewlines then @suppressNewlines() else @newlineToken 0
+      if noNewlines then @suppressNewlines() else @newlineToken {offset}
       return indent.length
 
     if size > @indent
@@ -529,22 +529,22 @@ exports.Lexer = class Lexer
         @indentLiteral = newIndentLiteral
         return indent.length
       diff = size - @indent + @outdebt
-      @token 'INDENT', diff, offset: indent.length - size, length: size
+      @token 'INDENT', diff, offset: offset + indent.length - size, length: size
       @indents.push diff
       @ends.push {tag: 'OUTDENT'}
       @outdebt = @indebt = 0
       @indent = size
       @indentLiteral = newIndentLiteral
     else if size < @baseIndent
-      @error 'missing indentation', offset: indent.length
+      @error 'missing indentation', offset: offset + indent.length
     else
       @indebt = 0
-      @outdentToken @indent - size, noNewlines, indent.length
+      @outdentToken {moveOut: @indent - size, noNewlines, outdentLength: indent.length, offset}
     indent.length
 
   # Record an outdent token or multiple tokens, if we happen to be moving back
   # inwards past several recorded indents. Sets new @indent value.
-  outdentToken: (moveOut, noNewlines, outdentLength) ->
+  outdentToken: ({moveOut, noNewlines, outdentLength = 0, offset = 0}) ->
     decreasedIndent = @indent - moveOut
     while moveOut > 0
       lastIndent = @indents[@indents.length - 1]
@@ -566,7 +566,7 @@ exports.Lexer = class Lexer
     @outdebt -= moveOut if dent
     @suppressSemicolons()
 
-    @token 'TERMINATOR', '\n', offset: outdentLength, length: 0 unless @tag() is 'TERMINATOR' or noNewlines
+    @token 'TERMINATOR', '\n', offset: offset + outdentLength, length: 0 unless @tag() is 'TERMINATOR' or noNewlines
     @indent = decreasedIndent
     @indentLiteral = @indentLiteral[...decreasedIndent]
     this
@@ -580,7 +580,7 @@ exports.Lexer = class Lexer
     if match then match[0].length else 0
 
   # Generate a newline token. Consecutive newlines get merged together.
-  newlineToken: (offset) ->
+  newlineToken: ({offset = 0} = {}) ->
     @suppressSemicolons()
     @token 'TERMINATOR', '\n', {offset, length: 0} unless @tag() is 'TERMINATOR'
     this
@@ -774,7 +774,7 @@ exports.Lexer = class Lexer
 
   # Close up all remaining open blocks at the end of the file.
   closeIndentation: ->
-    @outdentToken @indent
+    @outdentToken moveOut: @indent
 
   # Match the contents of a delimited token and expand variables and expressions
   # inside it using Ruby-like notation for substitution of arbitrary
@@ -948,7 +948,7 @@ exports.Lexer = class Lexer
       #       el.hide())
       #
       [..., lastIndent] = @indents
-      @outdentToken lastIndent, true
+      @outdentToken moveOut: lastIndent, noNewlines: true
       return @pair tag
     @ends.pop()
 

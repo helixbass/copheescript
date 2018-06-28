@@ -229,7 +229,9 @@ exports.ast = withPrettyErrors (source, options) ->
   {tokens, comments} = lexer.tokenize source, options
   parsed = parser.parse tokens
   parsed.allComments = comments
-  parsed.toAst options
+  ast = parsed.toAst options
+  return ast unless options.withTokens
+  {ast, tokens}
 
 {dump, flatten, isPlainObject, merge, traverseBabylonAst, traverseBabylonAsts} = helpers
 espreeTokenTypes =

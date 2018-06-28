@@ -4442,6 +4442,7 @@ exports.Code = class Code extends Base
 
   _toAst: (o) ->
     @updateOptions o
+    @mergeLocationDataFrom @name if @isMethod
     super o
 
   expandThisParams: (o) ->
