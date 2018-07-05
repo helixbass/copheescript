@@ -10,9 +10,16 @@ capitalized-comments
 prefer-rest-params
 id-length
 no-multi-assign
+no-continue
+prefer-destructuring
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
+
+customized for CS AST:
+use-isnan
+no-self-compare
+no-eq-null (just the error message)
 
 usable:
 valid-typeof
@@ -87,7 +94,6 @@ no-template-curly-in-string (though not super helpful, as Coffeescript has a dif
 no-unreachable
 no-unsafe-finally
 no-unsafe-negation
-use-isnan (trivially, since you can't generate a literal NaN)
 valid-jsdoc (doesn't break, but doesn't seem to pick up JSDoc comments so doesn't do anything)
 accessor-pairs (works for Object.defineProperty() calls, and for backticked objects with accessors)
 block-scoped-var (trivially, since we always hoist var declarations)
@@ -167,14 +173,11 @@ line-comment-position (against CS AST, seems to hang on eg:
 no-inline-comments (false positives)
 require-jsdoc
 
-not usable (could get triggered by generated code):
+not usable against JS AST (could get triggered by generated code):
 import/no-mutable-export (since you can't control whether an exported member is const)
 import/first (since var declarations get generated before imports - this seems fixable? absolute-first works)
 yoda (we generate for loop conditions that violate - should be fixable)
-no-self-compare (seems to rely on location data, so generated comparisons with identical location data on each side can trigger this, eg y.z?.a)
-prefer-destructuring (we generate eg indexOf = [].indexOf - this seems like we could change to allow this useful rule)
 no-sequences (we generate sequences)
-no-eq-null (we generate != null as part of existence checks)
 no-magic-numbers (seems like the assignment of the magic number to a var is always flagged since it's not part of the variable declaration)
 no-return-await (we generate return await when await is the last statement in a function, should we not?)
 no-use-before-define (this gets confused by location data of generated constructs)
@@ -183,7 +186,6 @@ lines-between-class-members (we generate constructors with fake location data)
 no-shadow (do (x) -> construct gets flagged, as does what we generate for classes eg A = class A)
 max-statements (generated var declarations get counted)
 max-statements-per-line
-no-continue (we generate continue statements as part of for when guard)
 no-negated-condition (unless generates a negated condition)
 padding-line-between-statements (we generate statements with fake location data)
 no-return-assign (except-parens doesn't always work, since the closing paren can get stomped on by the OUTDENT that's assigned the same location data. also, this doesn't distinguish implicit from explicit returns. also, we generate assignments that could get included in implicit/explicit return, eg a[b] ? c)

@@ -879,17 +879,18 @@ exports.Block = class Block extends Base
     @initializeScope o
 
     body = @bodyToAst merge o, level: LEVEL_TOP, root: yes
+    comments = @commentsToAst()
 
     program = @withBabylonLocationData {
       type: 'Program'
       sourceType: 'module'
       body, @directives
     }
+    mergeBabylonLocationData program, comment for comment in comments
 
     @withCopiedBabylonLocationData {
       type: 'File'
-      program
-      comments: @commentsToAst()
+      program, comments
     }, program
 
   commentsToAst: ->
