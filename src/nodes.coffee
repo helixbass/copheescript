@@ -6318,10 +6318,11 @@ exports.If = class If extends Base
   addElse: (elseBody) ->
     if @isChain
       @elseBodyNode().addElse elseBody
+      @mergeLocationDataFrom @elseBodyNode()
     else
       @isChain  = elseBody instanceof If
       @elseBody = @ensureBlock elseBody
-      @elseBody.updateLocationDataIfMissing elseBody.locationData
+      @mergeLocationDataFrom @elseBody if @elseBody.locationData and @locationData
     this
 
   # The **If** only compiles into a statement if either of its bodies needs
@@ -6391,8 +6392,11 @@ exports.If = class If extends Base
     this
 
   ensureBlock: (node) ->
-    @withLocationData(
-      if node instanceof Block then node else @withLocationData new Block [node])
+    block = if node instanceof Block then node else new Block [node]
+    if node.locationData
+      node.withLocationData block
+    else
+      @withLocationData block
 
   # Compile the `If` as a regular *if-else* statement. Flattened chains
   # force inner *else* bodies into statement form.

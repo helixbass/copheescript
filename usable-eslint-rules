@@ -12,6 +12,10 @@ id-length
 no-multi-assign
 no-continue
 prefer-destructuring
+no-plusplus (allowForLoopAfterthoughts is meaningless)
+no-underscore-dangle
+no-throw-literal
+prefer-spread
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -20,9 +24,10 @@ customized for CS AST:
 use-isnan
 no-self-compare
 no-eq-null (just the error message)
+valid-typeof
+no-negated-condition
 
 usable:
-valid-typeof
 no-new-object
 array-callback-return
 prefer-template
@@ -45,14 +50,12 @@ no-restricted-syntax (depending on what AST types are disallowed, we may generat
 dot-notation
 no-restricted-properties (like no-restricted-syntax, depending on what's disallowed we may generate it)
 no-undef
-no-plusplus (only if allowForLoopAfterthoughts is on, since we generate ++/-- in for loops - actually this can still fail, as the rule only checks if the immediate parent is a for, and we generate assignments to ++, I'd consider this a bug in the rule)
 eqeqeq (only if null: ignore or smart (ie not just always), since we generate != null in existence checks)
 no-case-declarations (trivially, as it seems impossible to generate a declaration inside a case)
 no-unneeded-ternary (perhaps confusing naming since in the source it's an if rather than a ternary, but works)
 no-new-wrappers
 radix
 new-cap
-no-underscore-dangle
 no-restricted-globals
 constructor-super (we catch some of these up front, but this works for eg missing super() in derived class constructor)
 no-class-assign (mostly useless (won't catch reassignment of class name at same level) since we always generate an assignment for named classes - not sure why we do that, if we didn't then this rule could presumably catch reassignments? But this can catch eg reassignment of class name inside class method)
@@ -122,7 +125,6 @@ no-octal-escape (trivially, since we throw an error on octal escape sequence)
 no-proto
 no-script-url
 no-self-assign (looks like as opposed to no-self-compare, this uses AST comparison rather than token comparison)
-no-throw-literal
 no-unused-expressions
 no-unused-labels (trivially, since you can't create labels in Coffeescript)
 no-useless-call (I don't think we generate any "useless" .call()/.apply()'s?)
@@ -186,7 +188,6 @@ lines-between-class-members (we generate constructors with fake location data)
 no-shadow (do (x) -> construct gets flagged, as does what we generate for classes eg A = class A)
 max-statements (generated var declarations get counted)
 max-statements-per-line
-no-negated-condition (unless generates a negated condition)
 padding-line-between-statements (we generate statements with fake location data)
 no-return-assign (except-parens doesn't always work, since the closing paren can get stomped on by the OUTDENT that's assigned the same location data. also, this doesn't distinguish implicit from explicit returns. also, we generate assignments that could get included in implicit/explicit return, eg a[b] ? c)
 no-unmodified-loop-condition (can get triggered by generated for-loop condition's location data - if there was an option to disable this rule for for-loops, would be safe/usable since we always generate correct modification of for-loop variables?)
@@ -194,9 +195,6 @@ consistent-return (eg a function ending with an if statement and no else generat
 no-implicit-coercion (we can generate !! in "bare" switch with negated case (seems like this should be optimized away?))
 no-loop-func (we generate a nested closure function when you have nested for loops as an expression)
 no-useless-escape (though prettier strips them from the output - we seem to generate "useless" escapes in regexes)
-
-not sure if it could get triggered by generated code:
-prefer-spread (works on manual .apply(), wasn't able to trigger it in simple check of generated .apply(), if it does get triggered by generated .apply()'s, could presumably get rid of generated .apply()'s)
 
 not usable but not meaningful:
 no-var

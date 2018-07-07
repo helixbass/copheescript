@@ -8,3 +8,5 @@
 - shouldn't this declare var b in the func (that's how it's compiling with Babylon)? obj.bar(-> b = 2).foo(b = 1)
 
 - should localize generation of comment inside catch block?
+- should parenthesize closure compiler type cast commented expressions? see eg prettier/src/tests/comments/closure-compiler-type-cast.js
+- support dynamic imports? ie import(...)
