@@ -1,7 +1,8 @@
 don't apply:
-prefer-const (trivially, since only looks for let)
-no-const-assign (trivially, since we don't generate const)
-func-style (trivially, since we only output function expressions I think)
+prefer-const
+no-const-assign
+func-style
+eqeqeq
 
 usable against CS AST:
 spaced-comment
@@ -16,6 +17,12 @@ no-plusplus (allowForLoopAfterthoughts is meaningless)
 no-underscore-dangle
 no-throw-literal
 prefer-spread
+no-eval
+no-implied-eval
+prefer-template
+new-cap
+no-debugger
+no-proto
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -26,14 +33,12 @@ no-self-compare
 no-eq-null (just the error message)
 valid-typeof
 no-negated-condition
+yoda
 
 usable:
 no-new-object
 array-callback-return
-prefer-template
 no-useless-concat
-no-eval
-no-implied-eval
 no-new-func
 no-param-reassign
 no-useless-constructor
@@ -50,12 +55,10 @@ no-restricted-syntax (depending on what AST types are disallowed, we may generat
 dot-notation
 no-restricted-properties (like no-restricted-syntax, depending on what's disallowed we may generate it)
 no-undef
-eqeqeq (only if null: ignore or smart (ie not just always), since we generate != null in existence checks)
 no-case-declarations (trivially, as it seems impossible to generate a declaration inside a case)
 no-unneeded-ternary (perhaps confusing naming since in the source it's an if rather than a ternary, but works)
 no-new-wrappers
 radix
-new-cap
 no-restricted-globals
 constructor-super (we catch some of these up front, but this works for eg missing super() in derived class constructor)
 no-class-assign (mostly useless (won't catch reassignment of class name at same level) since we always generate an assignment for named classes - not sure why we do that, if we didn't then this rule could presumably catch reassignments? But this can catch eg reassignment of class name inside class method)
@@ -77,7 +80,6 @@ no-cond-assign (except except-parens exception doesn't work, since it looks for 
 no-console
 no-constant-condition (but only with checkLoops: false, since loop generates a constant condition)
 no-control-regex (works but doesn't catch eg ///\x1f#{a}/// because compiles into template string - is that a bug in our compilation or does the rule not handle template strings?)
-no-debugger
 no-dupe-args (trivially, as we catch duplicate parameters)
 no-dupe-keys
 no-duplicate-case
@@ -122,7 +124,6 @@ no-multi-str (trivially, doesn't seem to be able to trigger on multiline regular
 no-new
 no-octal (trivially, since we throw an error on unprefixed octal literal)
 no-octal-escape (trivially, since we throw an error on octal escape sequence)
-no-proto
 no-script-url
 no-self-assign (looks like as opposed to no-self-compare, this uses AST comparison rather than token comparison)
 no-unused-expressions
@@ -178,7 +179,6 @@ require-jsdoc
 not usable against JS AST (could get triggered by generated code):
 import/no-mutable-export (since you can't control whether an exported member is const)
 import/first (since var declarations get generated before imports - this seems fixable? absolute-first works)
-yoda (we generate for loop conditions that violate - should be fixable)
 no-sequences (we generate sequences)
 no-magic-numbers (seems like the assignment of the magic number to a var is always flagged since it's not part of the variable declaration)
 no-return-await (we generate return await when await is the last statement in a function, should we not?)

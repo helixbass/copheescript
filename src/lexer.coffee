@@ -613,8 +613,8 @@ exports.Lexer = class Lexer
         prev[0] not in COMPARABLE_LEFT_SIDE
       )
       [input, id] = match
-      origin = @token 'CSX_TAG', id, offset: 1, length: id.length
-      @token 'CALL_START', '('
+      origin = @token 'CSX_TAG', id, length: id.length + 1
+      @token 'CALL_START', '(', offset: 1, length: id.length # encode the opening tagname location
       @token '[', '['
       @ends.push tag: '/>', origin: origin, name: id
       @csxDepth++
@@ -638,7 +638,7 @@ exports.Lexer = class Lexer
       else if firstChar is '>'
         # Ignore terminators inside a tag.
         @pair '/>' # As if the current tag was self-closing.
-        origin = @token ']', ']'
+        @token ']', ']'
         @token ',', ','
         {tokens, index: end} =
           @matchWithInterpolations INSIDE_CSX, '>', '</', CSX_INTERPOLATION
@@ -651,8 +651,8 @@ exports.Lexer = class Lexer
         afterTag = end + csxTag.name.length
         if @chunk[afterTag] isnt '>'
           @error "missing closing > after tag name", offset: afterTag, length: 1
-        # +1 for the closing `>`.
-        @token 'CALL_END', ')', offset: end, length: csxTag.name.length + 1
+        # +2 for the opening `</` and +1 for the closing `>`.
+        @token 'CALL_END', ')', offset: end - 2, length: csxTag.name.length + 3
         @csxDepth--
         return afterTag + 1
       else

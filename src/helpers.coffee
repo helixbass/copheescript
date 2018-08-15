@@ -139,8 +139,14 @@ buildTokenDataDictionary = (parserState) ->
 exports.addDataToNode = (parserState, first, last, {forceUpdateLocation} = {}) ->
   (obj) ->
     # Add location data.
-    if obj?.updateLocationDataIfMissing? and first?
-      obj.updateLocationDataIfMissing buildLocationData(first, last), force: forceUpdateLocation
+    if first?
+      if obj?.updateLocationDataIfMissing?
+        obj.updateLocationDataIfMissing buildLocationData(first, last), force: forceUpdateLocation
+      # This is only necessary to try and "preserve" JSX tag location data
+      else if isArray obj
+        obj.locationData = buildLocationData first, last
+        obj.openingBracketLocationData = buildLocationData first
+        obj.closingBracketLocationData = buildLocationData last# if last?
 
     # Add comments, building the dictionary of token data if it hasn’t been
     # built yet.

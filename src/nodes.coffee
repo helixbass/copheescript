@@ -2071,6 +2071,7 @@ exports.Call = class Call extends Base
   CSXToAst: (o) ->
     [attributes, content] = @args
     tagName = @variable.base
+    tagName.locationData = @args.openingBracketLocationData
     {
       ...(
         unless tagName.value.length
@@ -2087,6 +2088,7 @@ exports.Call = class Call extends Base
               selfClosing: not content
           openingElement.attributes = flatten(
             if attributes.base instanceof Arr
+              mergeBabylonLocationData openingElement, locationDataToBabylon attributes.base.locationData
               for obj in attributes.base.objects
                 {base: attr} = obj
                 attrProps = attr?.properties or []
@@ -2104,13 +2106,20 @@ exports.Call = class Call extends Base
                 else
                   compiled
             else [])
+          if content
+            closingElementBabylonLocationData = locationDataToBabylon @args.closingBracketLocationData
+            closingElement =
+              @withCopiedBabylonLocationData(
+                type: 'JSXClosingElement'
+                name: @withCopiedBabylonLocationData(
+                  tagName.toAst o
+                  closingElementBabylonLocationData # TODO: this is inaccurate but not sure where to store the closing tagname location data
+                )
+                closingElementBabylonLocationData
+              )
           {
             type: 'JSXElement'
-            openingElement
-            closingElement:
-              if content
-                type: 'JSXClosingElement'
-                name: tagName.toAst o
+            openingElement, closingElement
           }
       )
       children:
