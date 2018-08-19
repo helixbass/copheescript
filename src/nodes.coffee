@@ -1828,7 +1828,7 @@ exports.Value = class Value extends Base
   _toAst: (o) ->
     props = @properties
     ret = @base.toAst o, if props.length then LEVEL_ACCESS else null
-    for prop in props
+    for prop, propIndex in props
       ret =
         if prop instanceof Slice and o.compiling
           prop.compileValueToBabylon o, ret
@@ -1843,6 +1843,8 @@ exports.Value = class Value extends Base
               shorthand: prop.shorthand
             ret
           )
+      if @base instanceof Parens and @base.locationData? and propIndex is 0
+        mergeBabylonLocationData ret, locationDataToBabylon @base.locationData
     ret
 
   # Unfold a soak into an `If`: `a?.b` -> `a.b if a?`
