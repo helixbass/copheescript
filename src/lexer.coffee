@@ -343,12 +343,11 @@ exports.Lexer = class Lexer
 
       # Pull out the ###-style comment’s content, and format it.
       content = here
-      if '\n' in content
-        content = content.replace /// \n #{repeat ' ', @indent} ///g, '\n'
       contents = [{
         content
         length: withLeadingWhitespace.length - hereLeadingWhitespace.length
         leadingWhitespace: hereLeadingWhitespace
+        @indent
       }]
     else
       # The `COMMENT` regex captures successive line comments as one token.
@@ -376,7 +375,7 @@ exports.Lexer = class Lexer
 
     offsetInChunk += leadingNewlinesLength ? 0
     nonInitial ?= no
-    commentAttachments = for {content, length, leadingWhitespace}, i in contents
+    commentAttachments = for {content, length, leadingWhitespace, indent}, i in contents
       nonInitial = yes if i isnt 0
       leadingNewlineOffset = if nonInitial then 1 else 0
       offsetInChunk += leadingNewlineOffset + leadingWhitespace.length
@@ -387,6 +386,7 @@ exports.Lexer = class Lexer
         locationData: @makeLocationData {offsetInChunk, length}
         indented: isIndented leadingWhitespace
         outdented: isOutdented leadingWhitespace
+        indent
       }
       commentAttachment.dontShift = yes if dontShift
       commentAttachment.heregex = yes if heregex

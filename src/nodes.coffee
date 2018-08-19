@@ -17,7 +17,7 @@ throwSyntaxError, getNumberValue, dump, locationDataToBabylon
 isArray, isBoolean, isPlainObject, mapValues, traverseBabylonAst
 babylonLocationFields, isFunction, makeDelimitedLiteral
 mergeBabylonLocationData, mergeLocationData, replaceUnicodeCodePointEscapes
-assignEmptyTrailingLocationData} = require './helpers'
+assignEmptyTrailingLocationData, repeat} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -1877,30 +1877,34 @@ exports.Value = class Value extends Base
 
 # Comment delimited by `###` (becoming `/* */`).
 exports.HereComment = class HereComment extends Base
-  constructor: ({ @content, @newLine, @unshift, @locationData }) ->
+  constructor: ({ @content, @newLine, @unshift, @locationData, @indent }) ->
     super()
 
   _compileToBabylon: (o) ->
     hasLeadingMarks = /\n\s*[#|\*]/.test @content
     @content = @content.replace /^([ \t]*)#(?=\s)/gm, '$1 *' if hasLeadingMarks
     @content += ' ' if hasLeadingMarks
-    type: 'CommentBlock'
-    value: @content
-    leading: yes
+    {
+      type: 'CommentBlock'
+      value: @content
+      leading: yes
+      @indent
+    }
 
   compileNode: (o) ->
     multiline = '\n' in @content
+    @content = @content.replace /// \n #{repeat ' ', @indent} ///g, '\n' if multiline and @indent
     hasLeadingMarks = /\n\s*[#|\*]/.test @content
     @content = @content.replace /^([ \t]*)#(?=\s)/gm, ' *' if hasLeadingMarks
 
     # Unindent multiline comments. They will be reindented later.
-    if multiline
-      largestIndent = ''
-      for line in @content.split '\n'
-        leadingWhitespace = /^\s*/.exec(line)[0]
-        if leadingWhitespace.length > largestIndent.length
-          largestIndent = leadingWhitespace
-      @content = @content.replace ///^(#{leadingWhitespace})///gm, ''
+    # if multiline
+    #   largestIndent = ''
+    #   for line in @content.split '\n'
+    #     leadingWhitespace = /^\s*/.exec(line)[0]
+    #     if leadingWhitespace.length > largestIndent.length
+    #       largestIndent = leadingWhitespace
+    #   @content = @content.replace ///^(#{leadingWhitespace})///gm, ''
 
     @content = "/*#{@content}#{if hasLeadingMarks then ' ' else ''}*/"
     fragment = @makeCode @content
