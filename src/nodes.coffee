@@ -5694,6 +5694,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
 
   @fromStringLiteral: (stringLiteral) ->
     new StringWithInterpolations Block.wrap([ new Value stringLiteral ]), quote: stringLiteral.quote
+    .withLocationDataFrom stringLiteral
 
   children: ['body']
 
