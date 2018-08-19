@@ -5735,6 +5735,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
           elements.push empty
         else if node.expression
           (node.expression.comments ?= []).push node.comments... if node.comments
+          node.expression.locationData = node.locationData
           elements.push node.expression
         else if not o.compiling
           elements.push node
