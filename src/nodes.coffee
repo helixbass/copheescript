@@ -17,7 +17,7 @@ throwSyntaxError, getNumberValue, dump, locationDataToBabylon
 isArray, isBoolean, isPlainObject, mapValues, traverseBabylonAst
 babylonLocationFields, isFunction, makeDelimitedLiteral
 mergeBabylonLocationData, mergeLocationData, replaceUnicodeCodePointEscapes
-assignEmptyTrailingLocationData, repeat} = require './helpers'
+assignEmptyTrailingLocationData} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -1894,18 +1894,17 @@ exports.HereComment = class HereComment extends Base
 
   compileNode: (o) ->
     multiline = '\n' in @content
-    @content = @content.replace /// \n #{repeat ' ', @indent} ///g, '\n' if multiline and @indent
+    # Unindent multiline comments. They will be reindented later.
+    if multiline
+      indent = null
+      for line in @content.split '\n'
+        leadingWhitespace = /^\s*/.exec(line)[0]
+        if not indent or leadingWhitespace.length < indent.length
+          indent = leadingWhitespace
+      @content = @content.replace /// \n #{indent} ///g, '\n' if indent
+
     hasLeadingMarks = /\n\s*[#|\*]/.test @content
     @content = @content.replace /^([ \t]*)#(?=\s)/gm, ' *' if hasLeadingMarks
-
-    # Unindent multiline comments. They will be reindented later.
-    # if multiline
-    #   largestIndent = ''
-    #   for line in @content.split '\n'
-    #     leadingWhitespace = /^\s*/.exec(line)[0]
-    #     if leadingWhitespace.length > largestIndent.length
-    #       largestIndent = leadingWhitespace
-    #   @content = @content.replace ///^(#{leadingWhitespace})///gm, ''
 
     @content = "/*#{@content}#{if hasLeadingMarks then ' ' else ''}*/"
     fragment = @makeCode @content
