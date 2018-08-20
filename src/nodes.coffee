@@ -896,7 +896,7 @@ exports.Block = class Block extends Base
   commentsToAst: ->
     return [] unless @allComments?.length
 
-    for {here, content, locationData, heregex} in @allComments when not heregex
+    for {here, content, locationData, heregex, indent} in @allComments when not heregex
       {
         type:
           if here
@@ -905,6 +905,7 @@ exports.Block = class Block extends Base
             'CommentLine'
         value: content
         locationDataToBabylon(locationData)...
+        indent
       }
 
   bodyToAst: (o) ->
@@ -1888,7 +1889,7 @@ exports.HereComment = class HereComment extends Base
       type: 'CommentBlock'
       value: @content
       leading: yes
-      @indent
+      # @indent
     }
 
   compileNode: (o) ->
