@@ -215,7 +215,8 @@ compileScript = (file, input, base = null) ->
       printLine CoffeeScript.nodes(task.input, task.options).toString().trim()
     else if opts.ast
       compiled = CoffeeScript.compile task.input, task.options
-      printLine JSON.stringify(compiled, null, 2)
+      # printLine JSON.stringify(compiled, null, 2)
+      console.log util.inspect compiled, no, null
     else if opts.babylon
       console.log util.inspect CoffeeScript.babylon(task.input, task.options), no, null
     else if opts.run

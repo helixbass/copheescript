@@ -2,13 +2,14 @@
 # ------------------------------
 
 # Helpers to get AST nodes for a string of code. The root node is always a
-# `Block` node, so for brevity in the tests return its children from
-# `expressions`.
-getExpressions = (code) ->
+# `File` node, then a `Program` node, then possibly an `ExpressionStatement`
+# node, so for brevity in the tests return the first relevant expression or
+# statement node.
+getExpression = (code) ->
   ast = CoffeeScript.compile code, ast: yes
-  ast.expressions
-
-getExpression = (code) -> getExpressions(code)[0]
+  [statement] = ast.program.body
+  return statement unless statement.type is 'ExpressionStatement'
+  return statement.expression
 
 # Recursively compare all values of enumerable properties of `expected` with
 # those of `actual`. Use `looseArray` helper function to skip array length
@@ -41,6 +42,12 @@ testExpression = (code, expected) ->
       depth: 10
       colors: yes
 
+singleExpressionBlock = (expression) ->
+  type: 'BlockStatement'
+  body: [{
+    type: 'ExpressionStatement'
+    expression
+  }]
 
 test 'Confirm functionality of `deepStrictEqualExpectedProps`', ->
   actual =
@@ -151,10 +158,10 @@ test "AST as expected for PassthroughLiteral node", ->
     originalValue: code
     here: yes
 
-test "AST as expected for IdentifierLiteral node", ->
+test "AST as expected for Identifier node", ->
   testExpression 'id = "undercover agent"',
     variable:
-      type: 'IdentifierLiteral'
+      type: 'Identifier'
       value: 'id'
 
 test "AST as expected for CSXTag node", ->
@@ -289,16 +296,16 @@ test "AST as expected for Call node", ->
     ]
 
   testExpression 'do ->',
-    type: 'Call'
-    do: yes
-    variable:
+    type: 'Op'
+    operator: 'do'
+    first:
       type: 'Code'
 
   testExpression 'do fn',
-    type: 'Call'
-    do: yes
-    variable:
-      type: 'IdentifierLiteral'
+    type: 'Op'
+    operator: 'do'
+    first:
+      type: 'Identifier'
       value: 'fn'
 
 test "AST as expected for SuperCall node", ->
@@ -714,7 +721,7 @@ test "AST as expected for ImportSpecifier node", ->
           identifier: 'Component'
           moduleDeclarationType: 'import'
           original:
-            type: 'IdentifierLiteral'
+            type: 'Identifier'
             value: 'Component'
         ,
           type: 'ImportSpecifier'
@@ -729,7 +736,7 @@ test "AST as expected for ImportDefaultSpecifier node", ->
         moduleDeclarationType: 'import'
         identifier: 'React'
         original:
-          type: 'IdentifierLiteral'
+          type: 'Identifier'
           value: 'React'
 
 test "AST as expected for ImportNamespaceSpecifier node", ->
@@ -743,7 +750,7 @@ test "AST as expected for ImportNamespaceSpecifier node", ->
           type: 'Literal'
           value: '*'
         alias:
-          type: 'IdentifierLiteral'
+          type: 'Identifier'
           value: 'React'
 
 test "AST as expected for ExportSpecifier node", ->
@@ -754,7 +761,7 @@ test "AST as expected for ExportSpecifier node", ->
         moduleDeclarationType: 'export'
         identifier: 'X'
         original:
-          type: 'IdentifierLiteral'
+          type: 'Identifier'
       ]
 
 test "AST as expected for Assign node", ->
@@ -846,13 +853,13 @@ test "AST as expected for Elision node", ->
         {type: 'Elision'}
         {type: 'Elision'}
         {
-          type: 'IdentifierLiteral'
+          type: 'Identifier'
           value: 'a'
         }
         {type: 'Elision'}
         {type: 'Elision'}
         {
-          type: 'IdentifierLiteral'
+          type: 'Identifier'
           value: 'b'
         }
       ]
@@ -1044,7 +1051,7 @@ test "AST as expected for For node", ->
     guard:
       type: 'Existence'
     source:
-      type: 'IdentifierLiteral'
+      type: 'Identifier'
     body:
       type: 'Return'
 
@@ -1057,7 +1064,7 @@ test "AST as expected for For node", ->
     returns: no
     guard: undefined
     source:
-      type: 'IdentifierLiteral'
+      type: 'Identifier'
 
   testExpression 'for x from iterable then',
     type: 'For'
@@ -1066,7 +1073,7 @@ test "AST as expected for For node", ->
     body:
       type: 'Block'
     source:
-      type: 'IdentifierLiteral'
+      type: 'Identifier'
 
   testExpression 'for i in [0...42] by step when not i % 2 then',
     type: 'For'
@@ -1082,7 +1089,7 @@ test "AST as expected for For node", ->
     guard:
       type: 'Op'
     step:
-      type: 'IdentifierLiteral'
+      type: 'Identifier'
 
   testExpression 'a = (x for x in y)',
     type: 'Assign'
@@ -1099,11 +1106,11 @@ test "AST as expected for Switch node", ->
   testExpression 'switch x \n when a then a; when b, c then c else 42',
     type: 'Switch'
     subject:
-      type: 'IdentifierLiteral'
+      type: 'Identifier'
       value: 'x'
     cases: [
       {
-        type: 'IdentifierLiteral'
+        type: 'Identifier'
         value: 'a'
       }
       {
@@ -1112,11 +1119,11 @@ test "AST as expected for Switch node", ->
           value: 'a'
       }
       {
-        type: 'IdentifierLiteral'
+        type: 'Identifier'
         value: 'b'
       }
       {
-        type: 'IdentifierLiteral'
+        type: 'Identifier'
         value: 'c'
       }
       {
@@ -1135,46 +1142,47 @@ test "AST as expected for Switch node", ->
 
 test "AST as expected for If node", ->
   testExpression 'if maybe then yes',
-    type: 'If'
-    isChain: no
-    condition:
-      type: 'IdentifierLiteral'
-    body:
-      type: 'Value'
-      base:
-        type: 'BooleanLiteral'
+    type: 'IfStatement'
+    test:
+      type: 'Identifier'
+    consequent:
+      type: 'BlockStatement'
+      body: [
+        type: 'ExpressionStatement'
+        expression:
+          type: 'BooleanLiteral'
+          value: true
+          name: 'yes'
+      ]
+    inverted: no
 
   testExpression 'yes if maybe',
-    type: 'If'
-    isChain: no
-    condition:
-      type: 'IdentifierLiteral'
-    body:
-      type: 'Value'
-      base:
-        type: 'BooleanLiteral'
-
-  # TODO: Where's the post-if flag?
+    type: 'ConditionalExpression'
+    test:
+      type: 'Identifier'
+      name: 'maybe'
+    consequent:
+      type: 'BooleanLiteral'
+    inverted: no
+    postfix: yes
 
   testExpression 'unless x then x else if y then y else z',
-    type: 'If'
-    isChain: yes
-    condition:
-      type: 'Op'
-      operator: '!'
-      originalOperator: '!'
-      flip: no
-    body:
-      type: 'Value'
-    elseBody:
-      type: 'If'
-      isChain: no
-      condition:
-        type: 'IdentifierLiteral'
-      body:
-        type: 'Value'
-      elseBody:
-        type: 'Value'
-        isDefaultValue: no
-
-  # TODO: AST generator should preserve use of `unless`.
+    type: 'IfStatement'
+    inverted: yes
+    test:
+      type: 'Identifier'
+      name: 'x'
+    consequent: singleExpressionBlock
+      type: 'Identifier'
+      name: 'x'
+    alternate:
+      type: 'IfStatement'
+      test:
+        type: 'Identifier'
+        name: 'y'
+      consequent: singleExpressionBlock
+        type: 'Identifier'
+        name: 'y'
+      alternate: singleExpressionBlock
+        type: 'Identifier'
+        name: 'z'
