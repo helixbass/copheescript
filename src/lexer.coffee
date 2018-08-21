@@ -308,7 +308,7 @@ exports.Lexer = class Lexer
   # everything has been parsed and the JavaScript code generated.
   commentToken: (chunk = @chunk, {offsetInChunk = 0, nonInitial, dontShift, heregex} = {}) ->
     return 0 unless match = chunk.match COMMENT
-    [withLeadingWhitespace, hereLeadingWhitespace, here, nonHere] = match
+    [withLeadingWhitespace, hereLeadingWhitespace, here, hereTrailingWhitespace, nonHere] = match
     contents = null
     # Does this comment follow code on the same line?
     leadingNewLine = /^\s*\n+\s*#/.test withLeadingWhitespace
@@ -336,7 +336,7 @@ exports.Lexer = class Lexer
       content = here
       contents = [{
         content
-        length: withLeadingWhitespace.length - hereLeadingWhitespace.length
+        length: withLeadingWhitespace.length - hereLeadingWhitespace.length - hereTrailingWhitespace.length
         leadingWhitespace: hereLeadingWhitespace
         @indent # TODO: should even bother including this? not using since it's unreliable eg at the beginning of a new block
       }]
@@ -1196,7 +1196,7 @@ OPERATOR   = /// ^ (
 
 WHITESPACE = /^[^\n\S]+/
 
-COMMENT    = /^(\s*)###([^#][\s\S]*?)(?:###[^\n\S]*|###$)|^((?:\s*#(?!##[^#]).*)+)/
+COMMENT    = /^(\s*)###([^#][\s\S]*?)(?:###([^\n\S]*)|###$)|^((?:\s*#(?!##[^#]).*)+)/
 
 CODE       = /^[-=]>/
 
