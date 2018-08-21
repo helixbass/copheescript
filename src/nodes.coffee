@@ -5111,7 +5111,7 @@ exports.Op = class Op extends Base
     if op is 'new'
       if ((firstCall = unwrapped = first.unwrap()) instanceof Call or (firstCall = unwrapped.base) instanceof Call) and not firstCall.do and not firstCall.isNew
         return new Value firstCall.newInstance(), if firstCall is unwrapped then [] else unwrapped.properties
-      first = new Parens firstCall if firstCall instanceof Code and firstCall.bound or first instanceof Op and first.operator is 'do'
+      first = new Parens first if unwrapped instanceof Op and unwrapped.operator is 'do'
 
     @operator = CONVERSIONS[op] or op
     @first    = first
