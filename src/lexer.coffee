@@ -312,22 +312,13 @@ exports.Lexer = class Lexer
     contents = null
     # Does this comment follow code on the same line?
     leadingNewLine = /^\s*\n+\s*#/.test withLeadingWhitespace
-    isIndented = (leadingWhitespace) =>
+    getIndentSize = (leadingWhitespace) =>
       lastNewlineIndex = leadingWhitespace.lastIndexOf '\n'
       if here?
         return no unless lastNewlineIndex > -1
       else
         lastNewlineIndex ?= -1
-      indentSize = leadingWhitespace.length - 1 - lastNewlineIndex
-      indentSize > @indent
-    isOutdented = (leadingWhitespace) =>
-      lastNewlineIndex = leadingWhitespace.lastIndexOf '\n'
-      if here?
-        return no unless lastNewlineIndex > -1
-      else
-        lastNewlineIndex ?= -1
-      indentSize = leadingWhitespace.length - 1 - lastNewlineIndex
-      indentSize < @indent
+      leadingWhitespace.length - 1 - lastNewlineIndex
     if here?
       matchIllegal = HERECOMMENT_ILLEGAL.exec here
       if matchIllegal
@@ -347,7 +338,7 @@ exports.Lexer = class Lexer
         content
         length: withLeadingWhitespace.length - hereLeadingWhitespace.length
         leadingWhitespace: hereLeadingWhitespace
-        @indent
+        @indent # TODO: should even bother including this? not using since it's unreliable eg at the beginning of a new block
       }]
     else
       # The `COMMENT` regex captures successive line comments as one token.
@@ -379,13 +370,15 @@ exports.Lexer = class Lexer
       nonInitial = yes if i isnt 0
       leadingNewlineOffset = if nonInitial then 1 else 0
       offsetInChunk += leadingNewlineOffset + leadingWhitespace.length
+      indentSize = getIndentSize leadingWhitespace
       commentAttachment = {
         content
         here: here?
         newLine: leadingNewLine or nonInitial # Line comments after the first one start new lines, by definition.
         locationData: @makeLocationData {offsetInChunk, length}
-        indented: isIndented leadingWhitespace
-        outdented: isOutdented leadingWhitespace
+        indented:  indentSize > @indent
+        outdented: indentSize < @indent
+        indentSize
         indent
       }
       commentAttachment.dontShift = yes if dontShift
@@ -539,12 +532,12 @@ exports.Lexer = class Lexer
       @error 'missing indentation', offset: offset + indent.length
     else
       @indebt = 0
-      @outdentToken {moveOut: @indent - size, noNewlines, outdentLength: indent.length, offset}
+      @outdentToken {moveOut: @indent - size, noNewlines, outdentLength: indent.length, offset, indentSize: size}
     indent.length
 
   # Record an outdent token or multiple tokens, if we happen to be moving back
   # inwards past several recorded indents. Sets new @indent value.
-  outdentToken: ({moveOut, noNewlines, outdentLength = 0, offset = 0}) ->
+  outdentToken: ({moveOut, noNewlines, outdentLength = 0, offset = 0, indentSize}) ->
     decreasedIndent = @indent - moveOut
     while moveOut > 0
       lastIndent = @indents[@indents.length - 1]
@@ -563,6 +556,7 @@ exports.Lexer = class Lexer
         @pair 'OUTDENT'
         @token 'OUTDENT', moveOut, length: outdentLength
         moveOut -= dent
+        @tokens[@tokens.length - 1].indentSize = indentSize + moveOut
     @outdebt -= moveOut if dent
     @suppressSemicolons()
 
@@ -774,7 +768,7 @@ exports.Lexer = class Lexer
 
   # Close up all remaining open blocks at the end of the file.
   closeIndentation: ->
-    @outdentToken moveOut: @indent
+    @outdentToken moveOut: @indent, indentSize: 0
 
   # Match the contents of a delimited token and expand variables and expressions
   # inside it using Ruby-like notation for substitution of arbitrary

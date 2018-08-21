@@ -544,7 +544,8 @@ exports.Rewriter = class Rewriter
       return 1 unless token[0] in ['INDENT', 'OUTDENT'] or
         (token.generated and token[0] is 'CALL_END') or
         (token.generated and token[0] is '}')
-      prevLocationData = tokens[i - 1][2]
+      prevToken = tokens[i - 1]
+      prevLocationData = prevToken[2]
       # addLocationDataToGeneratedTokens() set the outdent's location data
       # to the preceding token's, but in order to detect comments inside an
       # empty "block" we want to look for comments preceding the next token
@@ -561,8 +562,9 @@ exports.Rewriter = class Rewriter
         indented: useNextToken# or token[0] is 'INDENT'
         first: token[0] is 'INDENT'
         afterPos: prevLocationData.range[0]
+        indentSize: token.indentSize
       )
-      # dump {token, precedingComment, useNextToken, commentPrecedes, next: tokens[i + 1]}
+      # dump {token, precedingComment, prevLocationData, useNextToken, next: tokens[i + 1]}
       if token[0] is 'INDENT'
         return 1 unless precedingComment?
       prevLocationData = precedingComment.locationData if precedingComment?
@@ -574,10 +576,10 @@ exports.Rewriter = class Rewriter
         range:        prevLocationData.range
       return 1
 
-  findPrecedingComment: (token, {indented, first, afterPos}) ->
+  findPrecedingComment: (token, {indented, first, afterPos, indentSize}) ->
     tokenStart = token[2].range[0]
     # TODO: optimize? eg binary search?
-    matches = (comment) -> not comment.outdented and comment.locationData.range[0] < tokenStart and comment.locationData.range[0] > afterPos and (if indented then comment.indented else yes)
+    matches = (comment) -> (not comment.outdented or indentSize? and comment.indentSize > indentSize) and comment.locationData.range[0] < tokenStart and comment.locationData.range[0] > afterPos and (if indented then comment.indented else yes)
     if first
       lastMatching = null
       for comment in @comments by -1
