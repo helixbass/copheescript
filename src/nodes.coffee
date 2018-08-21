@@ -136,6 +136,14 @@ exports.Base = class Base
       ...ast
     }
 
+  # Plain JavaScript object representation of the node, that can be serialized
+  # as JSON. This is used for generating an abstract syntax tree (AST).
+  # This is what the `ast` option in the Node API returns.
+  toJSON: (o) ->
+    # We try to follow the [Babel AST spec](https://github.com/babel/babel/blob/master/packages/babylon/ast/spec.md)
+    # as closely as possible, for improved interoperability with other tools.
+    @toAst o
+
   toAst: (o, level) ->
     return @compileToBabylon o, level if o.compiling
     o = extend {}, o

@@ -103,13 +103,13 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
         options.bare = yes
         break
 
-  parsed = parser.parse tokens
-  parsed.allComments = comments
-  # dump {parsed}
-  return parsed.toAst options if options.ast
+  nodes = parser.parse tokens
+  nodes.allComments = comments
+  # dump {nodes}
+  return nodes.toJSON options if options.ast
   js = do =>
     if options.usePrettier
-      {formatted, ast} = parsed.prettier merge options, {code, returnWithAst: yes}
+      {formatted, ast} = nodes.prettier merge options, {code, returnWithAst: yes}
       return formatted unless generateSourceMap
 
       {ast: prettierAst} = prettier.__debug.parseAndAttachComments formatted
@@ -128,9 +128,9 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
     else
       fragments =
         if options.usePrinter
-          printer.print parsed.compileToBabylon(options), options
+          printer.print nodes.compileToBabylon(options), options
         else
-          parsed.compileToFragments options
+          nodes.compileToFragments options
 
       currentLine = 0
       currentLine += 1 if options.header
@@ -220,16 +220,16 @@ exports.nodes = withPrettyErrors (source, options) ->
     parser.parse source
 exports.babylon = compileToBabylon = withPrettyErrors (source, options) ->
   {tokens, comments} = lexer.tokenize source, options
-  parsed = parser.parse tokens
-  parsed.allComments = comments
-  ast = parsed.compileToBabylon options
+  nodes = parser.parse tokens
+  nodes.allComments = comments
+  ast = nodes.compileToBabylon options
   return ast unless options.withTokens
   {ast, tokens}
 exports.ast = withPrettyErrors (source, options) ->
   {tokens, comments} = lexer.tokenize source, options
-  parsed = parser.parse tokens
-  parsed.allComments = comments
-  ast = parsed.toAst options
+  nodes = parser.parse tokens
+  nodes.allComments = comments
+  ast = nodes.toJSON options
   return ast unless options.withTokens
   {ast, tokens}
 
