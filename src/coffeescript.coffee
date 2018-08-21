@@ -106,7 +106,10 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
   nodes = parser.parse tokens
   nodes.allComments = comments
   # dump {nodes}
-  return nodes.toJSON options if options.ast
+  # If all that was requested was a POJO representation of the nodes, e.g.
+  # the abstract syntax tree (AST), we can stop now and just return that.
+  if options.ast
+    return nodes.toJSON options
   js = do =>
     if options.usePrettier
       {formatted, ast} = nodes.prettier merge options, {code, returnWithAst: yes}
@@ -120,6 +123,7 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
         return unless prettierNode?.loc
         {start: {line: sourceLine, column: sourceColumn}} = node.loc
         {start: {line: prettierLine, column: prettierColumn}} = prettierNode.loc
+
         map.add(
           [sourceLine   - 1, sourceColumn]
           [prettierLine - 1, prettierColumn]

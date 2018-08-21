@@ -467,13 +467,52 @@ exports.Base = class Base
   lastNode: (list) ->
     if list.length is 0 then null else list[list.length - 1]
 
-  # `toString` representation of the node, for inspecting the parse tree.
+  # Debugging representation of the node, for inspecting the parse tree.
   # This is what `coffee --nodes` prints out.
   toString: (idt = '', name = @constructor.name) ->
     tree = '\n' + idt + name
     tree += '?' if @soak
     @eachChild (node) -> tree += node.toString idt + TAB
     tree
+
+  # Plain JavaScript object representation of the node, that can be serialized
+  # as JSON. This is used for generating an abstract syntax tree (AST).
+  # This is what the `ast` option in the Node API returns.
+  toJSON: ->
+    # We try to follow the [Babel AST spec](https://github.com/babel/babel/blob/master/packages/babylon/ast/spec.md)
+    # as closely as possible, for improved interoperability with other tools.
+    obj =
+      type: @constructor.name
+      # Convert `locationData` to Babel’s style.
+      loc:
+        start:
+          line: @locationData.first_line
+          column: @locationData.first_column
+        end:
+          line: @locationData.last_line
+          column: @locationData.last_column
+
+    # Add serializable properties to the output. Properties that aren’t
+    # automatically serializable (because they’re already a primitive type)
+    # should be handled on a case-by-case basis in child node classes’ own
+    # `toJSON` methods.
+    for property, value of this
+      continue if property in ['locationData', 'children']
+      continue if value is undefined # Don’t skip `null` or `false` values.
+      if typeof value is 'boolean' or typeof value is 'number' or typeof value is 'string'
+        obj[property] = value
+
+    # Work our way down the tree. This is like `eachChild`, except that we
+    # preserve the child node name, and arrays.
+    for attr in @children when @[attr]
+      if Array.isArray(@[attr])
+        obj[attr] = []
+        for child in flatten [@[attr]]
+          obj[attr].push child.unwrap().toJSON()
+      else
+        obj[attr] = @[attr].unwrap().toJSON()
+
+    obj
 
   # Passes each child to a function, breaking when the function returns `false`.
   eachChild: (func) ->
@@ -3672,9 +3711,9 @@ exports.ExportSpecifier = class ExportSpecifier extends ModuleSpecifier
 # The **Assign** is used to assign a local variable to value, or to set the
 # property of an object -- including within object literals.
 exports.Assign = class Assign extends Base
-  constructor: (@variable, @value, {@context, @param, @subpattern, @operatorToken, @moduleDeclaration, @shorthand, @originalContext} = {}) ->
+  constructor: (@variable, @value, options = {}) ->
     super()
-    @originalContext ?= @context
+    {@context, @param, @subpattern, @operatorToken, @moduleDeclaration, @shorthand, @originalContext = @context} = options
     @propagateLhs()
 
   children: ['variable', 'value']
@@ -5072,7 +5111,7 @@ exports.Op = class Op extends Base
     if op is 'new'
       if ((firstCall = unwrapped = first.unwrap()) instanceof Call or (firstCall = unwrapped.base) instanceof Call) and not firstCall.do and not firstCall.isNew
         return new Value firstCall.newInstance(), if firstCall is unwrapped then [] else unwrapped.properties
-      first = new Parens first if first instanceof Code and first.bound or first instanceof Op and first.operator is 'do'
+      first = new Parens firstCall if firstCall instanceof Code and firstCall.bound or first instanceof Op and first.operator is 'do'
 
     @operator = CONVERSIONS[op] or op
     @first    = first
@@ -5116,7 +5155,7 @@ exports.Op = class Op extends Base
     @operator in ['<', '>', '>=', '<=', '===', '!==']
 
   invert: -> @withLocationData do =>
-    if @isIn()
+    if @isInOperator()
       @invertOperator = '!'
       return @
     if @isChainable() and @first.isChainable()
@@ -5164,11 +5203,11 @@ exports.Op = class Op extends Base
     call.do = yes
     call
 
-  isIn: ->
+  isInOperator: ->
     @originalOperator is 'in'
 
   compileNode: (o) ->
-    if @isIn()
+    if @isInOperator()
       inNode = new In @first, @second
       return (if @invertOperator then inNode.invert() else inNode).compileNode o
     if @invertOperator
@@ -5694,7 +5733,7 @@ exports.Parens = class Parens extends Base
       return expr.compileToFragments o
     fragments = expr.compileToFragments o, LEVEL_PAREN
     bare = o.level < LEVEL_OP and not shouldWrapComment and (
-        expr instanceof Op and not expr.isIn() or expr.unwrap() instanceof Call or
+        expr instanceof Op and not expr.isInOperator() or expr.unwrap() instanceof Call or
         (expr instanceof For and expr.returns)
       ) and (o.level < LEVEL_COND or fragments.length <= 3)
     return @wrapInCommentBoundingBraces fragments if @csxAttribute
@@ -6653,3 +6692,25 @@ unfoldSoak = (o, parent, name) ->
   parent[name] = ifn.body
   ifn.body = new Value parent
   ifn
+
+# Constructs a string or regex by escaping certain characters.
+makeDelimitedLiteral = (body, options = {}) ->
+  body = '(?:)' if body is '' and options.delimiter is '/'
+  regex = ///
+      (\\\\)                               # Escaped backslash.
+    | (\\0(?=[1-7]))                       # Null character mistaken as octal escape.
+    | \\?(#{options.delimiter})            # (Possibly escaped) delimiter.
+    | \\?(?: (\n)|(\r)|(\u2028)|(\u2029) ) # (Possibly escaped) newlines.
+    | (\\.)                                # Other escapes.
+  ///g
+  body = body.replace regex, (match, backslash, nul, delimiter, lf, cr, ls, ps, other) -> switch
+    # Ignore escaped backslashes.
+    when backslash then (if options.double then backslash + backslash else backslash)
+    when nul       then '\\x00'
+    when delimiter then "\\#{delimiter}"
+    when lf        then '\\n'
+    when cr        then '\\r'
+    when ls        then '\\u2028'
+    when ps        then '\\u2029'
+    when other     then (if options.double then "\\#{other}" else other)
+  "#{options.delimiter}#{body}#{options.delimiter}"

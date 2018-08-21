@@ -192,8 +192,22 @@ grammar =
     o 'String',                                                    -> $1
   ]
 
+  Interpolations: [
+    o 'InterpolationChunk',                     -> [$1]
+    o 'Interpolations InterpolationChunk',      -> $1.concat $2
+  ]
+
+  InterpolationChunk: [
+    o 'INTERPOLATION_START Body INTERPOLATION_END',                -> new Interpolation $2
+    o 'INTERPOLATION_START INDENT Body OUTDENT INTERPOLATION_END', -> new Interpolation $3
+    o 'INTERPOLATION_START INTERPOLATION_END',                     -> new Interpolation
+    o 'String',                                                    -> $1
+  ]
+
+  # The .toString() calls here and elsewhere are to convert `String` objects
+  # back to primitive strings now that we've retrieved stowaway extra properties
   Regex: [
-    o 'REGEX',                                  -> new RegexLiteral "#{$1}", delimiter: $1.delimiter
+    o 'REGEX',                                  -> new RegexLiteral $1.toString(), delimiter: $1.delimiter
     o 'REGEX_START Invocation REGEX_END',       -> new RegexWithInterpolations $2
   ]
 
@@ -201,11 +215,11 @@ grammar =
   # through and printed to JavaScript.
   Literal: [
     o 'AlphaNumeric'
-    o 'JS',                                     -> new PassthroughLiteral "#{$1}", here: $1.here, generated: $1.generated
+    o 'JS',                                     -> new PassthroughLiteral $1.toString(), here: $1.here, generated: $1.generated
     o 'Regex'
     o 'UNDEFINED',                              -> new UndefinedLiteral $1
     o 'NULL',                                   -> new NullLiteral $1
-    o 'BOOL',                                   -> new BooleanLiteral "#{$1}", originalValue: $1.original
+    o 'BOOL',                                   -> new BooleanLiteral $1.toString(), originalValue: $1.original
     o 'INFINITY',                               -> new InfinityLiteral $1
     o 'NAN',                                    -> new NaNLiteral $1
   ]
@@ -373,6 +387,7 @@ grammar =
     o 'Parenthetical',                          -> new Value $1
     o 'Range',                                  -> new Value $1
     o 'Invocation',                             -> new Value $1
+    o 'DoIife',                                 -> new Value $1
     o 'This'
     o 'Super',                                  -> new Value $1
   ]
@@ -827,11 +842,14 @@ grammar =
   # rules are necessary.
   OperationLine: [
     o 'UNARY ExpressionLine',                   -> new Op $1, $2
+    o 'DO ExpressionLine',                      -> new Op $1, $2
+    o 'DO_IIFE CodeLine',                       -> new Op $1, $2
   ]
 
   Operation: [
-    o 'UNARY Expression',                       -> new Op "#{$1}", $2, null, null, originalOperator: $1.original
-    o 'UNARY_MATH Expression',                  -> new Op $1 , $2
+    o 'UNARY Expression',                       -> new Op $1.toString(), $2, undefined, undefined, originalOperator: $1.original
+    o 'DO Expression',                          -> new Op $1, $2
+    o 'UNARY_MATH Expression',                  -> new Op $1, $2
     o '-     Expression',                      (-> new Op '-', $2), prec: 'UNARY_MATH'
     o '+     Expression',                      (-> new Op '+', $2), prec: 'UNARY_MATH'
 
@@ -852,21 +870,25 @@ grammar =
     o 'Expression MATH     Expression',         -> new Op $2, $1, $3
     o 'Expression **       Expression',         -> new Op $2, $1, $3
     o 'Expression SHIFT    Expression',         -> new Op $2, $1, $3
-    o 'Expression COMPARE  Expression',         -> new Op "#{$2}", $1, $3, null, originalOperator: $2.original
+    o 'Expression COMPARE  Expression',         -> new Op $2.toString(), $1, $3, undefined, originalOperator: $2.original
     o 'Expression &        Expression',         -> new Op $2, $1, $3
     o 'Expression ^        Expression',         -> new Op $2, $1, $3
     o 'Expression |        Expression',         -> new Op $2, $1, $3
-    o 'Expression &&       Expression',         -> new Op "#{$2}", $1, $3, null, originalOperator: $2.original
-    o 'Expression ||       Expression',         -> new Op "#{$2}", $1, $3, null, originalOperator: $2.original
+    o 'Expression &&       Expression',         -> new Op $2.toString(), $1, $3, undefined, originalOperator: $2.original
+    o 'Expression ||       Expression',         -> new Op $2.toString(), $1, $3, undefined, originalOperator: $2.original
     o 'Expression BIN?     Expression',         -> new Op $2, $1, $3
-    o 'Expression RELATION Expression',         -> new Op "#{$2}", $1, $3, null, invertOperator: $2.invert?.original ? $2.invert
+    o 'Expression RELATION Expression',         -> new Op $2.toString(), $1, $3, undefined, invertOperator: $2.invert?.original ? $2.invert
 
     o 'SimpleAssignable COMPOUND_ASSIGN
-       Expression',                             -> new Assign $1, $3, context: "#{$2}", originalContext: $2.original
+       Expression',                             -> new Assign $1, $3, context: $2.toString(), originalContext: $2.original
     o 'SimpleAssignable COMPOUND_ASSIGN
-       INDENT Expression OUTDENT',              -> new Assign $1, $4, context: "#{$2}", originalContext: $2.original
+       INDENT Expression OUTDENT',              -> new Assign $1, $4, context: $2.toString(), originalContext: $2.original
     o 'SimpleAssignable COMPOUND_ASSIGN TERMINATOR
-       Expression',                             -> new Assign $1, $4, context: "#{$2}", originalContext: $2.original
+       Expression',                             -> new Assign $1, $4, context: $2.toString(), originalContext: $2.original
+  ]
+
+  DoIife: [
+    o 'DO_IIFE Code',                           -> new Op $1 , $2
   ]
 
 # Precedence
@@ -881,11 +903,12 @@ grammar =
 #
 #     (2 + 3) * 4
 operators = [
+  ['right',     'DO_IIFE']
   ['left',      '.', '?.', '::', '?::']
   ['left',      'CALL_START', 'CALL_END']
   ['nonassoc',  '++', '--']
   ['left',      '?']
-  ['right',     'UNARY']
+  ['right',     'UNARY', 'DO']
   ['right',     'AWAIT']
   ['right',     '**']
   ['right',     'UNARY_MATH']
