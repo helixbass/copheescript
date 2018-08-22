@@ -11,12 +11,14 @@ prettier = require 'prettier'
 babylon = require 'babylon'
 
 # Import the helpers we plan to use.
-{compact, flatten, extend, merge, del, starts, ends, some
-addDataToNode, attachCommentsToNode, locationDataToString
-throwSyntaxError, getNumberValue, dump, locationDataToBabylon
-isArray, isBoolean, isPlainObject, mapValues, traverseBabylonAst
-babylonLocationFields, isFunction, makeDelimitedLiteral
-mergeBabylonLocationData, mergeLocationData, replaceUnicodeCodePointEscapes
+{compact, flatten, extend, merge, del, starts, ends, some,
+addDataToNode, attachCommentsToNode, locationDataToString,
+throwSyntaxError,  replaceUnicodeCodePointEscapes,
+locationDataToBabylon, babylonLocationFields,
+isArray, isFunction, isPlainObject, isBoolean,
+getNumberValue, dump,
+mapValues, traverseBabylonAst, makeDelimitedLiteral,
+mergeBabylonLocationData, mergeLocationData,
 assignEmptyTrailingLocationData} = require './helpers'
 
 # Functions required by parser.
@@ -121,71 +123,6 @@ exports.Base = class Base
       node.compileClosure o
     @compileCommentFragments o, node, fragments
     fragments
-
-  withAstType: (ast, o) ->
-    return ast unless ast
-    return ast if isArray ast
-    return ast if ast.type
-    return ast unless @emptyAst or do ->
-      return yes for key in Object.keys(ast) when key not in ['comments', babylonLocationFields...]
-
-    {
-      type: do =>
-        return @constructor.name unless @astType
-        @astType?(o) ? @astType
-      ...ast
-    }
-
-  # Plain JavaScript object representation of the node, that can be serialized
-  # as JSON. This is used for generating an abstract syntax tree (AST).
-  # This is what the `ast` option in the Node API returns.
-  toJSON: (o) ->
-    # We try to follow the [Babel AST spec](https://github.com/babel/babel/blob/master/packages/babylon/ast/spec.md)
-    # as closely as possible, for improved interoperability with other tools.
-    @toAst o
-
-  toAst: (o, level) ->
-    return @compileToBabylon o, level if o.compiling
-    o = extend {}, o
-    o.level = level if level
-    @withBabylonLocationData @withAstType @_toAst(o), o
-
-  astProps: []
-  getAstProps: (o) ->
-    return @astProps o if isFunction @astProps
-    obj = {}
-    if isArray @astProps
-      for prop in @astProps
-        obj[prop] = @[prop]
-    else
-      for prop, key of @astProps
-        obj[key] = @[prop]
-    obj
-
-  getAstChildren: (o) ->
-    return @astChildren(o) if isFunction @astChildren
-    obj = {}
-    addProp = ({prop, key = prop, level}) =>
-      val = @[prop]
-      obj[key] =
-        if isArray val
-          item.toAst o, level for item in val
-        else
-          val?.toAst o, level
-
-    children = @astChildren ? @children
-    if isArray children
-      addProp {prop} for prop in children
-    else
-      for prop, key of children
-        {key, level} = key if isPlainObject key
-        addProp {prop, key, level}
-    obj
-
-  _toAst: (o) -> {
-    ...@getAstChildren o
-    ...@getAstProps o
-  }
 
   compileToBabylon: (o, level) ->
     o = extend {}, o
@@ -474,6 +411,106 @@ exports.Base = class Base
     tree += '?' if @soak
     @eachChild (node) -> tree += node.toString idt + TAB
     tree
+
+  # Plain JavaScript object representation of the node, that can be serialized
+  # as JSON. This is used for generating an abstract syntax tree (AST).
+  # This is what the `ast` option in the Node API returns.
+  toJSON: (o) ->
+    # We try to follow the [Babel AST spec](https://github.com/babel/babel/blob/master/packages/babylon/ast/spec.md)
+    # as closely as possible, for improved interoperability with other tools.
+    @toAst o
+
+  # Returns the full AST for the node.
+  toAst: (o, level) ->
+    return @compileToBabylon o, level if o.compiling
+    o = extend {}, o
+    o.level = level if level
+    @withBabylonLocationData @withAstType @_toAst(o), o
+
+  # Adds `type` to an AST.
+  # A node class typically defines `astType` (as a string or callback) if it
+  # needs to override the default-generated `type` (ie its constructor name)
+  withAstType: (ast, o) ->
+    return ast unless ast
+    return ast if isArray ast
+    return ast if ast.type
+    return ast unless @emptyAst or do ->
+      return yes for key in Object.keys(ast) when key not in ['comments', babylonLocationFields...]
+
+    merge ast,
+      type: do =>
+        return @constructor.name unless @astType
+        @astType?(o) ? @astType
+
+  # Returns the "content" (ie not `type` or location data) of the AST for the node.
+  # By default, recursively generates AST nodes for `children`.
+  # To override, a node class can either:
+  #   - define `astChildren` to specify how to generate full child nodes, and/or
+  #     `astProps` to specify how to generate non-child-node fields
+  #   - override the `_toAst()` method
+  _toAst: (o) ->
+    merge(
+      @getAstChildren o
+      @getAstProps o
+    )
+
+  # Returns the child-nodes fields of the AST node.
+  # By default, recursively generates AST nodes for `children`.
+  # To override, a node class defines `astChildren`, which can be either:
+  # - an array of property names (like `children`) which should have their generated
+  #   AST nodes included recursively.
+  # - an object whose keys are the desired AST field names and whose values are either:
+  #   - a string, which is the name of the node object property whose generated AST node
+  #     should be the corresponding value included in the AST
+  #   - an object with `key` and/or `level` fields. `key` corresponds to the simple string
+  #     value above, ie it's the name of a node object property. `level` is the desired
+  #     AST "compilation" level for that child node, eg `LEVEL_PAREN`
+  # - a callback function, which should return all the AST child-node fields
+  getAstChildren: (o) ->
+    return @astChildren o if isFunction @astChildren
+    childAsts = {}
+    addChildAst = ({propName, key = propName, level}) =>
+      propName ?= key
+      val = @[propName]
+      childAsts[key] =
+        if isArray val
+          item.toAst o, level for item in val
+        else
+          val?.toAst o, level
+
+    children = @astChildren ? @children
+    if isArray children
+      addChildAst {propName} for propName in children
+    else
+      for key, propName of children
+        {propName, level} = propName if isPlainObject propName
+        addChildAst {propName, key, level}
+    childAsts
+
+  astProps: []
+  # Returns the "simple" (ie non-child-nodes) fields of the AST node.
+  # By default, returns an empty object.
+  # To override, a node class defines `astProps`, which can be either:
+  # - an array of property names which should have their values included.
+  # - an object whose keys are the desired AST field names and whose values are
+  #   the corresponding "mapped" node class property names whose values should be included.
+  # - a callback function, which should return all the AST non-child-node fields
+  getAstProps: (o) ->
+    return @astProps o if isFunction @astProps
+    astFields = {}
+    if isArray @astProps
+      for propName in @astProps
+        astFields[propName] = @[propName]
+    else
+      for key, propName of @astProps
+        astFields[key] = @[propName]
+    astFields
+
+  withBabylonLocationData: (ast, node) ->
+    return (@withBabylonLocationData(item, node) for item in ast) if isArray ast
+    {locationData} = node ? @
+    return ast unless locationData and ast and not ast.start?
+    merge ast, locationDataToBabylon locationData
 
   # Passes each child to a function, breaking when the function returns `false`.
   eachChild: (func) ->
@@ -1315,6 +1352,8 @@ exports.Literal = class Literal extends Base
   compileNode: (o) ->
     [@makeCode @value]
 
+  astProps: ['value']
+
   toString: ->
     # This is only intended for debugging.
     " #{if @isStatement() then super() else @constructor.name}: #{@value}"
@@ -1345,13 +1384,13 @@ exports.NaNLiteral = class NaNLiteral extends NumberLiteral
   constructor: ->
     super 'NaN'
 
-  astType: 'Identifier'
-  astProps: ->
-    name: 'NaN'
-
   compileNode: (o) ->
     code = [@makeCode '0/0']
     if o.level >= LEVEL_OP then @wrapInParentheses code else code
+
+  astType: 'Identifier'
+  astProps: ->
+    name: 'NaN'
 
   _compileToBabylon: (o) ->
     new Op('/', new NumberLiteral('0'), new NumberLiteral('0')).compileToBabylon o
@@ -1519,7 +1558,7 @@ exports.IdentifierLiteral = class IdentifierLiteral extends Literal
       'Identifier'
 
   astProps:
-    value: 'name'
+    name: 'value'
 
 exports.CSXTag = class CSXTag extends IdentifierLiteral
   _compileToBabylon: (o) ->
@@ -1560,10 +1599,20 @@ exports.StatementLiteral = class StatementLiteral extends Literal
   compileNode: (o) ->
     [@makeCode "#{@tab}#{@value};"]
 
+  astType: ->
+    switch @value
+      when 'continue' then 'ContinueStatement'
+      when 'break'    then 'BreakStatement'
+      when 'debugger' then 'DebuggerStatement'
+
 exports.ThisLiteral = class ThisLiteral extends Literal
   constructor: (value) ->
     super 'this'
-    @shorthand = yes if value is '@'
+    @shorthand = value is '@'
+
+  compileNode: (o) ->
+    code = if o.scope.method?.bound then o.scope.method.context else @value
+    [@makeCode code]
 
   _toAst: (o) ->
     {compiling} = o
@@ -1581,17 +1630,9 @@ exports.ThisLiteral = class ThisLiteral extends Literal
       type: 'Identifier' # TODO: refine/share code?
       name: value
 
-  compileNode: (o) ->
-    code = if o.scope.method?.bound then o.scope.method.context else @value
-    [@makeCode code]
-
 exports.UndefinedLiteral = class UndefinedLiteral extends Literal
   constructor: ->
     super 'undefined'
-
-  astType: 'Identifier'
-  astProps:
-    value: 'name'
 
   _compileToBabylon: (o) ->
     new Op('void', new NumberLiteral('0')).compileToBabylon o # TODO: capture LEVEL_ACCESS condition
@@ -1599,9 +1640,16 @@ exports.UndefinedLiteral = class UndefinedLiteral extends Literal
   compileNode: (o) ->
     [@makeCode if o.level >= LEVEL_ACCESS then '(void 0)' else 'void 0']
 
+  astType: 'Identifier'
+  astProps:
+    name: 'value'
+
 exports.NullLiteral = class NullLiteral extends Literal
   constructor: ->
     super 'null'
+
+  astProps: []
+  emptyAst: yes
 
 exports.BooleanLiteral = class BooleanLiteral extends Literal
   constructor: (value, {@originalValue} = {}) ->
@@ -1653,8 +1701,8 @@ exports.Return = class Return extends Base
 
   astType: 'ReturnStatement'
   astChildren:
-    expression:
-      key: 'argument'
+    argument:
+      propName: 'expression'
       level: LEVEL_PAREN
 
   compileNode: (o) ->
@@ -2042,15 +2090,15 @@ exports.Call = class Call extends Base
       'CallExpression'
 
   astChildren:
-    variable:
-      key: 'callee'
+    callee:
+      propName: 'variable'
       level: LEVEL_ACCESS
-    args:
-      key: 'arguments'
+    arguments:
+      propName: 'args'
       level: LEVEL_LIST
 
   astProps:
-    soak: 'optional'
+    optional: 'soak'
 
   # Compile a vanilla function call.
   compileNode: (o) ->
@@ -2937,8 +2985,8 @@ exports.Arr = class Arr extends Base
         unwrappedObj.nestedLhs = yes
 
   astChildren:
-    objects:
-      key: 'elements'
+    elements:
+      propName: 'objects'
       level: LEVEL_LIST
 
   astType: ->
@@ -3087,9 +3135,9 @@ exports.Class = class Class extends Base
       'ClassExpression'
 
   astChildren:
-    variable: 'id'
-    parent:
-      key: 'superClass'
+    id: 'variable'
+    superClass:
+      propName: 'parent'
       level: LEVEL_PAREN
     body:
       level: LEVEL_TOP
@@ -3456,7 +3504,7 @@ exports.ModuleDeclaration = class ModuleDeclaration extends Base
 
 exports.ImportDeclaration = class ImportDeclaration extends ModuleDeclaration
   astChildren:
-    clause: 'specifiers'
+    specifiers: 'clause'
     source: 'source'
   astProps: ->
     importKind: 'value' if @clause
@@ -3557,7 +3605,7 @@ exports.ExportNamedDeclaration = class ExportNamedDeclaration extends ExportDecl
 
 exports.ExportDefaultDeclaration = class ExportDefaultDeclaration extends ExportDeclaration
   astChildren:
-    clause: 'declaration'
+    declaration: 'clause'
 
   _toAst: (o) ->
     @checkScope o, 'export'
@@ -3650,7 +3698,7 @@ exports.ImportSpecifier = class ImportSpecifier extends ModuleSpecifier
 
 exports.ImportDefaultSpecifier = class ImportDefaultSpecifier extends ImportSpecifier
   astChildren:
-    original: 'local'
+    local: 'original'
 
 exports.ImportNamespaceSpecifier = class ImportNamespaceSpecifier extends ImportSpecifier
   astChildren: (o) ->
@@ -3702,11 +3750,11 @@ exports.Assign = class Assign extends Base
     else
       'AssignmentExpression'
   astChildren:
-    value:
-      key: 'right'
+    right:
+      propName: 'value'
       level: LEVEL_LIST
-    variable:
-      key: 'left'
+    left:
+      propName: 'variable'
       level: LEVEL_LIST
   astProps: (o) ->
     return {} if @isDefaultAssignment()
@@ -4899,8 +4947,8 @@ exports.Splat = class Splat extends Base
       'SpreadElement'
 
   astChildren:
-    name:
-      key: 'argument'
+    argument:
+      propName: 'name'
       level: LEVEL_OP
 
   astProps: ->
@@ -4989,8 +5037,8 @@ exports.While = class While extends Base
 
   astType: 'WhileStatement'
   astChildren:
-    condition:
-      key: 'test'
+    test:
+      propName: 'condition'
       level: LEVEL_PAREN
     body:
       level: LEVEL_TOP
@@ -5548,8 +5596,8 @@ exports.Throw = class Throw extends Base
 
   astType: 'ThrowStatement'
   astChildren:
-    expression:
-      key: 'argument'
+    argument:
+      propName: 'expression'
       level: LEVEL_LIST
 
   compileNode: (o) ->
@@ -5582,7 +5630,7 @@ exports.Existence = class Existence extends Base
   invert: NEGATE
 
   astChildren:
-    expression: 'argument'
+    argument: 'expression'
 
   _compileToBabylon: (o) ->
     compareOp = if @negated then '===' else '!=='

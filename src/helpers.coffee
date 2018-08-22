@@ -272,8 +272,36 @@ exports.nameWhitespaceCharacter = (string) ->
     when '\t' then 'tab'
     else string
 
+exports.locationDataToBabylon = ({first_line, first_column, last_line, last_column, range}) ->
+  loc:
+    start:
+      line: first_line + 1
+      column: first_column
+    end:
+      line: last_line + 1
+      column: last_column + 1
+  range: [
+    range[0]
+    if range[1] is -1
+      range[1]
+    else
+      range[1] + 1
+  ]
+  start: range[0]
+  end: range[1] + 1
+
+exports.babylonLocationFields = ['loc', 'range', 'start', 'end']
+
+exports.isArray = isArray = (obj) -> Array.isArray obj
+exports.isFunction = isFunction = (obj) -> Object::toString.call(obj) is '[object Function]'
+exports.isNumber = isNumber = (obj) -> Object::toString.call(obj) is '[object Number]'
+exports.isString = isString = (obj) -> Object::toString.call(obj) is '[object String]'
+exports.isBoolean = isBoolean = (obj) -> obj is yes or obj is no or Object::toString.call(obj) is '[object Boolean]'
+exports.isPlainObject = isPlainObject = (obj) -> typeof obj is 'object' and !!obj and not isArray(obj) and not isNumber(obj) and not isString(obj) and not isBoolean(obj)
+
+# Converts a number, string, or node (Value/NumberLiteral/unary +/- Op) to its
+# corresponding number value.
 exports.getNumberValue = (number) ->
-  orig = number
   return number if isNumber number
   invert = no
   unless isString number
@@ -297,26 +325,6 @@ exports.getNumberValue = (number) ->
 exports.dump = dump = (args..., obj) ->
   util = require 'util'
   console.log args..., util.inspect obj, no, null
-
-exports.locationDataToBabylon = ({first_line, first_column, last_line, last_column, range}) -> {
-  loc:
-    start:
-      line: first_line + 1
-      column: first_column
-    end:
-      line: last_line + 1
-      column: last_column
-  # range: range[..]
-  range: [
-    range[0]
-    if range[1] is -1
-      range[1]
-    else
-      range[1] + 1
-  ]
-  start: range[0]
-  end: range[1] + 1
-}
 
 exports.mergeBabylonLocationData = mergeBabylonLocationData = (intoNode, fromNode) ->
   if isArray fromNode
@@ -363,13 +371,6 @@ exports.assignEmptyTrailingLocationData = (intoNode, fromNode) ->
     last_line: fromLocationData.last_line
     last_column: fromLocationData.last_column + 1
   intoNode
-
-exports.isArray = isArray = (obj) -> Array.isArray obj
-exports.isNumber = isNumber = (obj) -> Object::toString.call(obj) is '[object Number]'
-exports.isString = isString = (obj) -> Object::toString.call(obj) is '[object String]'
-exports.isFunction = isFunction = (obj) -> Object::toString.call(obj) is '[object Function]'
-exports.isBoolean = isBoolean = (obj) -> obj is yes or obj is no or Object::toString.call(obj) is '[object Boolean]'
-exports.isPlainObject = isPlainObject = (obj) -> typeof obj is 'object' and !!obj and not isArray(obj) and not isNumber(obj) and not isString(obj) and not isBoolean(obj)
 
 exports.mapValues = (obj, fn) ->
   Object.keys(obj).reduce (result, key) ->

@@ -13,8 +13,8 @@
 
 # Import the helpers we need.
 {count, repeat, invertLiterate, merge, dump, makeDelimitedLiteral
-attachCommentsToNode, throwSyntaxError, getNumberValue, throwSyntaxError
-replaceUnicodeCodePointEscapes} = require './helpers'
+attachCommentsToNode, throwSyntaxError
+replaceUnicodeCodePointEscapes, getNumberValue} = require './helpers'
 
 # The Lexer Class
 # ---------------
