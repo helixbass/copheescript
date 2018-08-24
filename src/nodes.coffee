@@ -5737,6 +5737,9 @@ exports.Parens = class Parens extends Base
     return @wrapInCommentBoundingBraces fragments if @csxAttribute
     if bare then fragments else @wrapInParentheses fragments
 
+  _toAst: (o) ->
+    @body.unwrap().toAst o, LEVEL_PAREN
+
 #### StringWithInterpolations
 
 exports.StringWithInterpolations = class StringWithInterpolations extends Base
