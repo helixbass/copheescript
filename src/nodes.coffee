@@ -2012,12 +2012,18 @@ exports.Call = class Call extends Base
     if @locationData and @needsUpdatedStartLocation
       @locationData.first_line = locationData.first_line
       @locationData.first_column = locationData.first_column
-      @locationData.range[0] = locationData.range[0]
+      @locationData.range = [
+        locationData.range[0]
+        @locationData.range[1]
+      ]
       base = @variable?.base or @variable
       if base.needsUpdatedStartLocation
         @variable.locationData.first_line = locationData.first_line
         @variable.locationData.first_column = locationData.first_column
-        @variable.locationData.range[0] = locationData.range[0]
+        @variable.locationData.range = [
+          locationData.range[0]
+          @variable.locationData.range[1]
+        ]
         base.updateLocationDataIfMissing locationData
       delete @needsUpdatedStartLocation
     super locationData
@@ -5204,6 +5210,15 @@ exports.Op = class Op extends Base
   isInOperator: ->
     @originalOperator is 'in'
 
+  checkDeleteOperand: (o) ->
+    if @operator is 'delete' and o.scope.check(@first.unwrapAll().value)
+      @error 'delete operand may not be argument or var'
+
+  checkUpdateAssignability: ->
+    if @operator in ['--', '++']
+      message = isUnassignable @first.unwrapAll().value
+      @first.error message if message
+
   compileNode: (o) ->
     if @isInOperator()
       inNode = new In @first, @second
@@ -5216,11 +5231,8 @@ exports.Op = class Op extends Base
     # In chains, there's no need to wrap bare obj literals in parens,
     # as the chained expression is wrapped.
     @first.front = @front unless isChain
-    if @operator is 'delete' and o.scope.check(@first.unwrapAll().value)
-      @error 'delete operand may not be argument or var'
-    if @operator in ['--', '++']
-      message = isUnassignable @first.unwrapAll().value
-      @first.error message if message
+    @checkDeleteOperand o
+    @checkUpdateAssignability()
     return @compileContinuation o if @isYield() or @isAwait()
     return @compileUnary        o if @isUnary()
     return @compileChain        o if isChain
@@ -5242,51 +5254,50 @@ exports.Op = class Op extends Base
       when 'await'           then 'AwaitExpression'
       when 'yield', 'yield*' then 'YieldExpression'
       else
-        if @isUnary()
-          'UnaryExpression'
-        else
-          'BinaryExpression'
+        if @isUnary()        then 'UnaryExpression'
+        else                      'BinaryExpression'
+
+  _toAst: (o) ->
+    @checkDeleteOperand o
+    @checkUpdateAssignability()
+    @checkContinuation o if @isYield() or @isAwait()
+    super o
 
   astChildren: (o) ->
+    firstAst = @first.toAst o, LEVEL_OP
+    secondAst = @second?.toAst o, LEVEL_OP
     switch
       when @operator is 'new'
-        callee: @first.toAst o, LEVEL_OP
+        callee: firstAst
         arguments: []
       when @isUnary()
         argument:
           if @isYield() or @isAwait()
-            @first.toAst o, LEVEL_OP unless @first.unwrap().value is ''
+            firstAst unless @first.unwrap().value is ''
           else
-            @first.toAst o, LEVEL_OP
+            firstAst
       else
-        left: @first.toAst o, LEVEL_OP
-        right: @second.toAst o, LEVEL_OP
+        left: firstAst
+        right: secondAst
 
   astProps: (o) ->
-    return {} if @operator is 'new' or @isAwait()
-    return delegate: @operator is 'yield*' if @isYield()
-    {
-      operator:
-        if o.compiling
-          @operator
-        else
-          "#{if @invertOperator then "#{@invertOperator} " else ''}#{@originalOperator}"
-      ...(
-        if @isUnary()
+    operator =
+      if o.compiling
+        @operator
+      else
+        "#{if @invertOperator then "#{@invertOperator} " else ''}#{@originalOperator}"
+    switch
+      when @operator is 'new' or @isAwait()
+        {}
+      when @isYield()
+        delegate: @operator is 'yield*'
+      when @isUnary()
+        {
+          operator
           prefix: !@flip
-        else
-          {}
-      )
-    }
-
-  _toAst: (o) ->
-    if @operator is 'delete' and o.scope.check(@first.unwrapAll().value)
-      @error 'delete operand may not be argument or var'
-    if @operator in ['--', '++']
-      message = isUnassignable @first.unwrapAll().value
-      @first.error message if message
-    @checkContinuation o if @isYield() or @isAwait()
-    super o
+        }
+      else
+        {operator}
 
   _compileToBabylon: (o) ->
     if @originalOperator is 'in'
