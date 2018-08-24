@@ -461,7 +461,8 @@ exports.Base = class Base
 
   # For this node and all descendents, set the location data to `locationData`
   # if the location data is not already set.
-  updateLocationDataIfMissing: (locationData) ->
+  updateLocationDataIfMissing: (locationData, {force} = {}) ->
+    @forceUpdateLocation = yes if force
     return this if @locationData and not @forceUpdateLocation
     delete @forceUpdateLocation
     @locationData = locationData
@@ -960,6 +961,10 @@ exports.CSXTag = class CSXTag extends IdentifierLiteral
 
 exports.PropertyName = class PropertyName extends Literal
   isAssignable: YES
+
+  astType: 'Identifier'
+  astProps:
+    name: 'value'
 
 exports.ComputedPropertyName = class ComputedPropertyName extends PropertyName
   compileNode: (o) ->
@@ -1552,6 +1557,9 @@ exports.Index = class Index extends Base
 
   compileToFragments: (o) ->
     [].concat @makeCode("["), @index.compileToFragments(o, LEVEL_PAREN), @makeCode("]")
+
+  _toAst: (o) ->
+    @index.toAst o
 
   shouldCache: ->
     @index.shouldCache()
