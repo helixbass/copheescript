@@ -192,18 +192,6 @@ grammar =
     o 'String',                                                    -> $1
   ]
 
-  Interpolations: [
-    o 'InterpolationChunk',                     -> [$1]
-    o 'Interpolations InterpolationChunk',      -> $1.concat $2
-  ]
-
-  InterpolationChunk: [
-    o 'INTERPOLATION_START Body INTERPOLATION_END',                -> new Interpolation $2
-    o 'INTERPOLATION_START INDENT Body OUTDENT INTERPOLATION_END', -> new Interpolation $3
-    o 'INTERPOLATION_START INTERPOLATION_END',                     -> new Interpolation
-    o 'String',                                                    -> $1
-  ]
-
   # The .toString() calls here and elsewhere are to convert `String` objects
   # back to primitive strings now that we've retrieved stowaway extra properties
   Regex: [
