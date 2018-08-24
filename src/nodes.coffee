@@ -5699,9 +5699,6 @@ exports.Parens = class Parens extends Base
 
   shouldCache: -> @body.shouldCache()
 
-  _toAst: (o) ->
-    @body.unwrap().toAst o, LEVEL_PAREN
-
   _compileToBabylon: (o) ->
     expr = @body.unwrap()
     compiled = expr.compileToBabylon o, LEVEL_PAREN
