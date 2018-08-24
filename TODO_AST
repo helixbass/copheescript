@@ -1,1 +1,3 @@
 - directives
+
+- should test that all expected errors (that would occur when compiling) occur when generating AST

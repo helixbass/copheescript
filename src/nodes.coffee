@@ -1583,14 +1583,6 @@ exports.StatementLiteral = class StatementLiteral extends Literal
     return this if @value is 'break' and not (o?.loop or o?.block)
     return this if @value is 'continue' and not o?.loop
 
-  astType: ->
-    switch @value
-      when 'continue' then 'ContinueStatement'
-      when 'break'    then 'BreakStatement'
-      # TODO: no tests broke without this, include test with debugger statement?
-      when 'debugger' then 'DebuggerStatement'
-      # TODO: any others? throw error in else if we fall off the end of this switch?
-
   compileNode: (o) ->
     [@makeCode "#{@tab}#{@value};"]
 
@@ -1598,7 +1590,9 @@ exports.StatementLiteral = class StatementLiteral extends Literal
     switch @value
       when 'continue' then 'ContinueStatement'
       when 'break'    then 'BreakStatement'
+      # TODO: no tests broke without this, include test with debugger statement?
       when 'debugger' then 'DebuggerStatement'
+      # TODO: any others? throw error in else if we fall off the end of this switch?
 
 exports.ThisLiteral = class ThisLiteral extends Literal
   constructor: (value) ->
