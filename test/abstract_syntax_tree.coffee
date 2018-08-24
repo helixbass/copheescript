@@ -1112,7 +1112,6 @@ test "AST as expected for BooleanLiteral node", ->
 
 # test "AST as expected for If node", ->
 #   testExpression 'if maybe then yes',
-<<<<<<< HEAD
 #     type: 'IfStatement'
 #     test:
 #       type: 'Identifier'
