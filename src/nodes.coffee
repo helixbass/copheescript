@@ -14,8 +14,8 @@ babylon = require 'babylon'
 {compact, flatten, extend, merge, del, starts, ends, some,
 addDataToNode, attachCommentsToNode, locationDataToString,
 throwSyntaxError,  replaceUnicodeCodePointEscapes,
-locationDataToBabylon, babylonLocationFields,
-isArray, isFunction, isPlainObject, isBoolean,
+locationDataToBabel, babelLocationFields,
+isFunction, isPlainObject, isBoolean,
 getNumberValue, dump,
 mapValues, traverseBabylonAst, makeDelimitedLiteral,
 mergeBabylonLocationData, mergeLocationData,
@@ -131,7 +131,7 @@ exports.Base = class Base
 
     @withBabylonComments o, do =>
       return node.compileClosureToBabylon o unless o.level is LEVEL_TOP or not node.isStatement o
-      @withBabylonLocationData node._compileToBabylon o
+      @withBabelLocationData node._compileToBabylon o
 
   _compileToBabylon: (o) ->
     @precompile? o
@@ -152,7 +152,7 @@ exports.Base = class Base
         compiledComment.trailing = not leading
         compiledComment
     return compiled unless comments.length
-    if isArray compiled
+    if Array.isArray compiled
       [...rest, last] = compiled
       [...rest, {...last, comments}]
     else if compiled
@@ -161,13 +161,7 @@ exports.Base = class Base
       {comments}
 
   withEmptyBabylonLocationData: (compiled) ->
-    @withBabylonLocationData compiled, emptyLocationData
-
-  withBabylonLocationData: (compiled, node) ->
-    return (@withBabylonLocationData(item, node) for item in compiled) if isArray compiled
-    {locationData} = node or @
-    return compiled unless locationData and compiled and not compiled.start?
-    merge compiled, locationDataToBabylon locationData
+    @withBabelLocationData compiled, emptyLocationData
 
   withoutBabylonLocationData: (compiled) ->
     return compiled unless compiled?.start?
@@ -175,7 +169,7 @@ exports.Base = class Base
     compiled
 
   withCopiedBabylonLocationData: (compiled, other) ->
-    compiled[field] = other[field] for field in babylonLocationFields
+    compiled[field] = other[field] for field in babelLocationFields
     compiled
 
   withLocationData: (node, {force} = {}) ->
@@ -425,22 +419,23 @@ exports.Base = class Base
     return @compileToBabylon o, level if o.compiling
     o = extend {}, o
     o.level = level if level
-    @withBabylonLocationData @withAstType @_toAst(o), o
+    @withBabelLocationData @withAstType @_toAst(o), o
+
+  # By default, a node class's AST `type` is the class name
+  astType: -> @constructor.name
 
   # Adds `type` to an AST.
   # A node class typically defines `astType` (as a string or callback) if it
   # needs to override the default-generated `type` (ie its constructor name)
   withAstType: (ast, o) ->
     return ast unless ast
-    return ast if isArray ast
+    return ast if Array.isArray ast
     return ast if ast.type
     return ast unless @emptyAst or do ->
-      return yes for key in Object.keys(ast) when key not in ['comments', babylonLocationFields...]
+      return yes for key in Object.keys(ast) when key not in ['comments', babelLocationFields...]
 
     merge ast,
-      type: do =>
-        return @constructor.name unless @astType
-        @astType?(o) ? @astType
+      type: @astType?(o) ? @astType
 
   # Returns the "content" (ie not `type` or location data) of the AST for the node.
   # By default, recursively generates AST nodes for `children`.
@@ -473,13 +468,13 @@ exports.Base = class Base
       propName ?= key
       val = @[propName]
       childAsts[key] =
-        if isArray val
+        if Array.isArray val
           item.toAst o, level for item in val
         else
           val?.toAst o, level
 
     children = @astChildren ? @children
-    if isArray children
+    if Array.isArray children
       addChildAst {propName} for propName in children
     else
       for key, propName of children
@@ -498,7 +493,7 @@ exports.Base = class Base
   getAstProps: (o) ->
     return @astProps o if isFunction @astProps
     astFields = {}
-    if isArray @astProps
+    if Array.isArray @astProps
       for propName in @astProps
         astFields[propName] = @[propName]
     else
@@ -506,11 +501,11 @@ exports.Base = class Base
         astFields[key] = @[propName]
     astFields
 
-  withBabylonLocationData: (ast, node) ->
-    return (@withBabylonLocationData(item, node) for item in ast) if isArray ast
+  withBabelLocationData: (ast, node) ->
+    return (@withBabelLocationData(item, node) for item in ast) if Array.isArray ast
     {locationData} = node ? @
     return ast unless locationData and ast and not ast.start?
-    merge ast, locationDataToBabylon locationData
+    merge ast, locationDataToBabel locationData
 
   # Passes each child to a function, breaking when the function returns `false`.
   eachChild: (func) ->
@@ -530,7 +525,7 @@ exports.Base = class Base
   replaceInContext: (match, replacement) ->
     return false unless @children
     for attr in @children when children = @[attr]
-      if isArray children
+      if Array.isArray children
         for child, i in children
           if match child
             children[i..i] = replacement child, @
@@ -665,7 +660,7 @@ exports.HoistTarget = class HoistTarget extends Base
     fragments
 
   @expandBabylon = (compiled) =>
-    return (@expandBabylon obj for obj in compiled) if isArray compiled
+    return (@expandBabylon obj for obj in compiled) if Array.isArray compiled
     return compiled unless isPlainObject compiled
     return @expandBabylon compiled._hoistTarget if compiled?._hoistTarget
     mapValues compiled, @expandBabylon
@@ -898,7 +893,7 @@ exports.Block = class Block extends Base
           comment.leading = comment.trailing = no
           comment
       compiledBody = []
-    program = @includeCommentsInLocationData @withBabylonLocationData {
+    program = @includeCommentsInLocationData @withBabelLocationData {
       type: 'Program'
       sourceType: 'module'
       body: compiledBody
@@ -926,7 +921,7 @@ exports.Block = class Block extends Base
     body = @bodyToAst merge o, level: LEVEL_TOP, root: yes
     comments = @commentsToAst()
 
-    program = @withBabylonLocationData {
+    program = @withBabelLocationData {
       type: 'Program'
       sourceType: 'module'
       body, @directives
@@ -949,7 +944,7 @@ exports.Block = class Block extends Base
           else
             'CommentLine'
         value: content
-        locationDataToBabylon(locationData)...
+        locationDataToBabel(locationData)...
         indent
       }
 
@@ -969,7 +964,7 @@ exports.Block = class Block extends Base
         return ast if node.isStatement o
         ast = @extractDirectives ast, o
         return [] unless ast
-        return @asExpressionStatement ast unless isArray ast
+        return @asExpressionStatement ast unless Array.isArray ast
         @asExpressionStatement item for item in ast
     )
 
@@ -999,7 +994,7 @@ exports.Block = class Block extends Base
     body = @compileBodyToBabylon merge o, {root}
     body = [...@compileDeclarationsToBabylon(o), ...body] if withDeclarations
     return body if root
-    @includeCommentsInLocationData @withBabylonLocationData @withAstType {
+    @includeCommentsInLocationData @withBabelLocationData @withAstType {
       body
       @directives
     }
@@ -1051,7 +1046,7 @@ exports.Block = class Block extends Base
 
   hoistBabylonComments: (compiled, {onlyTrailing, onlyLeading} = {}) ->
     targetNode =
-      if isArray compiled
+      if Array.isArray compiled
         (do -> return item for item in compiled when item.type) ? compiled[0]
       else compiled
     comments = targetNode.comments ? []
@@ -1149,12 +1144,12 @@ exports.Block = class Block extends Base
         return @hoistBabylonComments compiled if node.isStatement o
         compiled = @extractDirectives compiled, o
         return [] unless compiled
-        return @asExpressionStatement compiled unless isArray compiled
+        return @asExpressionStatement compiled unless Array.isArray compiled
         @asExpressionStatement item for item in compiled
     )
 
   extractDirectives: (nodes, o) ->
-    return (@extractDirectives node, o for node in nodes) if isArray nodes
+    return (@extractDirectives node, o for node in nodes) if Array.isArray nodes
     return nodes unless nodes?.type is 'Directive'
     @directives.push nodes
     null
@@ -1891,7 +1886,7 @@ exports.Value = class Value extends Base
           prop.compileValueToBabylon o, ret
         else
           mergeBabylonLocationData(
-            prop.withBabylonLocationData
+            prop.withBabelLocationData
               type: 'MemberExpression'
               object: ret
               property: prop.toAst o
@@ -1901,7 +1896,7 @@ exports.Value = class Value extends Base
             ret
           )
       if @base instanceof Parens and @base.locationData? and propIndex is 0
-        mergeBabylonLocationData ret, locationDataToBabylon @base.locationData
+        mergeBabylonLocationData ret, locationDataToBabel @base.locationData
     ret
 
   # Unfold a soak into an `If`: `a?.b` -> `a.b if a?`
@@ -2138,19 +2133,19 @@ exports.Call = class Call extends Base
       ...(
         unless tagName.value.length
           type: 'JSXFragment'
-          openingFragment: tagName.withBabylonLocationData
+          openingFragment: tagName.withBabelLocationData
             type: 'JSXOpeningFragment'
-          closingFragment: tagName.withBabylonLocationData
+          closingFragment: tagName.withBabelLocationData
             type: 'JSXClosingFragment'
         else
           openingElement =
-            tagName.withBabylonLocationData
+            tagName.withBabelLocationData
               type: 'JSXOpeningElement'
               name: tagName.toAst o#, LEVEL_ACCESS
               selfClosing: not content
           openingElement.attributes = flatten(
             if attributes.base instanceof Arr
-              mergeBabylonLocationData openingElement, locationDataToBabylon attributes.base.locationData
+              mergeBabylonLocationData openingElement, locationDataToBabel attributes.base.locationData
               for obj in attributes.base.objects
                 {base: attr} = obj
                 attrProps = attr?.properties or []
@@ -2162,14 +2157,14 @@ exports.Call = class Call extends Base
                 compiled = attr.toAst o#, LEVEL_PAREN
                 mergeBabylonLocationData openingElement, compiled
                 if attr instanceof IdentifierLiteral
-                  attr.withBabylonLocationData
+                  attr.withBabelLocationData
                     type: 'JSXAttribute'
                     name: compiled
                 else
                   compiled
             else [])
           if content
-            closingElementBabylonLocationData = locationDataToBabylon @args.closingBracketLocationData
+            closingElementBabylonLocationData = locationDataToBabel @args.closingBracketLocationData
             closingElement =
               @withCopiedBabylonLocationData(
                 type: 'JSXClosingElement'
@@ -2662,7 +2657,7 @@ exports.Slice = class Slice extends Base
           new NumberLiteral '9e9'
     ) if to and not (not exclusive and toNum is -1)
 
-    @withBabylonLocationData
+    @withBabelLocationData
       type: 'CallExpression'
       callee:
         type: 'MemberExpression'
@@ -2745,7 +2740,7 @@ exports.Obj = class Obj extends Base
             variable.unwrap()
           ).toAst o, LEVEL_LIST
         compiledValue = value.toAst o, LEVEL_LIST
-        prop.withBabylonLocationData
+        prop.withBabelLocationData
           type: 'ObjectProperty'
           key: compiledKey
           value:
@@ -3791,7 +3786,7 @@ exports.Assign = class Assign extends Base
       return
         type: 'VariableDeclaration'
         declarations: [
-          @withBabylonLocationData
+          @withBabelLocationData
             type: 'VariableDeclarator'
             id:   @variable.compileToBabylon o
             init: @value.compileToBabylon o
@@ -3802,7 +3797,7 @@ exports.Assign = class Assign extends Base
 
   CSXAttributeToAst: (o) ->
     type: 'JSXAttribute'
-    name: @variable.base.withBabylonLocationData
+    name: @variable.base.withBabelLocationData
       type: 'JSXIdentifier'
       name: @variable.base.value
     value: do =>
@@ -3810,7 +3805,7 @@ exports.Assign = class Assign extends Base
       val.csxAttribute = yes
       compiled = astAsBlock val, o
       return compiled if val instanceof StringLiteral
-      val.withBabylonLocationData
+      val.withBabelLocationData
         type: 'JSXExpressionContainer'
         expression: compiled
 
@@ -5472,7 +5467,7 @@ exports.In = class In extends Base
 
     compareOp = if @negated then '!==' else '==='
     joinOp    = if @negated then '&&'  else '||'
-    @withBabylonLocationData (do =>
+    @withBabelLocationData (do =>
       ret = null
       for item, index in items
         comparison = new Op compareOp,
@@ -5538,13 +5533,13 @@ exports.Try = class Try extends Base
     block: @attempt.toAst o, LEVEL_TOP
     handler:
       if compiling
-        (@recovery or @).withBabylonLocationData {
+        (@recovery or @).withBabelLocationData {
           type: 'CatchClause'
           param: placeholder.compileToBabylon o
           body: (@recovery or @withLocationData new Block).compileToBabylon o, LEVEL_TOP
         } if placeholder
       else if @recovery
-        @recovery.withBabylonLocationData {
+        @recovery.withBabelLocationData {
           type: 'CatchClause'
           param: @errorVariable?.toAst o
           body: @recovery.toAst o, LEVEL_TOP
@@ -5719,7 +5714,7 @@ exports.Parens = class Parens extends Base
     shouldntWrap =
       expr instanceof Op or expr.unwrap() instanceof Call or
       (expr instanceof For and expr.returns)
-    return compiled if shouldntWrap or not compiled or isArray compiled
+    return compiled if shouldntWrap or not compiled or Array.isArray compiled
     {
       ...compiled
       extra: {
@@ -5832,7 +5827,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
     for element, index in elements
       if element instanceof StringLiteral
         @prepareElementValue(element)# if o.compilingBabylon
-        quasis.push element.withBabylonLocationData
+        quasis.push element.withBabelLocationData
           type: 'TemplateElement'
           value:
             raw:
@@ -5844,7 +5839,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
         justSawInterpolation = no
       else
         if justSawInterpolation
-          quasis.push lastElement.withBabylonLocationData
+          quasis.push lastElement.withBabelLocationData
             type: 'TemplateElement'
             value:
               raw: ''
@@ -5878,7 +5873,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
       else if compiled.type in ['JSXElement', 'JSXFragment'] and not hasComment
         compiled
       else
-        element.withBabylonLocationData
+        element.withBabelLocationData
           type: 'JSXExpressionContainer'
           expression: do ->
             compiled.type ?= 'JSXEmptyExpression'
@@ -6317,7 +6312,7 @@ exports.Switch = class Switch extends Base
           tests = flatten [tests]
           lastTestIndex = tests.length - 1
           for test, testIndex in tests
-            compiledCase = test.withBabylonLocationData(do =>
+            compiledCase = test.withBabelLocationData(do =>
               consequent.expressions.push new StatementLiteral 'break' if do =>
                 return no unless compiling
                 return no if caseIndex is lastCaseIndex and not @otherwise
@@ -6339,7 +6334,7 @@ exports.Switch = class Switch extends Base
       )
       ...(
         if @otherwise?.expressions.length then [
-          @otherwise.withBabylonLocationData
+          @otherwise.withBabelLocationData
             type: 'SwitchCase'
             test: null
             consequent: @otherwise.toAst(o, LEVEL_TOP).body

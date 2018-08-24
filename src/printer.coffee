@@ -1,4 +1,4 @@
-{merge, dump: _dump, extend, isString, isArray, del, flatten, compact} = require './helpers'
+{merge, dump: _dump, extend, isString, del, flatten, compact} = require './helpers'
 
 #### CodeFragment
 
@@ -509,7 +509,7 @@ nodePrinted = (node, o, level) ->
         o.front
       else
         no
-  # return flatten(@print child, o for child in node) if isArray node
+  # return flatten(@print child, o for child in node) if Array.isArray node
   node.parent = @
   printed = fragmentize print(node, o), node
   return printed unless needsParens node, o

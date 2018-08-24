@@ -143,7 +143,7 @@ exports.addDataToNode = (parserState, first, last, {forceUpdateLocation} = {}) -
       if obj?.updateLocationDataIfMissing?
         obj.updateLocationDataIfMissing buildLocationData(first, last), force: forceUpdateLocation
       # This is only necessary to try and "preserve" JSX tag location data
-      else if isArray obj
+      else if Array.isArray obj
         obj.locationData = buildLocationData first, last
         obj.openingBracketLocationData = buildLocationData first
         obj.closingBracketLocationData = buildLocationData last# if last?
@@ -272,7 +272,7 @@ exports.nameWhitespaceCharacter = (string) ->
     when '\t' then 'tab'
     else string
 
-exports.locationDataToBabylon = ({first_line, first_column, last_line, last_column, range}) ->
+exports.locationDataToBabel = ({first_line, first_column, last_line, last_column, range}) ->
   loc:
     start:
       line: first_line + 1
@@ -282,22 +282,18 @@ exports.locationDataToBabylon = ({first_line, first_column, last_line, last_colu
       column: last_column + 1
   range: [
     range[0]
-    if range[1] is -1
-      range[1]
-    else
-      range[1] + 1
+    range[1]
   ]
   start: range[0]
-  end: range[1] + 1
+  end: range[1]
 
-exports.babylonLocationFields = ['loc', 'range', 'start', 'end']
+exports.babelLocationFields = locationFields = ['loc', 'range', 'start', 'end']
 
-exports.isArray = isArray = (obj) -> Array.isArray obj
 exports.isFunction = isFunction = (obj) -> Object::toString.call(obj) is '[object Function]'
 exports.isNumber = isNumber = (obj) -> Object::toString.call(obj) is '[object Number]'
 exports.isString = isString = (obj) -> Object::toString.call(obj) is '[object String]'
 exports.isBoolean = isBoolean = (obj) -> obj is yes or obj is no or Object::toString.call(obj) is '[object Boolean]'
-exports.isPlainObject = isPlainObject = (obj) -> typeof obj is 'object' and !!obj and not isArray(obj) and not isNumber(obj) and not isString(obj) and not isBoolean(obj)
+exports.isPlainObject = isPlainObject = (obj) -> typeof obj is 'object' and !!obj and not Array.isArray(obj) and not isNumber(obj) and not isString(obj) and not isBoolean(obj)
 
 # Converts a number, string, or node (Value/NumberLiteral/unary +/- Op) to its
 # corresponding number value.
@@ -327,7 +323,7 @@ exports.dump = dump = (args..., obj) ->
   console.log args..., util.inspect obj, no, null
 
 exports.mergeBabylonLocationData = mergeBabylonLocationData = (intoNode, fromNode) ->
-  if isArray fromNode
+  if Array.isArray fromNode
     mergeBabylonLocationData intoNode, fromItem for fromItem in fromNode
     return intoNode
   {range: intoRange} = intoNode
@@ -378,13 +374,12 @@ exports.mapValues = (obj, fn) ->
     result
   , {}
 
-exports.babylonLocationFields = locationFields = ['loc', 'range', 'start', 'end']
 exports.traverseBabylonAst = traverseBabylonAst = (node, func, {skipSelf, skip, parent, key} = {}) ->
   # if skipSelf
   #   skip = [node]
   #   if skipSelf.and
   #     skip.push skipSelf.and...
-  if isArray node
+  if Array.isArray node
     indexesToRemove = []
     for item, index in node
       ret = traverseBabylonAst item, func, {skip, parent, key}
@@ -399,8 +394,8 @@ exports.traverseBabylonAst = traverseBabylonAst = (node, func, {skipSelf, skip, 
       node[_key] = null if childRet is 'REMOVE'
   ret
 exports.traverseBabylonAsts = traverseBabylonAsts = (node, correspondingNode, func) ->
-  if isArray node
-    return unless isArray correspondingNode
+  if Array.isArray node
+    return unless Array.isArray correspondingNode
     return (traverseBabylonAsts(item, correspondingNode[index], func) for item, index in node)
   func node, correspondingNode
   if isPlainObject node

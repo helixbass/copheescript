@@ -283,7 +283,7 @@ tokensForESLint = ({tokens, ast}) ->
         {
           type: getEspreeTokenType type
           value
-          ...helpers.locationDataToBabylon(locationData)
+          ...helpers.locationDataToBabel(locationData)
         }
       ])
     ...popExtraTokens({nextStart: 'END'})
