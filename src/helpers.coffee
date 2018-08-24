@@ -289,6 +289,35 @@ exports.locationDataToAst = ({first_line, first_column, last_line, last_column, 
 
 exports.astLocationFields = locationFields = ['loc', 'range', 'start', 'end']
 
+# Extends the location data of an AST node to include the location data from
+# another AST node.
+exports.mergeAstLocationData = mergeAstLocationData = (intoNode, fromNode) ->
+  if Array.isArray fromNode
+    mergeAstLocationData intoNode, fromItem for fromItem in fromNode
+    return intoNode
+  {range: intoRange} = intoNode
+  {range: fromRange} = fromNode
+  return intoNode unless intoRange and fromRange
+  if fromRange[0] < intoRange[0]
+    intoNode.range = [
+      fromRange[0]
+      intoRange[1]
+    ]
+    intoNode.start = fromNode.start
+    intoNode.loc =
+      start: fromNode.loc.start
+      end: intoNode.loc.end
+  if fromRange[1] > intoRange[1]
+    intoNode.range = [
+      intoRange[0]
+      fromRange[1]
+    ]
+    intoNode.end = fromNode.end
+    intoNode.loc =
+      start: intoNode.loc.start
+      end: fromNode.loc.end
+  intoNode
+
 exports.isFunction = isFunction = (obj) -> Object::toString.call(obj) is '[object Function]'
 exports.isNumber = isNumber = (obj) -> Object::toString.call(obj) is '[object Number]'
 exports.isString = isString = (obj) -> Object::toString.call(obj) is '[object String]'
@@ -321,23 +350,6 @@ exports.getNumberValue = (number) ->
 exports.dump = dump = (args..., obj) ->
   util = require 'util'
   console.log args..., util.inspect obj, no, null
-
-exports.mergeBabylonLocationData = mergeBabylonLocationData = (intoNode, fromNode) ->
-  if Array.isArray fromNode
-    mergeBabylonLocationData intoNode, fromItem for fromItem in fromNode
-    return intoNode
-  {range: intoRange} = intoNode
-  {range: fromRange} = fromNode
-  return intoNode unless intoRange and fromRange # TODO: should figure out why don't have location data?
-  if fromRange[0] < intoRange[0]
-    intoRange[0] = fromRange[0]
-    intoNode.start = fromNode.start
-    intoNode.loc.start = fromNode.loc.start
-  if fromRange[1] > intoRange[1]
-    intoRange[1] = fromRange[1]
-    intoNode.end = fromNode.end
-    intoNode.loc.end = fromNode.loc.end
-  intoNode
 
 exports.mergeLocationData = (intoNode, fromNode) ->
   {locationData: intoLocationData} = intoNode

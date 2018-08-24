@@ -14,11 +14,11 @@ babylon = require 'babylon'
 {compact, flatten, extend, merge, del, starts, ends, some,
 addDataToNode, attachCommentsToNode, locationDataToString,
 throwSyntaxError,  replaceUnicodeCodePointEscapes,
-locationDataToAst, astLocationFields,
+locationDataToAst, astLocationFields, mergeAstLocationData
 isFunction, isPlainObject, isBoolean,
 getNumberValue, dump,
 mapValues, traverseBabylonAst, makeDelimitedLiteral,
-mergeBabylonLocationData, mergeLocationData,
+mergeLocationData,
 assignEmptyTrailingLocationData} = require './helpers'
 
 # Functions required by parser.
@@ -926,7 +926,7 @@ exports.Block = class Block extends Base
       sourceType: 'module'
       body, @directives
     }
-    mergeBabylonLocationData program, comment for comment in comments
+    mergeAstLocationData program, comment for comment in comments
 
     @withCopiedBabylonLocationData {
       type: 'File'
@@ -1563,9 +1563,9 @@ exports.CSXTag = class CSXTag extends IdentifierLiteral
 exports.PropertyName = class PropertyName extends Literal
   isAssignable: YES
 
-  _toAst: (o) ->
-    type: 'Identifier'
-    name: @value
+  astType: 'Identifier'
+  astProps:
+    name: 'value'
 
 exports.ComputedPropertyName = class ComputedPropertyName extends PropertyName
   compileNode: (o) ->
@@ -1885,18 +1885,18 @@ exports.Value = class Value extends Base
         if prop instanceof Slice and o.compiling
           prop.compileValueToBabylon o, ret
         else
-          mergeBabylonLocationData(
+          mergeAstLocationData(
             prop.withAstLocationData
               type: 'MemberExpression'
               object: ret
               property: prop.toAst o
               computed: prop instanceof Index or prop.name?.unwrap() not instanceof PropertyName
-              optional: prop.soak
-              shorthand: prop.shorthand
+              optional: !!prop.soak
+              shorthand: !!prop.shorthand
             ret
           )
-      if @base instanceof Parens and @base.locationData? and propIndex is 0
-        mergeBabylonLocationData ret, locationDataToAst @base.locationData
+      if propIndex is 0 and @base instanceof Parens and @base.locationData?
+        mergeAstLocationData ret, locationDataToAst @base.locationData
     ret
 
   # Unfold a soak into an `If`: `a?.b` -> `a.b if a?`
@@ -2145,7 +2145,7 @@ exports.Call = class Call extends Base
               selfClosing: not content
           openingElement.attributes = flatten(
             if attributes.base instanceof Arr
-              mergeBabylonLocationData openingElement, locationDataToAst attributes.base.locationData
+              mergeAstLocationData openingElement, locationDataToAst attributes.base.locationData
               for obj in attributes.base.objects
                 {base: attr} = obj
                 attrProps = attr?.properties or []
@@ -2155,7 +2155,7 @@ exports.Call = class Call extends Base
                   """
                 attr.csx = yes
                 compiled = attr.toAst o#, LEVEL_PAREN
-                mergeBabylonLocationData openingElement, compiled
+                mergeAstLocationData openingElement, compiled
                 if attr instanceof IdentifierLiteral
                   attr.withAstLocationData
                     type: 'JSXAttribute'
@@ -2380,9 +2380,6 @@ exports.Access = class Access extends Base
 
   children: ['name']
 
-  _toAst: (o) ->
-    @name.toAst o
-
   compileToFragments: (o) ->
     name = @name.compileToFragments o
     node = @name.unwrap()
@@ -2390,6 +2387,9 @@ exports.Access = class Access extends Base
       [@makeCode('.'), name...]
     else
       [@makeCode('['), name..., @makeCode(']')]
+
+  _toAst: (o) ->
+    @name.toAst o
 
   shouldCache: NO
 
@@ -2402,11 +2402,11 @@ exports.Index = class Index extends Base
 
   children: ['index']
 
-  _toAst: (o) ->
-    @index.toAst o
-
   compileToFragments: (o) ->
     [].concat @makeCode("["), @index.compileToFragments(o, LEVEL_PAREN), @makeCode("]")
+
+  _toAst: (o) ->
+    @index.toAst o
 
   shouldCache: ->
     @index.shouldCache()
@@ -6329,7 +6329,7 @@ exports.Switch = class Switch extends Base
                   consequent.toAst(o, LEVEL_TOP).body
                 else []
             )
-            mergeBabylonLocationData compiledCase, compiledCase.consequent[compiledCase.consequent.length - 1] if compiledCase.consequent.length
+            mergeAstLocationData compiledCase, compiledCase.consequent[compiledCase.consequent.length - 1] if compiledCase.consequent.length
             compiledCase
       )
       ...(
