@@ -12,7 +12,7 @@ Error.stackTraceLimit = Infinity
 {compact, flatten, extend, merge, del, starts, ends, some,
 addDataToNode, attachCommentsToNode, locationDataToString,
 throwSyntaxError, replaceUnicodeCodePointEscapes,
-locationDataToAst, astLocationFields,
+locationDataToAst, astLocationFields, mergeAstLocationData
 isFunction, isPlainObject,
 getNumberValue,
 } = require './helpers'
@@ -1194,8 +1194,23 @@ exports.Value = class Value extends Base
     fragments
 
   _toAst: (o) ->
-    @base.toAst o
-    # TODO: will include AST generation for properties here
+    props = @properties
+    ret = @base.toAst o, if props.length then LEVEL_ACCESS else null
+    for prop, propIndex in props
+      ret =
+        mergeAstLocationData(
+          prop.withAstLocationData
+            type: 'MemberExpression'
+            object: ret
+            property: prop.toAst o
+            computed: prop instanceof Index or prop.name?.unwrap() not instanceof PropertyName
+            optional: !!prop.soak
+            shorthand: !!prop.shorthand
+          ret
+        )
+      if propIndex is 0 and @base instanceof Parens and @base.locationData?
+        mergeAstLocationData ret, locationDataToAst @base.locationData
+    ret
 
   # Unfold a soak into an `If`: `a?.b` -> `a.b if a?`
   unfoldSoak: (o) ->
@@ -1508,9 +1523,8 @@ exports.Extends = class Extends extends Base
 # A `.` access into a property of a value, or the `::` shorthand for
 # an access into the object's prototype.
 exports.Access = class Access extends Base
-  constructor: (@name, tag) ->
+  constructor: (@name, {@soak, @shorthand} = {}) ->
     super()
-    @soak  = tag is 'soak'
 
   children: ['name']
 
@@ -1521,6 +1535,9 @@ exports.Access = class Access extends Base
       [@makeCode('.'), name...]
     else
       [@makeCode('['), name..., @makeCode(']')]
+
+  _toAst: (o) ->
+    @name.toAst o
 
   shouldCache: NO
 
