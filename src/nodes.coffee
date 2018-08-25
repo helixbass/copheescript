@@ -1554,6 +1554,7 @@ exports.IdentifierLiteral = class IdentifierLiteral extends Literal
 
   astProps:
     name: 'value'
+    declaration: 'isDeclaration'
 
 exports.CSXTag = class CSXTag extends IdentifierLiteral
   _compileToBabylon: (o) ->
@@ -3764,6 +3765,7 @@ exports.Assign = class Assign extends Base
 
   _toAst: (o) ->
     return @CSXAttributeToAst o if @csx
+    @addScopeVariables o
     super o
 
   _compileToBabylon: (o) ->
@@ -3831,7 +3833,8 @@ exports.Assign = class Assign extends Base
           else
             'param'
       else
-        o.scope.find name.value
+        alreadyDeclared = o.scope.find name.value
+        name.isDeclaration = not alreadyDeclared
         # If this assignment identifier has one or more herecomments
         # attached, output them as part of the declarations line (unless
         # other herecomments are already staged there) for compatibility
@@ -6005,6 +6008,16 @@ exports.For = class For extends While
     this
 
   astType: 'For'
+
+  _toAst: (o) ->
+    addToScope = (name) ->
+      # TODO: should check assignability etc like in addScopeVariables()?
+      alreadyDeclared = o.scope.find name.value
+      name.isDeclaration = not alreadyDeclared
+    @name?.eachName addToScope
+    @index?.eachName addToScope
+    super o
+
   astChildren: (o) ->
     source: @source?.toAst o
     body:
