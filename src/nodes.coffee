@@ -3834,7 +3834,7 @@ exports.Assign = class Assign extends Base
             'param'
       else
         alreadyDeclared = o.scope.find name.value
-        name.isDeclaration = not alreadyDeclared
+        name.isDeclaration ?= not alreadyDeclared
         # If this assignment identifier has one or more herecomments
         # attached, output them as part of the declarations line (unless
         # other herecomments are already staged there) for compatibility
