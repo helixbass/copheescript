@@ -1912,10 +1912,10 @@ exports.Value = class Value extends Base
         return @withLocationData new If new Existence(fst), snd, soak: on
       no
 
-  eachName: (iterator) ->
+  eachName: (iterator, {checkAssignability = yes} = {}) ->
     if @hasProperties()
       iterator @
-    else if @base.isAssignable()
+    else if not checkAssignability or @base.isAssignable()
       @base.eachName iterator
     else
       @error 'tried to assign to unassignable value'
@@ -3765,7 +3765,7 @@ exports.Assign = class Assign extends Base
 
   _toAst: (o) ->
     return @CSXAttributeToAst o if @csx
-    @addScopeVariables o
+    @addScopeVariables o, checkAssignability: no
     super o
 
   _compileToBabylon: (o) ->
@@ -3811,9 +3811,9 @@ exports.Assign = class Assign extends Base
         type: 'JSXExpressionContainer'
         expression: compiled
 
-  addScopeVariables: (o) ->
+  addScopeVariables: (o, {checkAssignability = yes} = {}) ->
     varBase = @variable.unwrapAll()
-    unless varBase.isAssignable()
+    if checkAssignability and not varBase.isAssignable()
       @variable.error "'#{@variable.compile o}' can't be assigned"
 
     varBase.eachName (name) =>
@@ -6014,8 +6014,8 @@ exports.For = class For extends While
       # TODO: should check assignability etc like in addScopeVariables()?
       alreadyDeclared = o.scope.find name.value
       name.isDeclaration = not alreadyDeclared
-    @name?.eachName addToScope
-    @index?.eachName addToScope
+    @name?.eachName addToScope, checkAssignability: no
+    @index?.eachName addToScope, checkAssignability: no
     super o
 
   astChildren: (o) ->
