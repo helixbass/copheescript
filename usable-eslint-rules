@@ -14,6 +14,7 @@ no-octal-escape (we throw an error on octal escape sequence)
 func-names
 no-ternary
 init-declarations
+import/no-mutable-export (since you can't control whether an exported member is const - might be nice to implement its "possible future behavior" of checking whether it in fact does get reassigned?)
 
 usable against CS AST:
 spaced-comment
@@ -50,6 +51,12 @@ no-useless-concat
 no-iterator
 no-param-reassign
 no-new-func
+no-useless-constructor
+import/no-webpack-loader-syntax
+no-duplicate-imports
+import/prefer-default-export
+no-new
+prefer-numeric-literals
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -66,20 +73,16 @@ no-undef
 dot-notation
 no-compare-neg-zero
 camelcase (not really customized, just including a bugfix eslint/eslint#10802)
+object-shorthand
 
 not usable against CS AST:
 no-sequences (we use SequenceExpressions eg when you use a block where an expression is expected - if included, this rule should be about use of ; operator I'd think)
 
 usable:
 array-callback-return (this is mostly trivially, as we implicitly return something - could presumably support allowImplicit: false checking once code path analysis works)
-no-useless-constructor
 no-dupe-class-members
-no-duplicate-imports
-import/prefer-default-export
-import/no-webpack-loader-syntax
 
 partially usable:
-object-shorthand properties
 
 no-restricted-syntax (depending on what AST types are disallowed, we may generate them, but looks like airbnb blacklist are not generated)
 no-restricted-properties (like no-restricted-syntax, depending on what's disallowed we may generate it)
@@ -92,7 +95,6 @@ no-class-assign (mostly useless (won't catch reassignment of class name at same 
 no-restricted-imports
 no-this-before-super (we catch this references before super(), but this catches eg super.foo() called before super())
 no-useless-computed-key
-prefer-numeric-literals
 require-yield (trivially, since we only generate generators based on presence of yield)
 require-await (trivially, since we only generate async based on presence of await)
 sort-imports
@@ -139,7 +141,6 @@ no-invalid-this (but you can't generate eg function Foo(), Foo = -> @ will fail)
 no-labels (trivially, since you can't create labels in Coffeescript)
 no-lone-blocks (trivially, since afaik you can't create "standalone" blocks in Coffeescript)
 no-multi-str (trivially, doesn't seem to be able to trigger on multiline regular or heredoc strings)
-no-new
 no-script-url
 no-self-assign (looks like as opposed to no-self-compare, this uses AST comparison rather than token comparison)
 no-unused-expressions
@@ -189,7 +190,6 @@ no-inline-comments (false positives)
 require-jsdoc
 
 not usable against JS AST (could get triggered by generated code):
-import/no-mutable-export (since you can't control whether an exported member is const)
 import/first (since var declarations get generated before imports - this seems fixable? absolute-first works)
 no-magic-numbers (seems like the assignment of the magic number to a var is always flagged since it's not part of the variable declaration)
 no-return-await (we generate return await when await is the last statement in a function, should we not?)
@@ -208,7 +208,6 @@ no-loop-func (we generate a nested closure function when you have nested for loo
 no-useless-escape (though prettier strips them from the output - we seem to generate "useless" escapes in regexes)
 
 not usable but not meaningful:
-object-shorthand methods (we don't generate method shorthand)
 no-nested-ternary (we generate nested ternaries in expression if/else if constructs, but you can't explicitly write ternaries so never would catch anything useful)
 strict (I think we test that our generated JS follows strict mode semantics? how does it relate to sourceType: 'module'?)
 linebreak-style (I think? not sure how prettier generates linebreaks/why this isn't in eslint-config-prettier)

@@ -1480,20 +1480,15 @@ exports.RegexLiteral = class RegexLiteral extends Literal
 
   REGEX_REGEX: /^\/(.*)\/\w*$/
   _toAst: (o) ->
-    if o.compiling
-      [, pattern] = @REGEX_REGEX.exec @value
-    else
-      pattern = @originalValue
+    [, pattern] = @REGEX_REGEX.exec @value
     {
       type: 'RegExpLiteral'
       value: undefined
       pattern, @flags, @delimiter
+      originalPattern: @originalValue
       extra:
-        raw:
-          if o.compiling
-            @value
-          else
-            "#{@delimiter}#{@originalValue}#{@delimiter}#{@flags}"
+        raw: @value
+        originalRaw: "#{@delimiter}#{@originalValue}#{@delimiter}#{@flags}"
         rawValue: undefined
     }
 
