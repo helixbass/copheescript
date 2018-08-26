@@ -48,6 +48,8 @@ no-new-object
 handle-callback-err
 no-useless-concat
 no-iterator
+no-param-reassign
+no-new-func
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -70,8 +72,6 @@ no-sequences (we use SequenceExpressions eg when you use a block where an expres
 
 usable:
 array-callback-return (this is mostly trivially, as we implicitly return something - could presumably support allowImplicit: false checking once code path analysis works)
-no-new-func
-no-param-reassign
 no-useless-constructor
 no-dupe-class-members
 no-duplicate-imports
