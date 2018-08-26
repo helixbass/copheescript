@@ -312,9 +312,9 @@ exports.Lexer = class Lexer
     contents = null
     # Does this comment follow code on the same line?
     leadingNewLine = /^\s*\n+\s*#/.test withLeadingWhitespace
-    getIndentSize = (leadingWhitespace) =>
+    getIndentSize = (leadingWhitespace, {nonInitial}) =>
       lastNewlineIndex = leadingWhitespace.lastIndexOf '\n'
-      if here?
+      if here? or not nonInitial
         return no unless lastNewlineIndex > -1
       else
         lastNewlineIndex ?= -1
@@ -344,9 +344,9 @@ exports.Lexer = class Lexer
       # The `COMMENT` regex captures successive line comments as one token.
       # Remove any leading newlines before the first comment, but preserve
       # blank lines between line comments.
-      leadingNewlinesLength = 0
-      content = nonHere.replace /^(\n*)/, ({length}) ->
-        leadingNewlinesLength = length
+      leadingNewlines = ''
+      content = nonHere.replace /^(\n*)/, (_leadingNewlines) ->
+        leadingNewlines = _leadingNewlines
         ''
       precedingNonCommentLines = ''
       contents =
@@ -359,25 +359,26 @@ exports.Lexer = class Lexer
           content = line.replace /^([ |\t]*)#/, (_, whitespace) ->
             leadingWhitespace = whitespace
             ''
-          ret = {length: content.length + 1, content, leadingWhitespace: "#{precedingNonCommentLines}#{leadingWhitespace}"}
+          ret = {length: content.length + 1, content, leadingWhitespace: "#{precedingNonCommentLines}#{if index is 0 then leadingNewlines else ''}#{leadingWhitespace}"}
           precedingNonCommentLines = ''
           ret
         .filter (comment) -> comment
 
-    offsetInChunk += leadingNewlinesLength ? 0
+    # offsetInChunk += leadingNewlines?.length ? 0
     nonInitial ?= no
     commentAttachments = for {content, length, leadingWhitespace, indent}, i in contents
       nonInitial = yes if i isnt 0
       leadingNewlineOffset = if nonInitial then 1 else 0
       offsetInChunk += leadingNewlineOffset + leadingWhitespace.length
-      indentSize = getIndentSize leadingWhitespace
+      indentSize = getIndentSize leadingWhitespace, {nonInitial}
+      noIndent = indentSize is -1
       commentAttachment = {
         content
         here: here?
         newLine: leadingNewLine or nonInitial # Line comments after the first one start new lines, by definition.
         locationData: @makeLocationData {offsetInChunk, length}
-        indented:  indentSize > @indent
-        outdented: indentSize < @indent
+        indented:  not noIndent and indentSize > @indent
+        outdented: not noIndent and indentSize < @indent
         indentSize
         indent
       }
