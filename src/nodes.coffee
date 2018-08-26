@@ -1401,6 +1401,7 @@ exports.StringLiteral = class StringLiteral extends Literal
     if @heregex
       val = val.replace HEREGEX_OMIT, '$1$2'
       val = replaceUnicodeCodePointEscapes val, flags: @heregex.flags
+      @heregexPattern = val
     else
       val = val.replace STRING_OMIT, '$1'
       val =
@@ -2320,7 +2321,7 @@ exports.RegexWithInterpolations = class RegexWithInterpolations extends Base
 
   children: ['call']
 
-  astType: 'RegExpLiteral'
+  astType: 'InterpolatedRegExpLiteral'
 
   astChildren: (o) ->
     interpolatedPattern: @call.args[0].toAst o
@@ -5836,7 +5837,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
     for element, index in elements
       if element instanceof StringLiteral
         @prepareElementValue(element)# if o.compilingBabylon
-        quasis.push element.withAstLocationData
+        quasis.push element.withAstLocationData merge
           type: 'TemplateElement'
           value:
             raw:
@@ -5845,6 +5846,11 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
               else
                 element.originalValue
             tail: element is last
+        ,
+          if element.heregex
+            pattern: element.heregexPattern
+          else
+            {}
         justSawInterpolation = no
       else
         if justSawInterpolation
