@@ -4512,6 +4512,7 @@ exports.Code = class Code extends Base
 
   _toAst: (o) ->
     @updateOptions o
+    @processParams o # this is necessary to declare params on scope, probably could refactor to just do that
     @mergeLocationDataFrom @name if @isMethod
     super o
 
