@@ -15,6 +15,14 @@ func-names
 no-ternary
 init-declarations
 import/no-mutable-export (since you can't control whether an exported member is const - might be nice to implement its "possible future behavior" of checking whether it in fact does get reassigned?)
+no-label-var
+no-extra-label
+no-unused-labels
+no-labels
+no-with
+no-fallthrough
+no-undef-init
+no-undefined
 
 usable against CS AST:
 spaced-comment
@@ -59,6 +67,20 @@ no-new
 prefer-numeric-literals
 no-empty-character-class
 no-path-concat
+no-restricted-imports
+no-restricted-globals
+no-empty-pattern
+no-invalid-regexp
+no-caller
+no-new-wrappers
+no-script-url
+no-extend-native
+max-params
+prefer-promise-reject-errors
+id-blacklist
+no-useless-call
+no-array-constructor
+no-prototype-builtins
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -76,6 +98,9 @@ dot-notation
 no-compare-neg-zero
 camelcase (not really customized, just including a bugfix eslint/eslint#10802)
 object-shorthand
+no-extra-boolean-cast
+no-regex-spaces
+no-implicit-coercion
 
 not usable against CS AST:
 no-sequences (we use SequenceExpressions eg when you use a block where an expression is expected - if included, this rule should be about use of ; operator I'd think)
@@ -90,11 +115,8 @@ no-restricted-syntax (depending on what AST types are disallowed, we may generat
 no-restricted-properties (like no-restricted-syntax, depending on what's disallowed we may generate it)
 no-case-declarations (trivially, as it seems impossible to generate a declaration inside a case)
 no-unneeded-ternary (perhaps confusing naming since in the source it's an if rather than a ternary, but works)
-no-new-wrappers
-no-restricted-globals
 constructor-super (we catch some of these up front, but this works for eg missing super() in derived class constructor)
 no-class-assign (mostly useless (won't catch reassignment of class name at same level) since we always generate an assignment for named classes - not sure why we do that, if we didn't then this rule could presumably catch reassignments? But this can catch eg reassignment of class name inside class method)
-no-restricted-imports
 no-this-before-super (we catch this references before super(), but this catches eg super.foo() called before super())
 no-useless-computed-key
 require-yield (trivially, since we only generate generators based on presence of yield)
@@ -110,13 +132,9 @@ no-dupe-args (trivially, as we catch duplicate parameters)
 no-duplicate-case
 no-empty (with allowEmptyCatch option, since we generate empty catch block when just a try is specified - not sure if we generate empty blocks elsewhere? This rule seems not super valuable as afaik it's not easy to create empty blocks in Coffeescript)
 no-ex-assign (trivially, as we seem to always generate an error variable and then assign it to the specified var - so can't use this rule to achieve what it's meant to achieve)
-no-extra-boolean-cast
 no-func-assign (trivially, since I don't think we ever generate named functions)
 no-inner-declarations (trivially, since again don't think we generate named functions, and we always declare vars at top-level)
-no-invalid-regexp
 no-irregular-whitespace (can catch inside eg templates depending on which options are enabled)
-no-prototype-builtins
-no-regex-spaces
 no-template-curly-in-string (though not super helpful, as Coffeescript has a different interpolation syntax)
 no-unreachable
 no-unsafe-finally
@@ -128,43 +146,26 @@ class-methods-use-this
 complexity
 default-case (but there doesn't seem to be an easy way to generate an empty default case, nor does the // do nothing comment currently get correctly positioned to get picked up)
 guard-for-in
-no-caller
 no-div-regex
 no-empty-function (however, it doesn't seem currently easy/possible to place a comment inside an empty function body, so not very useful)
-no-empty-pattern (though doesn't catch [] = foo, since we compile that to just foo)
-no-extend-native
 no-extra-bind
-no-extra-label (trivially, as I think it's impossible to generate a labeled statement (or label) in Coffeescript)
-no-fallthrough (trivially, this is built into Coffeescript since it generates case break/return for us)
 no-global-assign (not sure I understand this rule, but I think the fact that we always generate declarations for assigned variables means that it can't be violated)
 no-implicit-globals (trivially, I think - seems like it'd depend on whether compiled with bare and whether it should be sourceType: 'module')
 no-invalid-this (but you can't generate eg function Foo(), Foo = -> @ will fail)
-no-labels (trivially, since you can't create labels in Coffeescript)
 no-lone-blocks (trivially, since afaik you can't create "standalone" blocks in Coffeescript)
 no-multi-str (trivially, doesn't seem to be able to trigger on multiline regular or heredoc strings)
-no-script-url
 no-self-assign (looks like as opposed to no-self-compare, this uses AST comparison rather than token comparison)
 no-unused-expressions
-no-unused-labels (trivially, since you can't create labels in Coffeescript)
-no-useless-call (I don't think we generate any "useless" .call()/.apply()'s?)
 no-useless-return (looks like this can't trigger, as we don't generate "useless" returns)
-no-with (trivially, as Coffeescript doesn't support with statements)
-prefer-promise-reject-errors
 vars-on-top (not sure in what cases we put things before var declarations in a block?)
 no-delete-var (mostly trivially, as we throw an error when deleting an existing var, but this can catch delete of var that's not yet been seen)
-no-label-var (trivially, since you can't create labels)
 no-shadow-restricted-names (trivially, since we flag attempts to assign to any of the restricted names)
-no-undef-init (trivially, since we don't generated initialized var declarations)
-no-undefined (trivially, since we generate void 0 for undefined and don't allow assigning to undefined)
 no-catch-shadow (trivially, we always generate a free error variable, so would never trigger)
 consistent-this
 func-name-matching (looks like this trivially works since it only looks for named functions (which we never generate), but it's conceptually irrelevant for Coffeescript since you can't "name" a function)
-id-blacklist
 max-depth
 max-lines (though seems like it's off by one)
 max-nested-callbacks
-max-params
-no-array-constructor
 no-lonely-if (trivially, since now generate else if when else clause is just an if statement)
 operator-assignment (but can't use never setting, since we generate += in for with step)
 sort-keys (I don't think we generate objects/object properties?)
@@ -203,7 +204,6 @@ padding-line-between-statements (we generate statements with fake location data)
 no-return-assign (except-parens doesn't always work, since the closing paren can get stomped on by the OUTDENT that's assigned the same location data. also, this doesn't distinguish implicit from explicit returns. also, we generate assignments that could get included in implicit/explicit return, eg a[b] ? c)
 no-unmodified-loop-condition (can get triggered by generated for-loop condition's location data - if there was an option to disable this rule for for-loops, would be safe/usable since we always generate correct modification of for-loop variables?)
 consistent-return (eg a function ending with an if statement and no else generates an explicit return value inside the if and no corresponding return outside the if)
-no-implicit-coercion (we can generate !! in "bare" switch with negated case (seems like this should be optimized away?))
 no-loop-func (we generate a nested closure function when you have nested for loops as an expression)
 no-useless-escape (though prettier strips them from the output - we seem to generate "useless" escapes in regexes)
 
