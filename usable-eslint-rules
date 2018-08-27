@@ -23,6 +23,14 @@ no-with
 no-fallthrough
 no-undef-init
 no-undefined
+require-await
+require-yield
+no-dupe-args
+getter-return (could be used for Object.defineProperty() calls?)
+func-name-matching
+no-func-assign
+max-statements-per-line
+no-mixed-requires
 
 usable against CS AST:
 spaced-comment
@@ -82,6 +90,18 @@ no-useless-call
 no-array-constructor
 no-prototype-builtins
 no-useless-computed-key
+global-require
+no-restricted-syntax
+no-restricted-properties
+no-unsafe-finally
+no-sync
+no-process-env
+no-restricted-modules
+sort-imports
+max-statements
+max-lines
+sort-keys
+max-nested-callbacks
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -102,6 +122,9 @@ object-shorthand
 no-extra-boolean-cast
 no-regex-spaces
 no-implicit-coercion
+no-magic-numbers
+no-self-assign
+operator-assignment
 
 not usable against CS AST:
 no-sequences (we use SequenceExpressions eg when you use a block where an expression is expected - if included, this rule should be about use of ; operator I'd think)
@@ -110,34 +133,23 @@ usable:
 array-callback-return (this is mostly trivially, as we implicitly return something - could presumably support allowImplicit: false checking once code path analysis works)
 no-dupe-class-members
 
-partially usable:
-
-no-restricted-syntax (depending on what AST types are disallowed, we may generate them, but looks like airbnb blacklist are not generated)
-no-restricted-properties (like no-restricted-syntax, depending on what's disallowed we may generate it)
 no-case-declarations (trivially, as it seems impossible to generate a declaration inside a case)
 no-unneeded-ternary (perhaps confusing naming since in the source it's an if rather than a ternary, but works)
 constructor-super (we catch some of these up front, but this works for eg missing super() in derived class constructor)
 no-class-assign (mostly useless (won't catch reassignment of class name at same level) since we always generate an assignment for named classes - not sure why we do that, if we didn't then this rule could presumably catch reassignments? But this can catch eg reassignment of class name inside class method)
 no-this-before-super (we catch this references before super(), but this catches eg super.foo() called before super())
-require-yield (trivially, since we only generate generators based on presence of yield)
-require-await (trivially, since we only generate async based on presence of await)
-sort-imports
 for-direction (trivially, as we typically generate the for loop direction - seems like it could in theory catch eg a for [10..1] by 2 but guessing it just looks at ++/-- rather than +=?)
-getter-return (works for Object.defineProperty() calls or if you backtick the object/class getter syntaxes)
 no-await-in-loop
 no-cond-assign (except except-parens exception doesn't work, since it looks for double-parens)
 no-constant-condition (but only with checkLoops: false, since loop generates a constant condition)
 no-control-regex (works but doesn't catch eg ///\x1f#{a}/// because compiles into template string - is that a bug in our compilation or does the rule not handle template strings?)
-no-dupe-args (trivially, as we catch duplicate parameters)
 no-duplicate-case
 no-empty (with allowEmptyCatch option, since we generate empty catch block when just a try is specified - not sure if we generate empty blocks elsewhere? This rule seems not super valuable as afaik it's not easy to create empty blocks in Coffeescript)
 no-ex-assign (trivially, as we seem to always generate an error variable and then assign it to the specified var - so can't use this rule to achieve what it's meant to achieve)
-no-func-assign (trivially, since I don't think we ever generate named functions)
 no-inner-declarations (trivially, since again don't think we generate named functions, and we always declare vars at top-level)
 no-irregular-whitespace (can catch inside eg templates depending on which options are enabled)
 no-template-curly-in-string (though not super helpful, as Coffeescript has a different interpolation syntax)
 no-unreachable
-no-unsafe-finally
 no-unsafe-negation
 valid-jsdoc (doesn't break, but doesn't seem to pick up JSDoc comments so doesn't do anything)
 accessor-pairs (works for Object.defineProperty() calls, and for backticked objects with accessors)
@@ -154,7 +166,6 @@ no-implicit-globals (trivially, I think - seems like it'd depend on whether comp
 no-invalid-this (but you can't generate eg function Foo(), Foo = -> @ will fail)
 no-lone-blocks (trivially, since afaik you can't create "standalone" blocks in Coffeescript)
 no-multi-str (trivially, doesn't seem to be able to trigger on multiline regular or heredoc strings)
-no-self-assign (looks like as opposed to no-self-compare, this uses AST comparison rather than token comparison)
 no-unused-expressions
 no-useless-return (looks like this can't trigger, as we don't generate "useless" returns)
 vars-on-top (not sure in what cases we put things before var declarations in a block?)
@@ -162,22 +173,12 @@ no-delete-var (mostly trivially, as we throw an error when deleting an existing 
 no-shadow-restricted-names (trivially, since we flag attempts to assign to any of the restricted names)
 no-catch-shadow (trivially, we always generate a free error variable, so would never trigger)
 consistent-this
-func-name-matching (looks like this trivially works since it only looks for named functions (which we never generate), but it's conceptually irrelevant for Coffeescript since you can't "name" a function)
 max-depth
-max-lines (though seems like it's off by one)
-max-nested-callbacks
 no-lonely-if (trivially, since now generate else if when else clause is just an if statement)
-operator-assignment (but can't use never setting, since we generate += in for with step)
-sort-keys (I don't think we generate objects/object properties?)
 callback-return
-global-require
 no-buffer-constructor
-no-mixed-requires (trivially, since we don't typically generate initialized declarations)
 no-new-require
-no-process-env
 no-process-exit
-no-restricted-modules
-no-sync
 
 need visibility of top-level ast.comments (should be doable to "hoist" comments just for eslint):
 multiline-comment-style (can't run against CS AST since it looks for eg generated * in block comments)
@@ -192,14 +193,11 @@ require-jsdoc
 
 not usable against JS AST (could get triggered by generated code):
 import/first (since var declarations get generated before imports - this seems fixable? absolute-first works)
-no-magic-numbers (seems like the assignment of the magic number to a var is always flagged since it's not part of the variable declaration)
 no-return-await (we generate return await when await is the last statement in a function, should we not?)
 no-use-before-define (this gets confused by location data of generated constructs)
 id-match (we generate vars that may not match the specified name pattern)
 lines-between-class-members (we generate constructors with fake location data)
 no-shadow (do (x) -> construct gets flagged, as does what we generate for classes eg A = class A)
-max-statements (generated var declarations get counted)
-max-statements-per-line
 padding-line-between-statements (we generate statements with fake location data)
 no-return-assign (except-parens doesn't always work, since the closing paren can get stomped on by the OUTDENT that's assigned the same location data. also, this doesn't distinguish implicit from explicit returns. also, we generate assignments that could get included in implicit/explicit return, eg a[b] ? c)
 no-unmodified-loop-condition (can get triggered by generated for-loop condition's location data - if there was an option to disable this rule for for-loops, would be safe/usable since we always generate correct modification of for-loop variables?)

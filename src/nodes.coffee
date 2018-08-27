@@ -5259,7 +5259,7 @@ exports.Op = class Op extends Base
   astType: ->
     switch @operator
       when 'new'             then 'NewExpression'
-      when '||', '&&'        then 'LogicalExpression'
+      when '||', '&&', '?'   then 'LogicalExpression'
       when '++', '--'        then 'UpdateExpression'
       when 'await'           then 'AwaitExpression'
       when 'yield', 'yield*' then 'YieldExpression'
