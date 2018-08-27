@@ -464,22 +464,25 @@ exports.Base = class Base
   getAstChildren: (o) ->
     return @astChildren o if isFunction @astChildren
     childAsts = {}
-    addChildAst = ({propName, key = propName, level}) =>
+    addChildAst = ({propName, key = propName, level, default: defaultVal}) =>
       propName ?= key
       val = @[propName]
       childAsts[key] =
         if Array.isArray val
           item.toAst o, level for item in val
         else
-          val?.toAst o, level
+          if val?
+            val.toAst o, level
+          else
+            defaultVal
 
     children = @astChildren ? @children
     if Array.isArray children
       addChildAst {propName} for propName in children
     else
       for key, propName of children
-        {propName, level} = propName if isPlainObject propName
-        addChildAst {propName, key, level}
+        {propName, level, default: defaultVal} = propName if isPlainObject propName
+        addChildAst {propName, key, level, default: defaultVal}
     childAsts
 
   astProps: []
@@ -3501,7 +3504,9 @@ exports.ModuleDeclaration = class ModuleDeclaration extends Base
 
 exports.ImportDeclaration = class ImportDeclaration extends ModuleDeclaration
   astChildren:
-    specifiers: 'clause'
+    specifiers:
+      propName: 'clause'
+      default: []
     source: 'source'
   astProps: ->
     importKind: 'value' if @clause

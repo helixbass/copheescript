@@ -57,6 +57,8 @@ no-duplicate-imports
 import/prefer-default-export
 no-new
 prefer-numeric-literals
+no-empty-character-class
+no-path-concat
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -107,7 +109,6 @@ no-control-regex (works but doesn't catch eg ///\x1f#{a}/// because compiles int
 no-dupe-args (trivially, as we catch duplicate parameters)
 no-duplicate-case
 no-empty (with allowEmptyCatch option, since we generate empty catch block when just a try is specified - not sure if we generate empty blocks elsewhere? This rule seems not super valuable as afaik it's not easy to create empty blocks in Coffeescript)
-no-empty-character-class
 no-ex-assign (trivially, as we seem to always generate an error variable and then assign it to the specified var - so can't use this rule to achieve what it's meant to achieve)
 no-extra-boolean-cast
 no-func-assign (trivially, since I don't think we ever generate named functions)
@@ -172,7 +173,6 @@ global-require
 no-buffer-constructor
 no-mixed-requires (trivially, since we don't typically generate initialized declarations)
 no-new-require
-no-path-concat
 no-process-env
 no-process-exit
 no-restricted-modules
