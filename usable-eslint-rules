@@ -81,6 +81,7 @@ id-blacklist
 no-useless-call
 no-array-constructor
 no-prototype-builtins
+no-useless-computed-key
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -118,7 +119,6 @@ no-unneeded-ternary (perhaps confusing naming since in the source it's an if rat
 constructor-super (we catch some of these up front, but this works for eg missing super() in derived class constructor)
 no-class-assign (mostly useless (won't catch reassignment of class name at same level) since we always generate an assignment for named classes - not sure why we do that, if we didn't then this rule could presumably catch reassignments? But this can catch eg reassignment of class name inside class method)
 no-this-before-super (we catch this references before super(), but this catches eg super.foo() called before super())
-no-useless-computed-key
 require-yield (trivially, since we only generate generators based on presence of yield)
 require-await (trivially, since we only generate async based on presence of await)
 sort-imports

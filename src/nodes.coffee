@@ -3771,7 +3771,7 @@ exports.Assign = class Assign extends Base
 
   _toAst: (o) ->
     return @CSXAttributeToAst o if @csx
-    @addScopeVariables o, checkAssignability: no
+    @addScopeVariables o, checkAssignability: no if not @context or @context is '**='
     super o
 
   _compileToBabylon: (o) ->
