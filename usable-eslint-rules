@@ -31,6 +31,7 @@ func-name-matching
 no-func-assign
 max-statements-per-line
 no-mixed-requires
+no-redeclare
 
 usable against CS AST:
 spaced-comment
@@ -102,6 +103,13 @@ max-statements
 max-lines
 sort-keys
 max-nested-callbacks
+no-duplicate-case
+no-process-exit
+no-ex-assign
+constructor-super
+no-new-require
+no-buffer-constructor
+no-inline-comments
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -125,6 +133,9 @@ no-implicit-coercion
 no-magic-numbers
 no-self-assign
 operator-assignment
+no-unreachable
+no-await-in-loop
+class-methods-use-this
 
 not usable against CS AST:
 no-sequences (we use SequenceExpressions eg when you use a block where an expression is expected - if included, this rule should be about use of ; operator I'd think)
@@ -135,26 +146,20 @@ no-dupe-class-members
 
 no-case-declarations (trivially, as it seems impossible to generate a declaration inside a case)
 no-unneeded-ternary (perhaps confusing naming since in the source it's an if rather than a ternary, but works)
-constructor-super (we catch some of these up front, but this works for eg missing super() in derived class constructor)
 no-class-assign (mostly useless (won't catch reassignment of class name at same level) since we always generate an assignment for named classes - not sure why we do that, if we didn't then this rule could presumably catch reassignments? But this can catch eg reassignment of class name inside class method)
 no-this-before-super (we catch this references before super(), but this catches eg super.foo() called before super())
 for-direction (trivially, as we typically generate the for loop direction - seems like it could in theory catch eg a for [10..1] by 2 but guessing it just looks at ++/-- rather than +=?)
-no-await-in-loop
 no-cond-assign (except except-parens exception doesn't work, since it looks for double-parens)
 no-constant-condition (but only with checkLoops: false, since loop generates a constant condition)
 no-control-regex (works but doesn't catch eg ///\x1f#{a}/// because compiles into template string - is that a bug in our compilation or does the rule not handle template strings?)
-no-duplicate-case
 no-empty (with allowEmptyCatch option, since we generate empty catch block when just a try is specified - not sure if we generate empty blocks elsewhere? This rule seems not super valuable as afaik it's not easy to create empty blocks in Coffeescript)
-no-ex-assign (trivially, as we seem to always generate an error variable and then assign it to the specified var - so can't use this rule to achieve what it's meant to achieve)
 no-inner-declarations (trivially, since again don't think we generate named functions, and we always declare vars at top-level)
 no-irregular-whitespace (can catch inside eg templates depending on which options are enabled)
 no-template-curly-in-string (though not super helpful, as Coffeescript has a different interpolation syntax)
-no-unreachable
 no-unsafe-negation
 valid-jsdoc (doesn't break, but doesn't seem to pick up JSDoc comments so doesn't do anything)
 accessor-pairs (works for Object.defineProperty() calls, and for backticked objects with accessors)
 block-scoped-var (trivially, since we always hoist var declarations)
-class-methods-use-this
 complexity
 default-case (but there doesn't seem to be an easy way to generate an empty default case, nor does the // do nothing comment currently get correctly positioned to get picked up)
 guard-for-in
@@ -176,9 +181,6 @@ consistent-this
 max-depth
 no-lonely-if (trivially, since now generate else if when else clause is just an if statement)
 callback-return
-no-buffer-constructor
-no-new-require
-no-process-exit
 
 need visibility of top-level ast.comments (should be doable to "hoist" comments just for eslint):
 multiline-comment-style (can't run against CS AST since it looks for eg generated * in block comments)
@@ -188,7 +190,6 @@ line-comment-position (against CS AST, seems to hang on eg:
   a = # b
     module
 )
-no-inline-comments (false positives)
 require-jsdoc
 
 not usable against JS AST (could get triggered by generated code):
@@ -209,4 +210,3 @@ not usable but not meaningful:
 no-nested-ternary (we generate nested ternaries in expression if/else if constructs, but you can't explicitly write ternaries so never would catch anything useful)
 strict (I think we test that our generated JS follows strict mode semantics? how does it relate to sourceType: 'module'?)
 linebreak-style (I think? not sure how prettier generates linebreaks/why this isn't in eslint-config-prettier)
-no-redeclare (eg export class A seems to trigger. builtinGlobals doesn't seem to work eg top-level Object = 1, probably has to do with bare compilation?)
