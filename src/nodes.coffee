@@ -6358,6 +6358,7 @@ exports.Switch = class Switch extends Base
                 if testIndex is lastTestIndex
                   consequent.toAst(o, LEVEL_TOP).body
                 else []
+              trailing: testIndex is lastTestIndex
             )
             mergeAstLocationData compiledCase, compiledCase.consequent[compiledCase.consequent.length - 1] if compiledCase.consequent.length
             compiledCase
