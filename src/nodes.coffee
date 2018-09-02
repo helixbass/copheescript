@@ -134,8 +134,6 @@ exports.Base = class Base
       @withAstLocationData node._compileToBabylon o
 
   _compileToBabylon: (o) ->
-    @precompile? o
-
     @withAstType @_toAst(o), o
 
   withBabylonComments: (o, compiled, {comments = @comments} = {}) ->
@@ -373,11 +371,12 @@ exports.Base = class Base
   # Construct a node that returns the current node's result.
   # Note that this is overridden for smarter behavior for
   # many statement nodes (e.g. If, For)...
-  makeReturn: (res) ->
+  makeReturn: ({accumulator, mark} = {}) ->
+    return @returns = yes if mark
     me = @unwrapAll()
     @withLocationData(
-      if res
-        new Call new Value(new IdentifierLiteral(res), [new Access new PropertyName 'push']), [me]
+      if accumulator
+        new Call new Value(new IdentifierLiteral(accumulator), [new Access new PropertyName 'push']), [me]
       else
         new Return me
     )
@@ -419,7 +418,7 @@ exports.Base = class Base
     return @compileToBabylon o, level if o.compiling
     o = extend {}, o
     o.level = level if level
-    @withAstLocationData @withAstType @_toAst(o), o
+    @withAstLocationData @withAstReturns @withAstType @_toAst(o), o
 
   # By default, a node class's AST `type` is the class name
   astType: -> @constructor.name
@@ -509,6 +508,11 @@ exports.Base = class Base
     {locationData} = node ? @
     return ast unless locationData and ast and not ast.start?
     merge ast, locationDataToAst locationData
+
+  withAstReturns: (ast) ->
+    return ast unless ast
+    ast.returns = yes if @returns
+    ast
 
   # Passes each child to a function, breaking when the function returns `false`.
   eachChild: (func) ->
@@ -759,7 +763,7 @@ exports.Block = class Block extends Base
 
   # A Block node does not return its entire body, rather it
   # ensures that the final expression is returned.
-  makeReturn: (res) ->
+  makeReturn: (opts) ->
     len = @expressions.length
     [..., lastExp] = @expressions
     lastExp = lastExp?.unwrap() or no
@@ -772,9 +776,11 @@ exports.Block = class Block extends Base
       last = last.unwrap()
       if penult instanceof Call and penult.csx and last instanceof Call and last.csx
         expressions[expressions.length - 1].error 'Adjacent JSX elements must be wrapped in an enclosing tag'
+    if opts?.mark
+      return @expressions[len - 1]?.makeReturn opts
     while len--
       expr = @expressions[len]
-      @expressions[len] = expr.makeReturn res
+      @expressions[len] = expr.makeReturn opts
       @expressions.splice(len, 1) if expr instanceof Return and not expr.expression
       break
     this
@@ -4293,8 +4299,8 @@ exports.Assign = class Assign extends Base
   eachName: (iterator) ->
     @variable.unwrapAll().eachName iterator
 
-  makeReturn: (res) ->
-    return super res if res
+  makeReturn: (opts) ->
+    return super opts if opts?.accumulator or opts?.mark
     @withLocationData new Return new Parens @
 
 #### FuncGlyph
@@ -4467,6 +4473,7 @@ exports.Code = class Code extends Base
     ...@methodAstFields o
   }
   astChildren: (o) ->
+    @body.makeReturn mark: yes unless @body.isEmpty()
     params: @paramsToAst o
     body: {
       ...@body.toAst merge(o, checkForDirectives: yes), LEVEL_TOP
@@ -5023,9 +5030,11 @@ exports.While = class While extends Base
 
   isStatement: YES
 
-  makeReturn: (res) ->
-    if res
-      super res
+  makeReturn: (opts) ->
+    if opts?.mark
+      @body.makeReturn opts
+    else if opts?.accumulator
+      super opts
     else
       @returns = not @jumps()
       this
@@ -5041,6 +5050,7 @@ exports.While = class While extends Base
     no
 
   astType: 'WhileStatement'
+
   astChildren:
     test:
       propName: 'condition'
@@ -5080,7 +5090,7 @@ exports.While = class While extends Base
   _compileToBabylon: (o) ->
     if @returns
       resultsVar = new IdentifierLiteral o.scope.freeVariable 'results'
-      @body.makeReturn resultsVar.value
+      @body.makeReturn accumulator: resultsVar.value
 
     @wrapInResultAccumulatingBlock({o, resultsVar}) @withAstType
       test: @processedCondition.compileToBabylon o, LEVEL_PAREN
@@ -5105,7 +5115,7 @@ exports.While = class While extends Base
         @makeCode ''
       else
         if @returns
-          @body.makeReturn rvar = o.scope.freeVariable 'results'
+          @body.makeReturn accumulator: rvar = o.scope.freeVariable 'results'
           set = "#{@tab}#{rvar} = [];\n"
         [].concat @makeCode("\n"), (@bodyWithGuard().compileToFragments o, LEVEL_TOP), @makeCode("\n#{@tab}")
     answer = [].concat @makeCode(set + @tab + "while ("), @processedCondition.compileToFragments(o, LEVEL_PAREN),
@@ -5533,9 +5543,13 @@ exports.Try = class Try extends Base
 
   jumps: (o) -> @attempt.jumps(o) or @recovery?.jumps(o)
 
-  makeReturn: (res) ->
-    @attempt  = @attempt .makeReturn res if @attempt
-    @recovery = @recovery.makeReturn res if @recovery
+  makeReturn: (opts) ->
+    if opts?.mark
+      @attempt?.makeReturn opts
+      @recovery?.makeReturn opts
+      return
+    @attempt  = @attempt .makeReturn opts if @attempt
+    @recovery = @recovery.makeReturn opts if @recovery
     this
 
   astType: 'TryStatement'
@@ -6096,7 +6110,7 @@ exports.For = class For extends While
 
     if @returns
       resultsVar = @withLocationData new IdentifierLiteral(scope.freeVariable 'results')
-      @body.makeReturn resultsVar.value
+      @body.makeReturn accumulator: resultsVar.value
 
     @body = @bodyWithGuard()
 
@@ -6267,7 +6281,7 @@ exports.For = class For extends While
     if @returns
       resultPart   = "#{@tab}#{rvar} = [];\n"
       returnResult = "\n#{@tab}return #{rvar};"
-      body.makeReturn rvar
+      body.makeReturn accumulator: rvar
     body = @bodyWithGuard()
     if @pattern
       body.expressions.unshift new Assign @name, if @from then new IdentifierLiteral kvar else new Literal "#{svar}[#{kvar}]"
@@ -6324,10 +6338,10 @@ exports.Switch = class Switch extends Base
       return jumpNode if jumpNode = block.jumps o
     @otherwise?.jumps o
 
-  makeReturn: (res) ->
-    pair[1].makeReturn res for pair in @cases
-    @otherwise or= new Block [new UndefinedLiteral] if res
-    @otherwise?.makeReturn res
+  makeReturn: (opts) ->
+    pair[1].makeReturn opts for pair in @cases
+    @otherwise or= new Block [new UndefinedLiteral] if opts?.accumulator
+    @otherwise?.makeReturn opts
     this
 
   astType: 'SwitchStatement'
@@ -6484,10 +6498,14 @@ exports.If = class If extends Base
     ...@astFields o
   }
 
-  makeReturn: (res) ->
-    @elseBody  or= new Block [new UndefinedLiteral] if res
-    @body     and= new Block [@body.makeReturn res]
-    @elseBody and= new Block [@elseBody.makeReturn res]
+  makeReturn: (opts) ->
+    if opts?.mark
+      @body?.makeReturn opts
+      @elseBody?.makeReturn opts
+      return
+    @elseBody  or= new Block [new UndefinedLiteral] if opts?.accumulator
+    @body     and= new Block [@body.makeReturn opts]
+    @elseBody and= new Block [@elseBody.makeReturn opts]
     this
 
   ensureBlock: (node) ->
