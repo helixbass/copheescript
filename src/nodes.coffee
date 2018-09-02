@@ -372,7 +372,7 @@ exports.Base = class Base
   # Note that this is overridden for smarter behavior for
   # many statement nodes (e.g. If, For)...
   makeReturn: ({accumulator, mark} = {}) ->
-    return @returns = yes if mark
+    return @canBeReturned = yes if mark
     me = @unwrapAll()
     @withLocationData(
       if accumulator
@@ -418,6 +418,7 @@ exports.Base = class Base
     return @compileToBabylon o, level if o.compiling
     o = extend {}, o
     o.level = level if level
+    @makeReturn mark: yes if @isStatement(o) and o.level isnt LEVEL_TOP
     @withAstLocationData @withAstReturns @withAstType @_toAst(o), o
 
   # By default, a node class's AST `type` is the class name
@@ -511,7 +512,7 @@ exports.Base = class Base
 
   withAstReturns: (ast) ->
     return ast unless ast
-    ast.returns = yes if @returns
+    ast.returns = yes if @canBeReturned
     ast
 
   # Passes each child to a function, breaking when the function returns `false`.
@@ -970,7 +971,7 @@ exports.Block = class Block extends Base
         ast = node.toAst o
         return [] unless ast
         return @extractDirectives ast.body, o if node instanceof Block or ast.type is 'BlockStatement'
-        return ast if node.isStatement o
+        return ast if node.isStatement(o) or node instanceof Class
         ast = @extractDirectives ast, o
         return [] unless ast
         return @asExpressionStatement ast unless Array.isArray ast
@@ -5031,13 +5032,14 @@ exports.While = class While extends Base
   isStatement: YES
 
   makeReturn: (opts) ->
-    if opts?.mark
-      @body.makeReturn opts
-    else if opts?.accumulator
+    if opts?.accumulator
       super opts
     else
       @returns = not @jumps()
-      this
+      if opts?.mark
+        @body.makeReturn opts
+      else
+        this
 
   addBody: (@body) ->
     this
@@ -6441,7 +6443,10 @@ exports.If = class If extends Base
   # The **If** only compiles into a statement if either of its bodies needs
   # to be a statement. Otherwise a conditional operator is safe.
   isStatement: (o) ->
-    return no if @postfix and not o.compiling
+    unless o.compiling
+      return no if @postfix
+      return yes if o?.level is LEVEL_TOP
+      return @bodyNode() instanceof Block or @elseBodyNode() instanceof Block
     o?.level is LEVEL_TOP or
       @bodyNode().isStatement(o) or @elseBodyNode()?.isStatement(o)
 
@@ -6476,7 +6481,7 @@ exports.If = class If extends Base
 
     {
       test: @useCondition(o).toAst o, LEVEL_PAREN
-      consequent: @ensureBlock(@body).toAst o
+      consequent: @ensureBlock(@body).toAst o, LEVEL_TOP
       alternate: do =>
         return unless @elseBody
         compiled = @elseBody.toAst o, LEVEL_TOP
