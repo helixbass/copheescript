@@ -116,6 +116,8 @@ no-inline-comments
 callback-return
 no-use-before-define
 no-class-assign
+no-dupe-class-members
+no-catch-shadow
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -147,13 +149,13 @@ no-unused-expressions
 no-template-curly-in-string
 no-unneeded-ternary
 no-unmodified-loop-condition
+max-depth
 
 not usable against CS AST:
 no-sequences (we use SequenceExpressions eg when you use a block where an expression is expected - if included, this rule should be about use of ; operator I'd think)
 
 usable:
 array-callback-return (this is mostly trivially, as we implicitly return something - could presumably support allowImplicit: false checking once code path analysis works)
-no-dupe-class-members
 
 no-this-before-super (we catch this references before super(), but this catches eg super.foo() called before super())
 no-cond-assign (except except-parens exception doesn't work, since it looks for double-parens)
@@ -179,9 +181,7 @@ no-multi-str (trivially, doesn't seem to be able to trigger on multiline regular
 no-useless-return (looks like this can't trigger, as we don't generate "useless" returns)
 vars-on-top (not sure in what cases we put things before var declarations in a block?)
 no-delete-var (mostly trivially, as we throw an error when deleting an existing var, but this can catch delete of var that's not yet been seen)
-no-catch-shadow (trivially, we always generate a free error variable, so would never trigger)
 consistent-this
-max-depth
 no-lonely-if (trivially, since now generate else if when else clause is just an if statement)
 
 need visibility of top-level ast.comments (should be doable to "hoist" comments just for eslint):

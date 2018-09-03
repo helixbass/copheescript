@@ -1,3 +1,4 @@
 - directives
 - check makeReturn() more thoroughly eg is ctor.body.makeReturn() desirable when generating AST?
 - should test that all expected errors (that would occur when compiling) occur when generating AST
+- location data for ClassMethod for static method should include @

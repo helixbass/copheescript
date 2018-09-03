@@ -5584,7 +5584,7 @@ exports.Try = class Try extends Base
       else if @recovery
         @recovery.withAstLocationData {
           type: 'CatchClause'
-          param: @errorVariable?.toAst o
+          param: @errorVariable?.toAst(o) ? null
           body: @recovery.toAst o, LEVEL_TOP
         }
     finalizer: @ensure?.toAst o, LEVEL_TOP
