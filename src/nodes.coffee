@@ -5538,6 +5538,7 @@ exports.In = class In extends Base
 exports.Try = class Try extends Base
   constructor: (@attempt, @errorVariable, @recovery, @ensure) ->
     super()
+    @errorVariable?.unwrap().propagateLhs? yes
 
   children: ['attempt', 'recovery', 'ensure']
 
