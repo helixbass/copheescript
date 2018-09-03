@@ -3144,7 +3144,13 @@ exports.Class = class Class extends Base
     body:
       level: LEVEL_TOP
 
+  declareName: (o) ->
+    return unless (name = @variable?.unwrap()) instanceof IdentifierLiteral
+    alreadyDeclared = o.scope.find name.value
+    name.isDeclaration = not alreadyDeclared
+
   _toAst: (o) ->
+    @declareName o
     @fixBodyLocationData()
     @name = @determineName()
     @body.isClassBody = yes

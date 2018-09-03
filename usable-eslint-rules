@@ -34,6 +34,7 @@ no-mixed-requires
 no-redeclare
 for-direction
 no-shadow-restricted-names
+no-case-declarations
 
 usable against CS AST:
 spaced-comment
@@ -113,6 +114,8 @@ no-new-require
 no-buffer-constructor
 no-inline-comments
 callback-return
+no-use-before-define
+no-class-assign
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -152,8 +155,6 @@ usable:
 array-callback-return (this is mostly trivially, as we implicitly return something - could presumably support allowImplicit: false checking once code path analysis works)
 no-dupe-class-members
 
-no-case-declarations (trivially, as it seems impossible to generate a declaration inside a case)
-no-class-assign (mostly useless (won't catch reassignment of class name at same level) since we always generate an assignment for named classes - not sure why we do that, if we didn't then this rule could presumably catch reassignments? But this can catch eg reassignment of class name inside class method)
 no-this-before-super (we catch this references before super(), but this catches eg super.foo() called before super())
 no-cond-assign (except except-parens exception doesn't work, since it looks for double-parens)
 no-control-regex (works but doesn't catch eg ///\x1f#{a}/// because compiles into template string - is that a bug in our compilation or does the rule not handle template strings?)
@@ -196,7 +197,6 @@ require-jsdoc
 not usable against JS AST (could get triggered by generated code):
 import/first (since var declarations get generated before imports - this seems fixable? absolute-first works)
 no-return-await (we generate return await when await is the last statement in a function, should we not?)
-no-use-before-define (this gets confused by location data of generated constructs)
 id-match (we generate vars that may not match the specified name pattern)
 lines-between-class-members (we generate constructors with fake location data)
 no-shadow (do (x) -> construct gets flagged, as does what we generate for classes eg A = class A)
