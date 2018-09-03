@@ -5562,6 +5562,11 @@ exports.Try = class Try extends Base
       placeholder = new IdentifierLiteral(o.scope.freeVariable 'error', reserve: no).withEmptyLocationData()
       @recovery.unshift @recovery.withLocationData new Assign @errorVariable, placeholder if @errorVariable
 
+    unless compiling
+      @errorVariable?.eachName (name) ->
+        alreadyDeclared = o.scope.find name.value
+        name.isDeclaration = not alreadyDeclared
+
     block: @attempt.toAst o, LEVEL_TOP
     handler:
       if compiling
