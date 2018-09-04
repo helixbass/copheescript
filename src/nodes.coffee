@@ -3845,6 +3845,7 @@ exports.Assign = class Assign extends Base
       @checkAssignability o, name
       if @moduleDeclaration
         o.scope.add name.value, @moduleDeclaration
+        name.isDeclaration = yes
       else if @param
         o.scope.add name.value,
           if @param is 'alwaysDeclare'

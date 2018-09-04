@@ -35,6 +35,7 @@ no-redeclare
 for-direction
 no-shadow-restricted-names
 no-case-declarations
+no-lone-blocks
 
 usable against CS AST:
 spaced-comment
@@ -118,6 +119,10 @@ no-use-before-define
 no-class-assign
 no-dupe-class-members
 no-catch-shadow
+no-empty
+line-comment-position
+linebreak-style
+no-delete-var
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -150,6 +155,9 @@ no-template-curly-in-string
 no-unneeded-ternary
 no-unmodified-loop-condition
 max-depth
+vars-on-top
+guard-for-in
+no-useless-return
 
 not usable against CS AST:
 no-sequences (we use SequenceExpressions eg when you use a block where an expression is expected - if included, this rule should be about use of ; operator I'd think)
@@ -160,7 +168,6 @@ array-callback-return (this is mostly trivially, as we implicitly return somethi
 no-this-before-super (we catch this references before super(), but this catches eg super.foo() called before super())
 no-cond-assign (except except-parens exception doesn't work, since it looks for double-parens)
 no-control-regex (works but doesn't catch eg ///\x1f#{a}/// because compiles into template string - is that a bug in our compilation or does the rule not handle template strings?)
-no-empty (with allowEmptyCatch option, since we generate empty catch block when just a try is specified - not sure if we generate empty blocks elsewhere? This rule seems not super valuable as afaik it's not easy to create empty blocks in Coffeescript)
 no-inner-declarations (trivially, since again don't think we generate named functions, and we always declare vars at top-level)
 no-irregular-whitespace (can catch inside eg templates depending on which options are enabled)
 no-unsafe-negation
@@ -169,18 +176,13 @@ accessor-pairs (works for Object.defineProperty() calls, and for backticked obje
 block-scoped-var (trivially, since we always hoist var declarations)
 complexity
 default-case (but there doesn't seem to be an easy way to generate an empty default case, nor does the // do nothing comment currently get correctly positioned to get picked up)
-guard-for-in
 no-div-regex
 no-empty-function (however, it doesn't seem currently easy/possible to place a comment inside an empty function body, so not very useful)
 no-extra-bind
 no-global-assign (not sure I understand this rule, but I think the fact that we always generate declarations for assigned variables means that it can't be violated)
 no-implicit-globals (trivially, I think - seems like it'd depend on whether compiled with bare and whether it should be sourceType: 'module')
 no-invalid-this (but you can't generate eg function Foo(), Foo = -> @ will fail)
-no-lone-blocks (trivially, since afaik you can't create "standalone" blocks in Coffeescript)
 no-multi-str (trivially, doesn't seem to be able to trigger on multiline regular or heredoc strings)
-no-useless-return (looks like this can't trigger, as we don't generate "useless" returns)
-vars-on-top (not sure in what cases we put things before var declarations in a block?)
-no-delete-var (mostly trivially, as we throw an error when deleting an existing var, but this can catch delete of var that's not yet been seen)
 consistent-this
 no-lonely-if (trivially, since now generate else if when else clause is just an if statement)
 
@@ -188,10 +190,6 @@ need visibility of top-level ast.comments (should be doable to "hoist" comments 
 multiline-comment-style (can't run against CS AST since it looks for eg generated * in block comments)
 
 not working:
-line-comment-position (against CS AST, seems to hang on eg:
-  a = # b
-    module
-)
 require-jsdoc
 
 not usable against JS AST (could get triggered by generated code):
@@ -209,4 +207,3 @@ no-useless-escape (though prettier strips them from the output - we seem to gene
 not usable but not meaningful:
 no-nested-ternary (we generate nested ternaries in expression if/else if constructs, but you can't explicitly write ternaries so never would catch anything useful)
 strict (I think we test that our generated JS follows strict mode semantics? how does it relate to sourceType: 'module'?)
-linebreak-style (I think? not sure how prettier generates linebreaks/why this isn't in eslint-config-prettier)
