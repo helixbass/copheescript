@@ -36,6 +36,13 @@ for-direction
 no-shadow-restricted-names
 no-case-declarations
 no-lone-blocks
+curly
+wrap-iife
+template-tag-spacing
+switch-colon-spacing
+semi
+semi-spacing
+semi-style
 
 usable against CS AST:
 spaced-comment
@@ -158,6 +165,7 @@ max-depth
 vars-on-top
 guard-for-in
 no-useless-return
+prefer-object-spread
 
 not usable against CS AST:
 no-sequences (we use SequenceExpressions eg when you use a block where an expression is expected - if included, this rule should be about use of ; operator I'd think)
