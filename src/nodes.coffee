@@ -1465,7 +1465,7 @@ exports.StringLiteral = class StringLiteral extends Literal
 
   _toAst: (o) ->
     return @CSXTextToAst o if @csx
-    if not o.compiling and @originalValue.indexOf('\n') > -1
+    if not o.compiling and @quote.length is 3 and @originalValue.indexOf('\n') > -1
       return @withLocationData(StringWithInterpolations.fromStringLiteral @).toAst o
     super o
 
@@ -4483,6 +4483,7 @@ exports.Code = class Code extends Base
     generator: @isGenerator
     async: @isAsync
     @bound
+    id: null
     ...@methodAstFields o
   }
   astChildren: (o) ->

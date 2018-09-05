@@ -130,6 +130,9 @@ no-empty
 line-comment-position
 linebreak-style
 no-delete-var
+key-spacing
+new-parens
+eol-last
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -168,6 +171,9 @@ no-useless-return
 prefer-object-spread
 arrow-spacing
 object-curly-spacing
+complexity
+max-len
+no-invalid-this
 
 not usable against CS AST:
 no-sequences (we use SequenceExpressions eg when you use a block where an expression is expected - if included, this rule should be about use of ; operator I'd think)
@@ -184,14 +190,12 @@ no-unsafe-negation
 valid-jsdoc (doesn't break, but doesn't seem to pick up JSDoc comments so doesn't do anything)
 accessor-pairs (works for Object.defineProperty() calls, and for backticked objects with accessors)
 block-scoped-var (trivially, since we always hoist var declarations)
-complexity
 default-case (but there doesn't seem to be an easy way to generate an empty default case, nor does the // do nothing comment currently get correctly positioned to get picked up)
 no-div-regex
 no-empty-function (however, it doesn't seem currently easy/possible to place a comment inside an empty function body, so not very useful)
 no-extra-bind
 no-global-assign (not sure I understand this rule, but I think the fact that we always generate declarations for assigned variables means that it can't be violated)
 no-implicit-globals (trivially, I think - seems like it'd depend on whether compiled with bare and whether it should be sourceType: 'module')
-no-invalid-this (but you can't generate eg function Foo(), Foo = -> @ will fail)
 no-multi-str (trivially, doesn't seem to be able to trigger on multiline regular or heredoc strings)
 consistent-this
 no-lonely-if (trivially, since now generate else if when else clause is just an if statement)
