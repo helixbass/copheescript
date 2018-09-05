@@ -166,6 +166,8 @@ vars-on-top
 guard-for-in
 no-useless-return
 prefer-object-spread
+arrow-spacing
+object-curly-spacing
 
 not usable against CS AST:
 no-sequences (we use SequenceExpressions eg when you use a block where an expression is expected - if included, this rule should be about use of ; operator I'd think)
