@@ -1997,6 +1997,7 @@ exports.Call = class Call extends Base
   constructor: (@variable, @args = [], @soak, @token) ->
     super()
 
+    @implicit = @args.implicit
     @isNew = no
     if @variable instanceof Value and @variable.isNotCallable()
       @variable.error "literal is not a function"
@@ -2101,6 +2102,7 @@ exports.Call = class Call extends Base
 
   astProps:
     optional: 'soak'
+    implicit: 'implicit'
 
   # Compile a vanilla function call.
   compileNode: (o) ->
@@ -2763,6 +2765,9 @@ exports.Obj = class Obj extends Base
             return no if @isClassBody
             return no if not o.compiling# and variable.unwrap() instanceof StringWithInterpolations
             variable.shouldCache()
+
+  astProps:
+    implicit: 'generated'
 
   _toAst: (o) ->
     return @CSXAttributesToAst o if @csx
