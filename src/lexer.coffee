@@ -233,7 +233,7 @@ exports.Lexer = class Lexer
         [poppedToken[2].first_line, poppedToken[2].first_column, poppedToken[2].range[0]]
     if colon
       colonOffset = input.lastIndexOf if inCSXTag then '=' else ':'
-      colonToken = @token ':', ':', offset: colonOffset, length: colon.length
+      colonToken = @token ':', ':', offset: colonOffset
       colonToken.csxColon = yes if inCSXTag # used by rewriter
     if inCSXTag and tag is 'IDENTIFIER' and prev[0] isnt ':'
       @token ',', ',', length: 0, origin: tagToken
