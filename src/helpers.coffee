@@ -354,6 +354,9 @@ exports.dump = dump = (args..., obj) ->
 exports.mergeLocationData = (intoNode, fromNode) ->
   {locationData: intoLocationData} = intoNode
   {locationData: fromLocationData} = fromNode
+  unless intoLocationData
+    intoNode.locationData = fromLocationData
+    return intoNode
   {range: intoRange} = intoLocationData
   {range: fromRange} = fromLocationData
   return intoNode unless intoRange and fromRange # TODO: should figure out why don't have location data?

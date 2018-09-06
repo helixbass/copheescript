@@ -634,7 +634,7 @@ exports.Lexer = class Lexer
         # Ignore terminators inside a tag.
         @pair '/>' # As if the current tag was self-closing.
         @token ']', ']'
-        @token ',', ','
+        @token ',', 'JSX_COMMA'
         {tokens, index: end} =
           @matchWithInterpolations INSIDE_CSX, '>', '</', CSX_INTERPOLATION
         @mergeInterpolationTokens tokens, {}, (value) =>

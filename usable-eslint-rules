@@ -134,6 +134,8 @@ key-spacing
 new-parens
 eol-last
 dot-location
+no-multi-str
+comma-spacing
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -175,6 +177,8 @@ object-curly-spacing
 complexity
 max-len
 no-invalid-this
+lines-between-class-members
+max-lines-per-function
 
 not usable against CS AST:
 no-sequences (we use SequenceExpressions eg when you use a block where an expression is expected - if included, this rule should be about use of ; operator I'd think)
@@ -197,7 +201,6 @@ no-empty-function (however, it doesn't seem currently easy/possible to place a c
 no-extra-bind
 no-global-assign (not sure I understand this rule, but I think the fact that we always generate declarations for assigned variables means that it can't be violated)
 no-implicit-globals (trivially, I think - seems like it'd depend on whether compiled with bare and whether it should be sourceType: 'module')
-no-multi-str (trivially, doesn't seem to be able to trigger on multiline regular or heredoc strings)
 consistent-this
 no-lonely-if (trivially, since now generate else if when else clause is just an if statement)
 
@@ -211,7 +214,6 @@ not usable against JS AST (could get triggered by generated code):
 import/first (since var declarations get generated before imports - this seems fixable? absolute-first works)
 no-return-await (we generate return await when await is the last statement in a function, should we not?)
 id-match (we generate vars that may not match the specified name pattern)
-lines-between-class-members (we generate constructors with fake location data)
 no-shadow (do (x) -> construct gets flagged, as does what we generate for classes eg A = class A)
 padding-line-between-statements (we generate statements with fake location data)
 no-return-assign (except-parens doesn't always work, since the closing paren can get stomped on by the OUTDENT that's assigned the same location data. also, this doesn't distinguish implicit from explicit returns. also, we generate assignments that could get included in implicit/explicit return, eg a[b] ? c)

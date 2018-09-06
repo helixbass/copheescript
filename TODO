@@ -10,3 +10,5 @@
 - should localize generation of comment inside catch block?
 - should parenthesize closure compiler type cast commented expressions? see eg prettier/src/tests/comments/closure-compiler-type-cast.js
 - support dynamic imports? ie import(...)
+- should allow computed static method names? eg @[b]: ->
+- empty backticks can generate invalid JS eg foo = ``

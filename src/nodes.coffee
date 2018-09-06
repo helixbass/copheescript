@@ -3242,7 +3242,12 @@ exports.Class = class Class extends Base
         exprs     = []
         end       = 0
         start     = 0
-        pushSlice = -> exprs.push new Value new Obj properties[start...end], generated: true, isClassBody: true if end > start
+        pushSlice = ->
+          if end > start
+            obj = new Obj properties[start...end], generated: true, isClassBody: true
+            obj.mergeLocationDataFrom prop for prop in properties[start...end]
+            obj = obj.withLocationData new Value obj
+            exprs.push obj
 
         while assign = properties[end]
           if initializerExpression = @addInitializerExpression assign
