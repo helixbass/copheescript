@@ -417,23 +417,34 @@ exports.traverseBabylonAsts = traverseBabylonAsts = (node, correspondingNode, fu
 # Constructs a string or regex by escaping certain characters.
 exports.makeDelimitedLiteral = (body, options = {}) ->
   body = '(?:)' if body is '' and options.delimiter is '/'
-  regex = ///
-      (\\\\)                               # Escaped backslash.
-    | (\\0(?=[1-7]))                       # Null character mistaken as octal escape.
-    | \\?(#{options.delimiter})            # (Possibly escaped) delimiter.
-    | \\?(?: (\n)|(\r)|(\u2028)|(\u2029) ) # (Possibly escaped) newlines.
-    | (\\.)                                # Other escapes.
-  ///g
-  body = body.replace regex, (match, backslash, nul, delimiter, lf, cr, ls, ps, other) -> switch
-    # Ignore escaped backslashes.
-    when backslash then (if options.double then backslash + backslash else backslash)
-    when nul       then '\\x00'
-    when delimiter then "\\#{delimiter}"
-    when lf        then '\\n'
-    when cr        then '\\r'
-    when ls        then '\\u2028'
-    when ps        then '\\u2029'
-    when other     then (if options.double then "\\#{other}" else other)
+  regex =
+    if options.justEscapeDelimiter
+      ///
+          \\?(#{options.delimiter})            # (Possibly escaped) delimiter.
+      ///g
+    else
+      ///
+          (\\\\)                               # Escaped backslash.
+        | (\\0(?=[1-7]))                       # Null character mistaken as octal escape.
+        | \\?(#{options.delimiter})            # (Possibly escaped) delimiter.
+        | \\?(?: (\n)|(\r)|(\u2028)|(\u2029) ) # (Possibly escaped) newlines.
+        | (\\.)                                # Other escapes.
+      ///g
+  body = body.replace regex, (args...) ->
+    if options.justEscapeDelimiter
+      [match, delimiter] = args
+    else
+      [match, backslash, nul, delimiter, lf, cr, ls, ps, other] = args
+    switch
+      # Ignore escaped backslashes.
+      when backslash then (if options.double then backslash + backslash else backslash)
+      when nul       then '\\x00'
+      when delimiter then "\\#{delimiter}"
+      when lf        then '\\n'
+      when cr        then '\\r'
+      when ls        then '\\u2028'
+      when ps        then '\\u2029'
+      when other     then (if options.double then "\\#{other}" else other)
   "#{options.delimiter}#{body}#{options.delimiter}"
 
 unicodeCodePointToUnicodeEscapes = (codePoint) ->

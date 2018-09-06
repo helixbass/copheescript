@@ -133,6 +133,7 @@ no-delete-var
 key-spacing
 new-parens
 eol-last
+dot-location
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)

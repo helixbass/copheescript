@@ -2,5 +2,5 @@
 - check makeReturn() more thoroughly eg is ctor.body.makeReturn() desirable when generating AST?
 - should test that all expected errors (that would occur when compiling) occur when generating AST
 - location data for ClassMethod for static method should include @
-- seems like StringLiteral extra.raw shouldn't have some of the escaping done that makeDelimitedLiteral() does? eg for a string with a backslash line continuation?
+- StringLiteral extra.raw escaping - seems like maybe extra.raw should include triple quotes if it's a heredoc and then not escape the quote (in makeDelimitedLiteral())?
 - should update to OptionalCallExpression/OptionalMemberExpression? Is that where babel 7 landed?

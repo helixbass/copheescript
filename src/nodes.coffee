@@ -1433,11 +1433,11 @@ exports.StringLiteral = class StringLiteral extends Literal
               ' '
     @value = @delimit val
 
-  delimit: (val) ->
-    makeDelimitedLiteral val, {
+  delimit: (val, opts = {}) ->
+    makeDelimitedLiteral val, merge {
       delimiter: @quote.charAt 0
       @double
-    }
+    }, opts
 
   compileNode: (o) ->
     return [@makeCode @unquote(yes, yes)] if @csx
@@ -1461,7 +1461,7 @@ exports.StringLiteral = class StringLiteral extends Literal
         if o.compiling
           @value
         else
-          @delimit @originalValue
+          @delimit @originalValue, justEscapeDelimiter: yes
 
   _toAst: (o) ->
     return @CSXTextToAst o if @csx
@@ -6769,25 +6769,3 @@ unfoldSoak = (o, parent, name) ->
   parent[name] = ifn.body
   ifn.body = new Value parent
   ifn
-
-# Constructs a string or regex by escaping certain characters.
-makeDelimitedLiteral = (body, options = {}) ->
-  body = '(?:)' if body is '' and options.delimiter is '/'
-  regex = ///
-      (\\\\)                               # Escaped backslash.
-    | (\\0(?=[1-7]))                       # Null character mistaken as octal escape.
-    | \\?(#{options.delimiter})            # (Possibly escaped) delimiter.
-    | \\?(?: (\n)|(\r)|(\u2028)|(\u2029) ) # (Possibly escaped) newlines.
-    | (\\.)                                # Other escapes.
-  ///g
-  body = body.replace regex, (match, backslash, nul, delimiter, lf, cr, ls, ps, other) -> switch
-    # Ignore escaped backslashes.
-    when backslash then (if options.double then backslash + backslash else backslash)
-    when nul       then '\\x00'
-    when delimiter then "\\#{delimiter}"
-    when lf        then '\\n'
-    when cr        then '\\r'
-    when ls        then '\\u2028'
-    when ps        then '\\u2029'
-    when other     then (if options.double then "\\#{other}" else other)
-  "#{options.delimiter}#{body}#{options.delimiter}"
