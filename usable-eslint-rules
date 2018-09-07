@@ -43,6 +43,9 @@ switch-colon-spacing
 semi
 semi-spacing
 semi-style
+no-extra-semi
+no-unexpected-multiline
+no-mixed-spaces-and-tabs
 
 usable against CS AST:
 spaced-comment
@@ -136,6 +139,9 @@ eol-last
 dot-location
 no-multi-str
 comma-spacing
+no-control-regex
+no-global-assign (only ++ applies since we generate declarations on other write references)
+no-irregular-whitespace
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -179,6 +185,13 @@ max-len
 no-invalid-this
 lines-between-class-members
 max-lines-per-function
+space-infix-ops
+space-unary-ops
+no-this-before-super
+no-cond-assign
+no-inner-declarations
+consistent-this
+no-unsafe-negation
 
 not usable against CS AST:
 no-sequences (we use SequenceExpressions eg when you use a block where an expression is expected - if included, this rule should be about use of ; operator I'd think)
@@ -186,12 +199,7 @@ no-sequences (we use SequenceExpressions eg when you use a block where an expres
 usable:
 array-callback-return (this is mostly trivially, as we implicitly return something - could presumably support allowImplicit: false checking once code path analysis works)
 
-no-this-before-super (we catch this references before super(), but this catches eg super.foo() called before super())
-no-cond-assign (except except-parens exception doesn't work, since it looks for double-parens)
-no-control-regex (works but doesn't catch eg ///\x1f#{a}/// because compiles into template string - is that a bug in our compilation or does the rule not handle template strings?)
-no-inner-declarations (trivially, since again don't think we generate named functions, and we always declare vars at top-level)
-no-irregular-whitespace (can catch inside eg templates depending on which options are enabled)
-no-unsafe-negation
+no-useless-escape (though prettier strips them from the output - we seem to generate "useless" escapes in regexes)
 valid-jsdoc (doesn't break, but doesn't seem to pick up JSDoc comments so doesn't do anything)
 accessor-pairs (works for Object.defineProperty() calls, and for backticked objects with accessors)
 block-scoped-var (trivially, since we always hoist var declarations)
@@ -199,9 +207,7 @@ default-case (but there doesn't seem to be an easy way to generate an empty defa
 no-div-regex
 no-empty-function (however, it doesn't seem currently easy/possible to place a comment inside an empty function body, so not very useful)
 no-extra-bind
-no-global-assign (not sure I understand this rule, but I think the fact that we always generate declarations for assigned variables means that it can't be violated)
 no-implicit-globals (trivially, I think - seems like it'd depend on whether compiled with bare and whether it should be sourceType: 'module')
-consistent-this
 no-lonely-if (trivially, since now generate else if when else clause is just an if statement)
 
 need visibility of top-level ast.comments (should be doable to "hoist" comments just for eslint):
@@ -219,8 +225,10 @@ padding-line-between-statements (we generate statements with fake location data)
 no-return-assign (except-parens doesn't always work, since the closing paren can get stomped on by the OUTDENT that's assigned the same location data. also, this doesn't distinguish implicit from explicit returns. also, we generate assignments that could get included in implicit/explicit return, eg a[b] ? c)
 consistent-return (eg a function ending with an if statement and no else generates an explicit return value inside the if and no corresponding return outside the if)
 no-loop-func (we generate a nested closure function when you have nested for loops as an expression)
-no-useless-escape (though prettier strips them from the output - we seem to generate "useless" escapes in regexes)
 
 not usable but not meaningful:
 no-nested-ternary (we generate nested ternaries in expression if/else if constructs, but you can't explicitly write ternaries so never would catch anything useful)
 strict (I think we test that our generated JS follows strict mode semantics? how does it relate to sourceType: 'module'?)
+
+stylistic rules:
+- operator-linebreak - mostly doesn't apply as leading operators aren't allowed (but when leading logical lands, could control that). could support "none" (don't allow breaking operators)
