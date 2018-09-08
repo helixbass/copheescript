@@ -2748,12 +2748,15 @@ exports.Obj = class Obj extends Base
           else
             variable.unwrap()
           ).toAst o, LEVEL_LIST
+        isAssignmentPattern = prop instanceof Assign and prop.context isnt 'object' # TODO: restructure this Assign in expandProperties() to avoid this special case?
+        # key = merge {}, compiledKey
+        # key.declaration = no if key.declaration
         compiledValue = value.toAst o, LEVEL_LIST
         prop.withAstLocationData
           type: 'ObjectProperty'
           key: compiledKey
           value:
-            if prop instanceof Assign and prop.context isnt 'object' # TODO: restructure this Assign in expandProperties() to avoid this special case?
+            if isAssignmentPattern
               type: 'AssignmentPattern'
               left: compiledKey
               right: compiledValue

@@ -48,16 +48,12 @@ no-unexpected-multiline
 no-mixed-spaces-and-tabs
 
 usable against CS AST:
-spaced-comment
 no-warning-comments
-capitalized-comments
 prefer-rest-params
 id-length
 no-multi-assign
 no-continue
-prefer-destructuring
 no-plusplus (allowForLoopAfterthoughts is meaningless)
-no-underscore-dangle
 no-throw-literal
 prefer-spread
 no-eval
@@ -142,6 +138,8 @@ comma-spacing
 no-control-regex
 no-global-assign (only ++ applies since we generate declarations on other write references)
 no-irregular-whitespace
+default-case
+max-classes-per-file
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -192,6 +190,12 @@ no-cond-assign
 no-inner-declarations
 consistent-this
 no-unsafe-negation
+prefer-destructuring
+spaced-comment
+capitalized-comments
+no-underscore-dangle
+no-useless-escape
+no-return-await
 
 not usable against CS AST:
 no-sequences (we use SequenceExpressions eg when you use a block where an expression is expected - if included, this rule should be about use of ; operator I'd think)
@@ -199,11 +203,9 @@ no-sequences (we use SequenceExpressions eg when you use a block where an expres
 usable:
 array-callback-return (this is mostly trivially, as we implicitly return something - could presumably support allowImplicit: false checking once code path analysis works)
 
-no-useless-escape (though prettier strips them from the output - we seem to generate "useless" escapes in regexes)
 valid-jsdoc (doesn't break, but doesn't seem to pick up JSDoc comments so doesn't do anything)
 accessor-pairs (works for Object.defineProperty() calls, and for backticked objects with accessors)
 block-scoped-var (trivially, since we always hoist var declarations)
-default-case (but there doesn't seem to be an easy way to generate an empty default case, nor does the // do nothing comment currently get correctly positioned to get picked up)
 no-div-regex
 no-empty-function (however, it doesn't seem currently easy/possible to place a comment inside an empty function body, so not very useful)
 no-extra-bind
@@ -218,7 +220,6 @@ require-jsdoc
 
 not usable against JS AST (could get triggered by generated code):
 import/first (since var declarations get generated before imports - this seems fixable? absolute-first works)
-no-return-await (we generate return await when await is the last statement in a function, should we not?)
 id-match (we generate vars that may not match the specified name pattern)
 no-shadow (do (x) -> construct gets flagged, as does what we generate for classes eg A = class A)
 padding-line-between-statements (we generate statements with fake location data)
