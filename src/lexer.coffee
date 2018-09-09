@@ -101,15 +101,17 @@ exports.Lexer = class Lexer
       code = code.slice 1
       @locationDataCompensations[0] = 1
       thusFar += 1
+    if WHITESPACE.test code
+      code = "\n#{code}"
+      @chunkLine--
+      @locationDataCompensations[0] ?= 0
+      @locationDataCompensations[0] -= 1
     code = code
       .replace /\r/g, (match, offset) =>
         @locationDataCompensations[thusFar + offset] = 1
         # thusFar += 1
         return ''
       .replace TRAILING_SPACES, ''
-    if WHITESPACE.test code
-      code = "\n#{code}"
-      @chunkLine-- # TODO: should update @chunkOffset?
     code = invertLiterate code if @literate
     code
 
@@ -1228,7 +1230,7 @@ OPERATOR   = /// ^ (
    | \.{2,3}           # range or splat
 ) ///
 
-WHITESPACE = /^[^\n\S]+/
+WHITESPACE = /^[^\n\r\S]+/
 
 COMMENT    = /^(\s*)###([^#][\s\S]*?)(?:###([^\n\S]*)|###$)|^((?:\s*#(?!##[^#]).*)+)/
 

@@ -46,6 +46,8 @@ semi-style
 no-extra-semi
 no-unexpected-multiline
 no-mixed-spaces-and-tabs
+no-nested-ternary
+no-implicit-globals (it seems like non-bare compilation covers this)
 
 usable against CS AST:
 no-warning-comments
@@ -149,6 +151,7 @@ import/prefer-default-export
 import/max-dependencies
 import/newline-after-import
 import/group-exports
+accessor-pairs (wouldn't work for backticked get/set syntax)
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -211,6 +214,11 @@ import/no-default-export
 import/dynamic-import-chunkname
 no-lonely-if
 no-loop-func
+valid-jsdoc
+require-jsdoc
+multiline-comment-style
+no-div-regex
+no-extra-bind
 
 not usable against CS AST:
 no-sequences (we use SequenceExpressions eg when you use a block where an expression is expected - if included, this rule should be about use of ; operator I'd think)
@@ -218,19 +226,8 @@ no-sequences (we use SequenceExpressions eg when you use a block where an expres
 usable:
 array-callback-return (this is mostly trivially, as we implicitly return something - could presumably support allowImplicit: false checking once code path analysis works)
 
-valid-jsdoc (doesn't break, but doesn't seem to pick up JSDoc comments so doesn't do anything)
-accessor-pairs (works for Object.defineProperty() calls, and for backticked objects with accessors)
 block-scoped-var (trivially, since we always hoist var declarations)
-no-div-regex
 no-empty-function (however, it doesn't seem currently easy/possible to place a comment inside an empty function body, so not very useful)
-no-extra-bind
-no-implicit-globals (trivially, I think - seems like it'd depend on whether compiled with bare and whether it should be sourceType: 'module')
-
-need visibility of top-level ast.comments (should be doable to "hoist" comments just for eslint):
-multiline-comment-style (can't run against CS AST since it looks for eg generated * in block comments)
-
-not working:
-require-jsdoc
 
 not usable against JS AST (could get triggered by generated code):
 id-match (we generate vars that may not match the specified name pattern)
@@ -239,8 +236,7 @@ padding-line-between-statements (we generate statements with fake location data)
 no-return-assign (except-parens doesn't always work, since the closing paren can get stomped on by the OUTDENT that's assigned the same location data. also, this doesn't distinguish implicit from explicit returns. also, we generate assignments that could get included in implicit/explicit return, eg a[b] ? c)
 consistent-return (eg a function ending with an if statement and no else generates an explicit return value inside the if and no corresponding return outside the if)
 
-not usable but not meaningful:
-no-nested-ternary (we generate nested ternaries in expression if/else if constructs, but you can't explicitly write ternaries so never would catch anything useful)
+not sure:
 strict (I think we test that our generated JS follows strict mode semantics? how does it relate to sourceType: 'module'?)
 
 stylistic rules:
