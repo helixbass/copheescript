@@ -324,28 +324,36 @@ exports.isString = isString = (obj) -> Object::toString.call(obj) is '[object St
 exports.isBoolean = isBoolean = (obj) -> obj is yes or obj is no or Object::toString.call(obj) is '[object Boolean]'
 exports.isPlainObject = isPlainObject = (obj) -> typeof obj is 'object' and !!obj and not Array.isArray(obj) and not isNumber(obj) and not isString(obj) and not isBoolean(obj)
 
-# Converts a number, string, or node (Value/NumberLiteral/unary +/- Op) to its
-# corresponding number value.
-exports.getNumberValue = (number) ->
-  return number if isNumber number
-  invert = no
-  unless isString number
-    number = do ->
-      number = number.unwrap()
-      if number.operator
-        invert = yes if number.operator is '-'
-        number.first.unwrap().value
-      else
-        number.value
-  base = switch number.charAt 1
+# Converts a string to its corresponding number value.
+exports.parseNumber = parseNumber = (str) ->
+  base = switch str.charAt 1
     when 'b' then 2
     when 'o' then 8
     when 'x' then 16
     else null
 
-  val = if base? then parseInt(number[2..], base) else parseFloat(number)
-  return val unless invert
-  val * -1
+  if base? then parseInt(str[2..], base) else parseFloat(str)
+
+# Converts a number, string, or node (Value/NumberLiteral/unary +/- Op) to its
+# corresponding number value.
+exports.getNumberValue = getNumberValue = (number) ->
+  switch
+    when isNumber number
+      number
+    when isString number
+      parseNumber number
+    else
+      number = number.unwrap()
+      return number.parsedValue if number.parsedValue?
+      invert = no
+      val = getNumberValue(
+        if number.operator
+          invert = yes if number.operator is '-'
+          number.first
+        else
+          number.value
+      )
+      if invert then val * -1 else val
 
 exports.dump = dump = (args..., obj) ->
   util = require 'util'
