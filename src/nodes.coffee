@@ -5046,11 +5046,12 @@ exports.While = class While extends Base
   constructor: (@condition, {@invert, @guard, @isLoop} = {}) ->
     super()
 
-    @processedCondition = if @invert then @condition.invert() else @condition
-
   children: ['condition', 'guard', 'body']
 
   isStatement: YES
+
+  processedCondition: ->
+    @_processedCondition ?= if @invert then @condition.invert() else @condition
 
   makeReturn: (opts) ->
     if opts?.accumulator
@@ -5116,7 +5117,7 @@ exports.While = class While extends Base
       @body.makeReturn accumulator: resultsVar.value
 
     @wrapInResultAccumulatingBlock({o, resultsVar}) @withAstType
-      test: @processedCondition.compileToBabylon o, LEVEL_PAREN
+      test: @processedCondition().compileToBabylon o, LEVEL_PAREN
       body: @bodyWithGuard().compileToBabylon o, LEVEL_TOP
 
   bodyWithGuard: ->
@@ -5141,7 +5142,7 @@ exports.While = class While extends Base
           @body.makeReturn accumulator: rvar = o.scope.freeVariable 'results'
           set = "#{@tab}#{rvar} = [];\n"
         [].concat @makeCode("\n"), (@bodyWithGuard().compileToFragments o, LEVEL_TOP), @makeCode("\n#{@tab}")
-    answer = [].concat @makeCode(set + @tab + "while ("), @processedCondition.compileToFragments(o, LEVEL_PAREN),
+    answer = [].concat @makeCode(set + @tab + "while ("), @processedCondition().compileToFragments(o, LEVEL_PAREN),
       @makeCode(") {"), body, @makeCode("}")
     if @returns
       answer.push @makeCode "\n#{@tab}return #{rvar};"
@@ -6449,12 +6450,14 @@ exports.If = class If extends Base
     @isChain   = false
     {@soak, @type, statement: @postfix} = options
     moveComments @condition, @ if @condition.comments
-    @processedCondition = if @type is 'unless' then @condition.invert() else @condition
 
   children: ['condition', 'body', 'elseBody']
 
   bodyNode:     -> @body?.unwrap()
   elseBodyNode: -> @elseBody?.unwrap()
+
+  processedCondition: ->
+    @_processedCondition ?= if @type is 'unless' then @condition.invert() else @condition
 
   # Rewrite a chain of **Ifs** to add a default case as the final *else*.
   addElse: (elseBody) ->
@@ -6498,13 +6501,13 @@ exports.If = class If extends Base
     }
 
   useCondition: (o) ->
-    if o.compiling then @processedCondition else @condition
+    if o.compiling then @processedCondition() else @condition
 
   statementToAst: (o) ->
     {compiling} = o
     exeq = del o, 'isExistentialEquals'
     if exeq
-      return new If(@processedCondition.invert(), @elseBodyNode(), type: 'if').toAst o
+      return new If(@processedCondition().invert(), @elseBodyNode(), type: 'if').toAst o
 
     {
       test: @useCondition(o).toAst o, LEVEL_PAREN
@@ -6554,10 +6557,10 @@ exports.If = class If extends Base
     exeq     = del o, 'isExistentialEquals'
 
     if exeq
-      return new If(@processedCondition.invert(), @elseBodyNode(), type: 'if').compileToFragments o
+      return new If(@processedCondition().invert(), @elseBodyNode(), type: 'if').compileToFragments o
 
     indent   = o.indent + TAB
-    cond     = @processedCondition.compileToFragments o, LEVEL_PAREN
+    cond     = @processedCondition().compileToFragments o, LEVEL_PAREN
     body     = @ensureBlock(@body).compileToFragments merge o, {indent}
     ifPart   = [].concat @makeCode("if ("), cond, @makeCode(") {\n"), body, @makeCode("\n#{@tab}}")
     ifPart.unshift @makeCode @tab unless child
@@ -6572,7 +6575,7 @@ exports.If = class If extends Base
 
   # Compile the `If` as a conditional operator.
   compileExpression: (o) ->
-    cond = @processedCondition.compileToFragments o, LEVEL_COND
+    cond = @processedCondition().compileToFragments o, LEVEL_COND
     body = @bodyNode().compileToFragments o, LEVEL_LIST
     alt  = if @elseBodyNode() then @elseBodyNode().compileToFragments(o, LEVEL_LIST) else [@makeCode('void 0')]
     fragments = cond.concat @makeCode(" ? "), body, @makeCode(" : "), alt

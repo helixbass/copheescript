@@ -140,6 +140,15 @@ no-global-assign (only ++ applies since we generate declarations on other write 
 no-irregular-whitespace
 default-case
 max-classes-per-file
+import/first
+import/no-amd
+import/no-nodejs-modules
+import/exports-last
+import/no-namespace
+import/prefer-default-export
+import/max-dependencies
+import/newline-after-import
+import/group-exports
 
 partially usable against CS AST:
 no-else-return (since we conflate else [nested if] with else if, can't currently just disallow the former)
@@ -196,6 +205,12 @@ capitalized-comments
 no-underscore-dangle
 no-useless-escape
 no-return-await
+import/export (TODO: support for export from via ExportMap/checking other module's exports)
+import/no-commonjs
+import/no-default-export
+import/dynamic-import-chunkname
+no-lonely-if
+no-loop-func
 
 not usable against CS AST:
 no-sequences (we use SequenceExpressions eg when you use a block where an expression is expected - if included, this rule should be about use of ; operator I'd think)
@@ -210,7 +225,6 @@ no-div-regex
 no-empty-function (however, it doesn't seem currently easy/possible to place a comment inside an empty function body, so not very useful)
 no-extra-bind
 no-implicit-globals (trivially, I think - seems like it'd depend on whether compiled with bare and whether it should be sourceType: 'module')
-no-lonely-if (trivially, since now generate else if when else clause is just an if statement)
 
 need visibility of top-level ast.comments (should be doable to "hoist" comments just for eslint):
 multiline-comment-style (can't run against CS AST since it looks for eg generated * in block comments)
@@ -219,13 +233,11 @@ not working:
 require-jsdoc
 
 not usable against JS AST (could get triggered by generated code):
-import/first (since var declarations get generated before imports - this seems fixable? absolute-first works)
 id-match (we generate vars that may not match the specified name pattern)
 no-shadow (do (x) -> construct gets flagged, as does what we generate for classes eg A = class A)
 padding-line-between-statements (we generate statements with fake location data)
 no-return-assign (except-parens doesn't always work, since the closing paren can get stomped on by the OUTDENT that's assigned the same location data. also, this doesn't distinguish implicit from explicit returns. also, we generate assignments that could get included in implicit/explicit return, eg a[b] ? c)
 consistent-return (eg a function ending with an if statement and no else generates an explicit return value inside the if and no corresponding return outside the if)
-no-loop-func (we generate a nested closure function when you have nested for loops as an expression)
 
 not usable but not meaningful:
 no-nested-ternary (we generate nested ternaries in expression if/else if constructs, but you can't explicitly write ternaries so never would catch anything useful)
