@@ -48,6 +48,8 @@ no-unexpected-multiline
 no-mixed-spaces-and-tabs
 no-nested-ternary
 no-implicit-globals (it seems like non-bare compilation covers this)
+array-callback-return (though could presumably support allowImplicit: false checking and possibly detect implicit returns of nullish values?)
+consistent-return (could probably do some form of comparing implicitly (and/or explicitly) returned values?)
 
 usable against CS AST:
 no-warning-comments
@@ -219,12 +221,10 @@ require-jsdoc
 multiline-comment-style
 no-div-regex
 no-extra-bind
+no-return-assign
 
 not usable against CS AST:
 no-sequences (we use SequenceExpressions eg when you use a block where an expression is expected - if included, this rule should be about use of ; operator I'd think)
-
-usable:
-array-callback-return (this is mostly trivially, as we implicitly return something - could presumably support allowImplicit: false checking once code path analysis works)
 
 block-scoped-var (trivially, since we always hoist var declarations)
 no-empty-function (however, it doesn't seem currently easy/possible to place a comment inside an empty function body, so not very useful)
@@ -233,8 +233,6 @@ not usable against JS AST (could get triggered by generated code):
 id-match (we generate vars that may not match the specified name pattern)
 no-shadow (do (x) -> construct gets flagged, as does what we generate for classes eg A = class A)
 padding-line-between-statements (we generate statements with fake location data)
-no-return-assign (except-parens doesn't always work, since the closing paren can get stomped on by the OUTDENT that's assigned the same location data. also, this doesn't distinguish implicit from explicit returns. also, we generate assignments that could get included in implicit/explicit return, eg a[b] ? c)
-consistent-return (eg a function ending with an if statement and no else generates an explicit return value inside the if and no corresponding return outside the if)
 
 not sure:
 strict (I think we test that our generated JS follows strict mode semantics? how does it relate to sourceType: 'module'?)
