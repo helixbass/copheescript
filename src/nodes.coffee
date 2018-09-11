@@ -3164,6 +3164,7 @@ exports.Class = class Class extends Base
     @body.isClassBody = yes
     @walkBody o
     @sniffDirectives @body.expressions, replace: yes
+    @ctor?.noReturn = true
     super o
 
   fixBodyLocationData: ->
@@ -4495,7 +4496,7 @@ exports.Code = class Code extends Base
     ...@methodAstFields o
   }
   astChildren: (o) ->
-    @body.makeReturn mark: yes unless @body.isEmpty()
+    @body.makeReturn mark: yes unless @body.isEmpty() or @noReturn
     params: @paramsToAst o
     body: {
       ...@body.toAst merge(o, checkForDirectives: yes), LEVEL_TOP
@@ -5059,7 +5060,7 @@ exports.While = class While extends Base
     else
       @returns = not @jumps()
       if opts?.mark
-        @body.makeReturn opts
+        @body.makeReturn opts if @returns
       else
         this
 
