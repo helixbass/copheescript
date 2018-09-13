@@ -19,7 +19,8 @@ isFunction, isPlainObject, isBoolean,
 getNumberValue, dump,
 mapValues, traverseBabylonAst, makeDelimitedLiteral,
 mergeLocationData,
-assignEmptyTrailingLocationData} = require './helpers'
+assignEmptyTrailingLocationData,
+UNICODE_CODE_POINT_ESCAPE} = require './helpers'
 
 # Functions required by parser.
 exports.extend = extend
@@ -1455,7 +1456,7 @@ exports.StringLiteral = class StringLiteral extends Literal
       if o.compiling
         @unquote()
       else
-        @originalValue
+        unicodeEscapesToString @originalValue
     extra:
       raw:
         if o.compiling
@@ -1466,7 +1467,7 @@ exports.StringLiteral = class StringLiteral extends Literal
   _toAst: (o) ->
     return @CSXTextToAst o if @csx
     if not o.compiling and @quote.length is 3 and @originalValue.indexOf('\n') > -1
-      return @withLocationData(StringWithInterpolations.fromStringLiteral @).toAst o
+      return StringWithInterpolations.fromStringLiteral(@).toAst o
     super o
 
   unquote: (doubleQuote = no, csx = no) ->
@@ -1474,6 +1475,26 @@ exports.StringLiteral = class StringLiteral extends Literal
     unquoted = unquoted.replace /\\"/g, '"'  if doubleQuote
     unquoted = unquoted.replace /\\n/g, '\n' if csx
     unquoted
+
+  withoutQuotesInLocationData: ->
+    # TODO: make this non-mutating (return new StringLiteral)?
+    endsWithNewline = @originalValue[-1..] is '\n'
+    @locationData = merge {}, @locationData
+    @locationData.first_column += @quote.length
+    if endsWithNewline
+      @locationData.last_line -= 1
+      @locationData.last_column =
+        if @locationData.last_line is @locationData.first_line
+          @locationData.first_column + @originalValue.length - '\n'.length
+        else
+          @originalValue.length - '\n'.length - @originalValue.lastIndexOf('\n')
+    else
+      @locationData.last_column -= @quote.length
+    @locationData.range = [
+      @locationData.range[0] + @quote.length
+      @locationData.range[1] - @quote.length
+    ]
+    @
 
   isEmpty: ->
     not @unquote().length
@@ -1563,9 +1584,9 @@ exports.IdentifierLiteral = class IdentifierLiteral extends Literal
     declaration: 'isDeclaration'
 
 exports.CSXTag = class CSXTag extends IdentifierLiteral
-  _compileToBabylon: (o) ->
-    type: 'JSXIdentifier'
-    name: @value
+  astType: 'JSXIdentifier'
+  astProps:
+    name: 'value'
 
 exports.PropertyName = class PropertyName extends Literal
   isAssignable: YES
@@ -5810,8 +5831,9 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
     super()
 
   @fromStringLiteral: (stringLiteral) ->
-    new StringWithInterpolations Block.wrap([ new Value stringLiteral ]), quote: stringLiteral.quote
-    .withLocationDataFrom stringLiteral
+    originalLocationData = stringLiteral.locationData
+    new StringWithInterpolations Block.wrap([ new Value stringLiteral.withoutQuotesInLocationData() ]), quote: stringLiteral.quote
+    .withLocationDataFrom locationData: originalLocationData
 
   children: ['body']
 
@@ -6774,6 +6796,27 @@ isLiteralThis = (node) ->
   node instanceof ThisLiteral or (node instanceof Code and node.bound)
 
 shouldCacheOrIsAssignable = (node) -> node.shouldCache() or node.isAssignable?()
+
+# taken from acorn
+codePointToString = (code) ->
+  # UTF-16 Decoding
+  return String.fromCharCode code if code <= 0xFFFF
+  code -= 0x10000
+  String.fromCharCode (code >> 10) + 0xD800, (code & 1023) + 0xDC00
+
+UNICODE_ESCAPE = ///
+  ( \\\\ ) # Make sure the escape isn't escaped
+  |
+  \\u\{ ( [\da-fA-F]+ ) \}
+  |
+  \\u ( [\da-fA-F]{4} )
+///g
+
+unicodeEscapesToString = (str) ->
+  str.replace UNICODE_ESCAPE, (match, escapedBackslash, codePointHex, escapeHex) ->
+    return escapedBackslash if escapedBackslash
+
+    codePointToString parseInt (codePointHex ? escapeHex), 16
 
 # Unfold a node's child if soak, then tuck the node under created `If`
 unfoldSoak = (o, parent, name) ->

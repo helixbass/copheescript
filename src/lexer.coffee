@@ -308,7 +308,7 @@ exports.Lexer = class Lexer
         indent = attempt if indent is null or 0 < attempt.length < indent.length
 
     delimiter = quote.charAt(0)
-    @mergeInterpolationTokens tokens, {quote, indent}, (value) =>
+    @mergeInterpolationTokens tokens, {quote, indent, endOffset: end}, (value) =>
       @validateUnicodeCodePointEscapes value, delimiter: quote
 
     if @atCSXTag()
@@ -477,7 +477,7 @@ exports.Lexer = class Lexer
         @token 'REGEX_START', '(',    {length: 0, origin}
         @token 'IDENTIFIER', 'RegExp', length: 0
         @token 'CALL_START', '(',      length: 0
-        @mergeInterpolationTokens tokens, {double: yes, heregex: {flags}}, (str) =>
+        @mergeInterpolationTokens tokens, {double: yes, heregex: {flags}, endOffset: end}, (str) =>
           @validateUnicodeCodePointEscapes str, {delimiter}
         if flags
           @token ',', ',',                    offset: index - 1, length: 0
@@ -650,7 +650,7 @@ exports.Lexer = class Lexer
         @token ',', 'JSX_COMMA'
         {tokens, index: end} =
           @matchWithInterpolations INSIDE_CSX, '>', '</', CSX_INTERPOLATION
-        @mergeInterpolationTokens tokens, {}, (value) =>
+        @mergeInterpolationTokens tokens, {endOffset: end}, (value) =>
           @validateUnicodeCodePointEscapes value, delimiter: '>'
         match = CSX_IDENTIFIER.exec(@chunk[end...]) or CSX_FRAGMENT_IDENTIFIER.exec(@chunk[end...])
         if not match or match[1] isnt csxTag.name
@@ -848,6 +848,11 @@ exports.Lexer = class Lexer
         [open, ..., close] = nested
         open[0]  = 'INTERPOLATION_START'
         open[1]  = '('
+        open[2].first_column -= interpolationOffset
+        open[2].range = [
+          open[2].range[0] - interpolationOffset
+          open[2].range[1]
+        ]
         close[0]  = 'INTERPOLATION_END'
         close[1] = ')'
         close.origin = ['', 'end of interpolation', close[2]]
@@ -873,17 +878,17 @@ exports.Lexer = class Lexer
       @error "missing #{closingDelimiter}", length: delimiter.length
 
     [firstToken, ..., lastToken] = tokens
-    firstToken[2].first_column -= delimiter.length
-    firstToken[2].range[0]     -= delimiter.length
-    lastToken[2].range[1]      += closingDelimiter.length
-    if lastToken[1].substr(-1) is '\n'
-      lastToken[2].last_line += 1
-      lastToken[2].last_column = closingDelimiter.length - 1
-    else
-      lastToken[2].last_column += closingDelimiter.length
-    if lastToken[1].length is 0
-      lastToken[2].last_column -= 1
-      lastToken[2].range[1]    -= 1
+    # firstToken[2].first_column -= delimiter.length
+    # firstToken[2].range[0]     -= delimiter.length
+    # lastToken[2].range[1]      += closingDelimiter.length
+    # if lastToken[1].substr(-1) is '\n'
+    #   lastToken[2].last_line += 1
+    #   lastToken[2].last_column = closingDelimiter.length - 1
+    # else
+    #   lastToken[2].last_column += closingDelimiter.length
+    # if lastToken[1].length is 0
+    #   lastToken[2].last_column -= 1
+    #   lastToken[2].range[1]    -= 1
 
     {tokens, index: offsetInChunk + closingDelimiter.length}
 
@@ -892,10 +897,10 @@ exports.Lexer = class Lexer
   # of `'NEOSTRING'`s are converted using `fn` and turned into strings using
   # `options` first.
   mergeInterpolationTokens: (tokens, options, fn) ->
-    {quote, indent, double, heregex} = options
+    {quote, indent, double, heregex, endOffset} = options
 
     if tokens.length > 1
-      lparen = @token 'STRING_START', '(', length: 0, data: {quote}
+      lparen = @token 'STRING_START', '(', length: quote?.length ? 0, data: {quote}
 
     firstIndex = @tokens.length
     $ = tokens.length - 1
@@ -929,6 +934,17 @@ exports.Lexer = class Lexer
           addTokenData token, {heregex} if heregex
           token[0] = 'STRING'
           token[1] = '"' + converted + '"'
+          if tokens.length is 1 and quote?
+            token[2].first_column -= quote.length
+            if token[1].substr(-2, 1) is '\n'
+              token[2].last_line += 1
+              token[2].last_column = quote.length - 1
+            else
+              token[2].last_column += quote.length
+            token[2].range = [
+              token[2].range[0] - quote.length
+              token[2].range[1] + quote.length
+            ]
           locationToken = token
           tokensToPush = [token]
       @tokens.push tokensToPush...
@@ -945,14 +961,14 @@ exports.Lexer = class Lexer
           lastToken[2].range[1]
         ]
       ]
-      lparen[2] = lparen.origin[2]
-      rparen = @token 'STRING_END', ')'
-      rparen[2] =
-        first_line:   lastToken[2].last_line
-        first_column: lastToken[2].last_column
-        last_line:    lastToken[2].last_line
-        last_column:  lastToken[2].last_column
-        range:        lastToken[2].range
+      # lparen[2] = lparen.origin[2]
+      rparen = @token 'STRING_END', ')', offset: endOffset - (quote ? '').length, length: quote?.length ? 0
+      # rparen[2] =
+      #   first_line:   lastToken[2].last_line
+      #   first_column: lastToken[2].last_column
+      #   last_line:    lastToken[2].last_line
+      #   last_column:  lastToken[2].last_column
+      #   range:        lastToken[2].range
 
   # Pairs up a closing token, ensuring that all listed pairs of tokens are
   # correctly balanced throughout the course of the token stream.
@@ -1017,7 +1033,7 @@ exports.Lexer = class Lexer
     lastCharacter = if length > 0 then (length - 1) else 0
     [locationData.last_line, locationData.last_column, endOffset] =
       @getLineAndColumnFromChunk offsetInChunk + lastCharacter
-    locationData.range[1] = endOffset + 1
+    locationData.range[1] = if length > 0 then endOffset + 1 else endOffset
 
     locationData
 
