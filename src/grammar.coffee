@@ -47,9 +47,14 @@ o = (patternString, action, options) ->
     getAddDataToNodeFunctionString = (first, last) ->
       "yy.addDataToNode(yy, @#{first}, #{if last then "@#{last}" else 'null'}, {forceUpdateLocation: true})"
 
+    returnsLoc = /^LOC/.test action
     action = action.replace /LOC\(([0-9]*)\)/g, getAddDataToNodeFunctionString('$1')
     action = action.replace /LOC\(([0-9]*),\s*([0-9]*)\)/g, getAddDataToNodeFunctionString('$1', '$2')
-    performActionFunctionString = "$$ = #{getAddDataToNodeFunctionString(1, patternCount)}(#{action});"
+    performActionFunctionString =
+      if returnsLoc
+        "$$ = #{action};"
+      else
+        "$$ = #{getAddDataToNodeFunctionString(1, patternCount)}(#{action});"
   else
     performActionFunctionString = '$$ = $1;'
 
@@ -790,7 +795,7 @@ grammar =
   # An individual **When** clause, with action.
   When: [
     o 'LEADING_WHEN SimpleArgs Block',            -> new SwitchWhen $2, $3
-    o 'LEADING_WHEN SimpleArgs Block TERMINATOR', -> new SwitchWhen $2, $3
+    o 'LEADING_WHEN SimpleArgs Block TERMINATOR', -> LOC(1, 3) new SwitchWhen $2, $3
   ]
 
   # The most basic form of *if* is a condition and an action. The following
