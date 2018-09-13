@@ -6387,12 +6387,12 @@ exports.Switch = class Switch extends Base
   isStatement: YES
 
   jumps: (o = {block: yes}) ->
-    for [conds, block] in @cases
+    for {block} in @cases
       return jumpNode if jumpNode = block.jumps o
     @otherwise?.jumps o
 
   makeReturn: (opts) ->
-    pair[1].makeReturn opts for pair in @cases
+    block.makeReturn opts for {block} in @cases
     @otherwise or= new Block [new UndefinedLiteral] if opts?.accumulator
     @otherwise?.makeReturn opts
     this
@@ -6405,7 +6405,7 @@ exports.Switch = class Switch extends Base
     cases: [
       ...flatten(
         for kase, caseIndex in @cases
-          [tests, consequent] = kase
+          {conditions: tests, block: consequent, leadingToken, trailingToken} = kase
           tests = flatten [tests]
           lastTestIndex = tests.length - 1
           for test, testIndex in tests
@@ -6428,6 +6428,8 @@ exports.Switch = class Switch extends Base
               trailing: testIndex is lastTestIndex
             )
             mergeAstLocationData compiledCase, compiledCase.consequent[compiledCase.consequent.length - 1] if compiledCase.consequent.length
+            mergeAstLocationData compiledCase, locationDataToAst(kase.locationData), justLeading: yes if testIndex is 0
+            mergeAstLocationData compiledCase, locationDataToAst(kase.locationData), justEnding:  yes if testIndex is lastTestIndex
             compiledCase
       )
       ...(
@@ -6445,7 +6447,7 @@ exports.Switch = class Switch extends Base
     fragments = [].concat @makeCode(@tab + "switch ("),
       (if @subject then @subject.compileToFragments(o, LEVEL_PAREN) else @makeCode "false"),
       @makeCode(") {\n")
-    for [conditions, block], i in @cases
+    for {conditions, block}, i in @cases
       for cond in flatten [conditions]
         cond  = cond.invert() unless @subject
         fragments = fragments.concat @makeCode(idt1 + "case "), cond.compileToFragments(o, LEVEL_PAREN), @makeCode(":\n")
@@ -6458,6 +6460,12 @@ exports.Switch = class Switch extends Base
       fragments.push @makeCode(idt1 + "default:\n"), (@otherwise.compileToFragments o, LEVEL_TOP)..., @makeCode("\n")
     fragments.push @makeCode @tab + '}'
     fragments
+
+exports.SwitchWhen = class SwitchWhen extends Base
+  constructor: (@conditions, @block) ->
+    super()
+
+  children: ['conditions', 'block']
 
 #### If
 

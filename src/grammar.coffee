@@ -779,18 +779,18 @@ grammar =
     o 'SWITCH Expression INDENT Whens ELSE Block OUTDENT',     -> new Switch $2, $4, LOC(5,6) $6
     o 'SWITCH ExpressionLine INDENT Whens ELSE Block OUTDENT', -> new Switch $2, $4, LOC(5,6) $6
     o 'SWITCH INDENT Whens OUTDENT',                           -> new Switch null, $3
-    o 'SWITCH INDENT Whens ELSE Block OUTDENT',                -> new Switch null, $3, $5
+    o 'SWITCH INDENT Whens ELSE Block OUTDENT',                -> new Switch null, $3, LOC(4,5) $5
   ]
 
   Whens: [
-    o 'When'
+    o 'When',                                   -> [$1]
     o 'Whens When',                             -> $1.concat $2
   ]
 
   # An individual **When** clause, with action.
   When: [
-    o 'LEADING_WHEN SimpleArgs Block',            -> [[$2, $3]]
-    o 'LEADING_WHEN SimpleArgs Block TERMINATOR', -> [[$2, $3]]
+    o 'LEADING_WHEN SimpleArgs Block',            -> new SwitchWhen $2, $3
+    o 'LEADING_WHEN SimpleArgs Block TERMINATOR', -> new SwitchWhen $2, $3
   ]
 
   # The most basic form of *if* is a condition and an action. The following

@@ -291,31 +291,33 @@ exports.astLocationFields = locationFields = ['loc', 'range', 'start', 'end']
 
 # Extends the location data of an AST node to include the location data from
 # another AST node.
-exports.mergeAstLocationData = mergeAstLocationData = (intoNode, fromNode) ->
+exports.mergeAstLocationData = mergeAstLocationData = (intoNode, fromNode, {justLeading, justEnding} = {}) ->
   if Array.isArray fromNode
     mergeAstLocationData intoNode, fromItem for fromItem in fromNode
     return intoNode
   {range: intoRange} = intoNode
   {range: fromRange} = fromNode
   return intoNode unless intoRange and fromRange
-  if fromRange[0] < intoRange[0]
-    intoNode.range = [
-      fromRange[0]
-      intoRange[1]
-    ]
-    intoNode.start = fromNode.start
-    intoNode.loc =
-      start: fromNode.loc.start
-      end: intoNode.loc.end
-  if fromRange[1] > intoRange[1]
-    intoNode.range = [
-      intoRange[0]
-      fromRange[1]
-    ]
-    intoNode.end = fromNode.end
-    intoNode.loc =
-      start: intoNode.loc.start
-      end: fromNode.loc.end
+  unless justEnding
+    if fromRange[0] < intoRange[0]
+      intoNode.range = [
+        fromRange[0]
+        intoRange[1]
+      ]
+      intoNode.start = fromNode.start
+      intoNode.loc =
+        start: fromNode.loc.start
+        end: intoNode.loc.end
+  unless justLeading
+    if fromRange[1] > intoRange[1]
+      intoNode.range = [
+        intoRange[0]
+        fromRange[1]
+      ]
+      intoNode.end = fromNode.end
+      intoNode.loc =
+        start: intoNode.loc.start
+        end: fromNode.loc.end
   intoNode
 
 exports.isFunction = isFunction = (obj) -> Object::toString.call(obj) is '[object Function]'
