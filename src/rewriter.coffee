@@ -573,8 +573,8 @@ exports.Rewriter = class Rewriter
       return 1 if token.generated and token[0] is 'CALL_END' and precedingComment?.indented
       prevLocationData = precedingComment.locationData if precedingComment?
       token[2] =
-        first_line:   prevLocationData.last_line
-        first_column: prevLocationData.last_column
+        first_line:   if precedingComment? then prevLocationData.first_line   else prevLocationData.last_line
+        first_column: if precedingComment? then prevLocationData.first_column else prevLocationData.last_column
         last_line:    prevLocationData.last_line
         last_column:  prevLocationData.last_column
         range:        prevLocationData.range

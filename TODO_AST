@@ -5,3 +5,12 @@
 - StringLiteral extra.raw escaping - seems like maybe extra.raw should include triple quotes if it's a heredoc and then not escape the quote (in makeDelimitedLiteral())?
 - should update to OptionalCallExpression/OptionalMemberExpression? Is that where babel 7 landed?
 - alternate location data includes "else" for inline eg if a then b else c
+- (implicit?) object location data should include trailing indented comma? eg
+  obj =
+    a: 1
+    # comment
+  same with leading comment eg
+  obj =
+    ### comment ###
+    a: 1
+- use ClassProperty for static class fields eg @a: 2?

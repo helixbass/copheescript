@@ -362,6 +362,7 @@ exports.Lexer = class Lexer
         leadingNewlines = _leadingNewlines
         ''
       precedingNonCommentLines = ''
+      hasSeenFirstCommentLine = no
       contents =
         content.split '\n'
         .map (line, index) ->
@@ -372,7 +373,8 @@ exports.Lexer = class Lexer
           content = line.replace /^([ |\t]*)#/, (_, whitespace) ->
             leadingWhitespace = whitespace
             ''
-          ret = {length: content.length + 1, content, leadingWhitespace: "#{precedingNonCommentLines}#{if index is 0 then leadingNewlines else ''}#{leadingWhitespace}"}
+          ret = {length: content.length + 1, content, leadingWhitespace: "#{precedingNonCommentLines}#{unless hasSeenFirstCommentLine then leadingNewlines else ''}#{leadingWhitespace}"}
+          hasSeenFirstCommentLine = yes
           precedingNonCommentLines = ''
           ret
         .filter (comment) -> comment

@@ -1117,7 +1117,7 @@ exports.Block = class Block extends Base
   asExpressionStatement: (compiled) ->
     @includeCommentsInLocationData @hoistBabylonComments do ->
       return compiled unless compiled.type
-      return compiled if compiled.type in ['VariableDeclaration', 'ImportDeclaration', 'ClassMethod']
+      return compiled if compiled.type in ['VariableDeclaration', 'ImportDeclaration', 'ClassMethod', 'ClassProperty']
       type: 'ExpressionStatement'
       expression: compiled
       loc: compiled.loc
@@ -3275,7 +3275,7 @@ exports.Class = class Class extends Base
             exprs.push obj
 
         while assign = properties[end]
-          if initializerExpression = @addInitializerExpression assign
+          if initializerExpression = @addInitializerExpression assign, o
             pushSlice()
             exprs.push initializerExpression
             initializer.push initializerExpression
@@ -3286,7 +3286,7 @@ exports.Class = class Class extends Base
         expressions[i..i] = exprs
         i += exprs.length
       else
-        if initializerExpression = @addInitializerExpression expression
+        if initializerExpression = @addInitializerExpression expression, o
           initializer.push initializerExpression
           expressions[i] = initializerExpression
         i += 1
@@ -3320,13 +3320,28 @@ exports.Class = class Class extends Base
   # initializer as an escape hatch for ES features that are not implemented
   # (e.g. getters and setters defined via the `get` and `set` keywords as
   # opposed to the `Object.defineProperty` method).
-  addInitializerExpression: (node) ->
+  addInitializerExpression: (node, o) ->
     if node.unwrapAll() instanceof PassthroughLiteral
       node
     else if @validInitializerMethod node
       @addInitializerMethod node
+    else if not o.compiling and @validClassProperty node
+      @addClassProperty node
     else
       null
+
+  validClassProperty: (node) ->
+    return no unless node instanceof Assign
+    return node.variable.looksStatic @name
+
+  addClassProperty: (node) ->
+    {variable, value, operatorToken} = node
+    node.withLocationData new ClassProperty {
+      name: variable.properties[0]
+      isStatic: variable.looksStatic @name # is always static, this is to get className
+      value
+      operatorToken
+    }
 
   # Checks if the given node is a valid ES class initializer method.
   validInitializerMethod: (node) ->
@@ -3383,6 +3398,26 @@ exports.Class = class Class extends Base
       @withLocationData new Assign name, new Call(new Value(name, [new Access new PropertyName 'bind']), [new ThisLiteral])
 
     null
+
+exports.ClassProperty = class ClassProperty extends Base
+  constructor: ({@name, @isStatic, @value, @operatorToken}) ->
+    super()
+
+  children: ['name', 'value']
+
+  astChildren:
+    key: 'name'
+    value: 'value'
+  astProps: ->
+    fields =
+      static: @isStatic
+      computed: do =>
+        return yes if @name instanceof Index
+        return yes if @name instanceof Access and @name.name instanceof ComputedPropertyName
+        no
+      operator: @operatorToken?.value ? '='
+    fields.staticClassName = @isStatic.className if @isStatic?.className
+    fields
 
 exports.ExecutableClassBody = class ExecutableClassBody extends Base
   children: [ 'class', 'body' ]
