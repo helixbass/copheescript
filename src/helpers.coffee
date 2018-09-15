@@ -300,7 +300,7 @@ exports.mergeAstLocationData = mergeAstLocationData = (intoNode, fromNode, {just
   return intoNode unless intoRange and fromRange
   unless justEnding
     if fromRange[0] < intoRange[0]
-      intoNode.range = [
+      intoNode.range = intoRange = [
         fromRange[0]
         intoRange[1]
       ]

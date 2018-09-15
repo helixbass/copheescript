@@ -1591,7 +1591,11 @@ exports.CSXTag = class CSXTag extends IdentifierLiteral
 exports.PropertyName = class PropertyName extends Literal
   isAssignable: YES
 
-  astType: 'Identifier'
+  astType: ->
+    if @csx
+      'JSXIdentifier'
+    else
+      'Identifier'
   astProps:
     name: 'value'
 
@@ -1902,14 +1906,20 @@ exports.Value = class Value extends Base
   _toAst: (o) ->
     props = @properties
     ret = @base.toAst o, if props.length then LEVEL_ACCESS else null
+    isCsx = @base instanceof CSXTag
     for prop, propIndex in props
+      prop.name.csx = yes if isCsx
       ret =
         if prop instanceof Slice and o.compiling
           prop.compileValueToBabylon o, ret
         else
           mergeAstLocationData(
             prop.withAstLocationData
-              type: 'MemberExpression'
+              type:
+                if isCsx
+                  'JSXMemberExpression'
+                else
+                  'MemberExpression'
               object: ret
               property: prop.toAst o
               computed: prop instanceof Index or prop.name?.unwrap() not instanceof PropertyName
@@ -2171,8 +2181,10 @@ exports.Call = class Call extends Base
           openingElement =
             tagName.withAstLocationData
               type: 'JSXOpeningElement'
-              name: tagName.toAst o#, LEVEL_ACCESS
+              name: @variable.unwrap().toAst o#, LEVEL_ACCESS
               selfClosing: not content
+          for prop in @variable.properties
+            mergeAstLocationData openingElement, locationDataToAst prop.locationData
           openingElement.attributes = flatten(
             if attributes.base instanceof Arr
               mergeAstLocationData openingElement, locationDataToAst attributes.base.locationData
@@ -2199,11 +2211,27 @@ exports.Call = class Call extends Base
               @withCopiedBabylonLocationData(
                 type: 'JSXClosingElement'
                 name: @withCopiedBabylonLocationData(
-                  tagName.toAst o
+                  @variable.unwrap().toAst o#, LEVEL_ACCESS
                   closingElementBabylonLocationData # TODO: this is inaccurate but not sure where to store the closing tagname location data
                 )
                 closingElementBabylonLocationData
               )
+            if closingElement.name.type is 'JSXMemberExpression'
+              rangeDiff = closingElement.range[0] - openingElement.range[0] + '/'.length
+              shiftAstLocationData = (node) ->
+                node.range = [
+                  node.range[0] + rangeDiff
+                  node.range[1] + rangeDiff
+                ]
+                node.start += rangeDiff
+                node.end += rangeDiff
+              currentExpr = closingElement.name
+              while currentExpr.type is 'JSXMemberExpression'
+                shiftAstLocationData currentExpr unless currentExpr is closingElement.name
+                shiftAstLocationData currentExpr.property
+                currentExpr = currentExpr.object
+              shiftAstLocationData currentExpr
+              
           {
             type: 'JSXElement'
             openingElement, closingElement

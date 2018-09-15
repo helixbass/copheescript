@@ -623,12 +623,23 @@ exports.Lexer = class Lexer
         prev[0] not in COMPARABLE_LEFT_SIDE
       )
       [input, id] = match
+      fullId = id
+      if '.' in id
+        [id, properties...] = id.split '.'
+      else
+        properties = []
       origin = @token 'CSX_TAG', id, length: id.length + 1
+      offset = id.length + 1
+      for prop in properties
+        @token '.', '.', {offset}
+        offset += 1
+        @token 'PROPERTY', prop, {offset}
+        offset += prop.length
       @token 'CALL_START', '(', offset: 1, length: id.length # encode the opening tagname location
       @token '[', '['
-      @ends.push tag: '/>', origin: origin, name: id
+      @ends.push {tag: '/>', origin, name: id, properties}
       @csxDepth++
-      return id.length + 1
+      return fullId.length + 1
     else if csxTag = @atCSXTag()
       if @chunk[...2] is '/>'
         @pair '/>'
@@ -655,14 +666,14 @@ exports.Lexer = class Lexer
         @mergeInterpolationTokens tokens, {endOffset: end}, (value) =>
           @validateUnicodeCodePointEscapes value, delimiter: '>'
         match = CSX_IDENTIFIER.exec(@chunk[end...]) or CSX_FRAGMENT_IDENTIFIER.exec(@chunk[end...])
-        if not match or match[1] isnt csxTag.name
+        if not match or match[1] isnt "#{csxTag.name}#{(".#{prop}" for prop in csxTag.properties).join ''}"
           @error "expected corresponding CSX closing tag for #{csxTag.name}",
             csxTag.origin[2]
-        afterTag = end + csxTag.name.length
+        afterTag = end + match[1].length
         if @chunk[afterTag] isnt '>'
           @error "missing closing > after tag name", offset: afterTag, length: 1
         # +2 for the opening `</` and +1 for the closing `>`.
-        @token 'CALL_END', ')', offset: end - 2, length: csxTag.name.length + 3
+        @token 'CALL_END', ')', offset: end - 2, length: match[1].length + 3
         @csxDepth--
         return afterTag + 1
       else
