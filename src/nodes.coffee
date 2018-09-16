@@ -2202,6 +2202,7 @@ exports.Call = class Call extends Base
                   attr.withAstLocationData
                     type: 'JSXAttribute'
                     name: compiled
+                    value: null
                 else
                   compiled
             else [])
