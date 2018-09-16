@@ -657,8 +657,11 @@ exports.Lexer = class Lexer
         return 2
       else if firstChar is '{'
         if prevChar is ':'
-          token = @token '(', '('
+          token = @token '(', '{'
           @csxObjAttribute[@csxDepth] = no
+          # tag attribute name as csx
+          addTokenData @tokens[@tokens.length - 3],
+            csx: yes
         else
           token = @token '{', '{'
           @csxObjAttribute[@csxDepth] = yes
@@ -674,7 +677,7 @@ exports.Lexer = class Lexer
         @token ',', 'JSX_COMMA', generated: yes
         {tokens, index: end} =
           @matchWithInterpolations INSIDE_CSX, '>', '</', CSX_INTERPOLATION
-        @mergeInterpolationTokens tokens, {endOffset: end}, (value) =>
+        @mergeInterpolationTokens tokens, {endOffset: end, csx: yes}, (value) =>
           @validateUnicodeCodePointEscapes value, delimiter: '>'
         match = CSX_IDENTIFIER.exec(@chunk[end...]) or CSX_FRAGMENT_IDENTIFIER.exec(@chunk[end...])
         if not match or match[1] isnt "#{csxTag.name}#{(".#{prop}" for prop in csxTag.properties).join ''}"
@@ -707,8 +710,8 @@ exports.Lexer = class Lexer
           @token '}', '}'
           @csxObjAttribute[@csxDepth] = no
         else
-          @token ')', ')'
-        @token ',', ','
+          @token ')', '}'
+        @token ',', ',', generated: yes
         return 1
       else
         return 0
@@ -932,7 +935,7 @@ exports.Lexer = class Lexer
   # of `'NEOSTRING'`s are converted using `fn` and turned into strings using
   # `options` first.
   mergeInterpolationTokens: (tokens, options, fn) ->
-    {quote, indent, double, heregex, endOffset} = options
+    {quote, indent, double, heregex, endOffset, csx} = options
 
     if tokens.length > 1
       lparen = @token 'STRING_START', '(', length: quote?.length ? 0, data: {quote}, generated: not quote?.length
@@ -966,6 +969,7 @@ exports.Lexer = class Lexer
           addTokenData token, finalChunk: yes   if i is $
           addTokenData token, {indent, quote, double}
           addTokenData token, {heregex} if heregex
+          addTokenData token, {csx} if csx
           token[0] = 'STRING'
           token[1] = '"' + converted + '"'
           if tokens.length is 1 and quote?

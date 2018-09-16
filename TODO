@@ -16,3 +16,5 @@
 - whitespace (eg tests from no-irregular-whitespace) at end of file-ending line comment seems to get lost
 - arrow functions don't have arguments, so shouldn't generate arrow function that references arguments?
 - should tagged template literal be able to have string/template literal as its tag?
+- should allow closing /> to be "indented"?
+- allow : in JSX tag names?

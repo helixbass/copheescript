@@ -2184,11 +2184,21 @@ exports.Call = class Call extends Base
     {
       ...(
         unless tagName.value.length
-          type: 'JSXFragment'
-          openingFragment: tagName.withAstLocationData
+          openingFragment = tagName.withAstLocationData
             type: 'JSXOpeningFragment'
-          closingFragment: tagName.withAstLocationData
-            type: 'JSXClosingFragment'
+          if attributes.base instanceof Arr
+            mergeAstLocationData openingFragment, locationDataToAst attributes.base.locationData
+          closingFragment =
+            @withCopiedBabylonLocationData(
+              type: 'JSXClosingFragment'
+              locationDataToAst tagName.closingTagOpeningBracketLocationData
+            )
+          mergeAstLocationData closingFragment, locationDataToAst tagName.closingTagClosingBracketLocationData
+          {
+            type: 'JSXFragment'
+            openingFragment
+            closingFragment
+          }
         else
           openingElement =
             tagName.withAstLocationData
