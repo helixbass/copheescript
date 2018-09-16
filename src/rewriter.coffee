@@ -47,7 +47,6 @@ exports.Rewriter = class Rewriter
     if process?.env?.DEBUG_TOKEN_STREAM
       console.log 'Initial token stream:' if process.env.DEBUG_REWRITTEN_TOKEN_STREAM
       console.log (t[0] + '/' + t[1] + (if t.comments then '*' else '') for t in @tokens).join ' '
-    dump {@tokens}
     @removeLeadingNewlines()
     @closeOpenCalls()
     @closeOpenIndexes()
@@ -62,7 +61,6 @@ exports.Rewriter = class Rewriter
     if process?.env?.DEBUG_REWRITTEN_TOKEN_STREAM
       console.log 'Rewritten token stream:' if process.env.DEBUG_TOKEN_STREAM
       console.log (t[0] + '/' + t[1] + (if t.comments then '*' else '') for t in @tokens).join ' '
-    dump {@tokens}
     @tokens
 
   # Rewrite the token stream, looking one token ahead and behind.
@@ -546,7 +544,7 @@ exports.Rewriter = class Rewriter
   fixIndentationLocationData: ->
     @scanTokens (token, i, tokens) ->
       return 1 unless token[0] in ['INDENT', 'OUTDENT'] or
-        (token.generated and token[0] is 'CALL_END') or
+        (token.generated and token[0] is 'CALL_END' and not token.data?.closingTagNameToken) or
         (token.generated and token[0] is '}')
       prevToken = token.prevToken ? tokens[i - 1]
       prevLocationData = prevToken[2]

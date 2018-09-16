@@ -1587,9 +1587,14 @@ exports.IdentifierLiteral = class IdentifierLiteral extends Literal
     declaration: 'isDeclaration'
 
 exports.CSXTag = class CSXTag extends IdentifierLiteral
-  constructor: (value, {@tagNameLocationData}) ->
+  constructor: (value, {
+    @tagNameLocationData
+    @closingTagOpeningBracketLocationData
+    @closingTagSlashLocationData
+    @closingTagNameLocationData
+    @closingTagClosingBracketLocationData
+  }) ->
     super value
-    dump @
 
   astType: 'JSXIdentifier'
   astProps:
@@ -2175,7 +2180,6 @@ exports.Call = class Call extends Base
   CSXToAst: (o) ->
     [attributes, content] = @args
     tagName = @variable.base
-    dump {tagName}
     tagName.locationData = tagName.tagNameLocationData
     {
       ...(
@@ -2214,17 +2218,20 @@ exports.Call = class Call extends Base
                 else
                   compiled
             else [])
+          closingElement = null
           if content
-            closingElementBabylonLocationData = locationDataToAst @args.closingBracketLocationData
+            closingTagNameAstLocationData = locationDataToAst tagName.closingTagNameLocationData
             closingElement =
               @withCopiedBabylonLocationData(
                 type: 'JSXClosingElement'
                 name: @withCopiedBabylonLocationData(
                   @variable.unwrap().toAst o#, LEVEL_ACCESS
-                  closingElementBabylonLocationData # TODO: this is inaccurate but not sure where to store the closing tagname location data
+                  closingTagNameAstLocationData
                 )
-                closingElementBabylonLocationData
+                closingTagNameAstLocationData
               )
+            mergeAstLocationData closingElement, locationDataToAst tagName.closingTagOpeningBracketLocationData
+            mergeAstLocationData closingElement, locationDataToAst tagName.closingTagClosingBracketLocationData
             if closingElement.name.type is 'JSXMemberExpression'
               rangeDiff = closingElement.range[0] - openingElement.range[0] + '/'.length
               shiftAstLocationData = (node) ->

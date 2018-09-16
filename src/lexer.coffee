@@ -249,7 +249,7 @@ exports.Lexer = class Lexer
       colonToken = @token ':', ':', offset: colonOffset
       colonToken.csxColon = yes if inCSXTag # used by rewriter
     if inCSXTag and tag is 'IDENTIFIER' and prev[0] isnt ':'
-      @token ',', ',', length: 0, origin: tagToken
+      @token ',', ',', length: 0, origin: tagToken, generated: yes
 
     input.length
 
@@ -632,7 +632,6 @@ exports.Lexer = class Lexer
         data:
           openingBracketToken: @makeToken '<', '<'
           tagNameToken: @makeToken 'IDENTIFIER', id, offset: 1
-      dump {tagToken}
       offset = id.length + 1
       for prop in properties
         @token '.', '.', {offset}
@@ -645,10 +644,15 @@ exports.Lexer = class Lexer
       @csxDepth++
       return fullId.length + 1
     else if csxTag = @atCSXTag()
-      if @chunk[...2] is '/>'
+      if @chunk[...2] is '/>' # self-closing tag
         @pair '/>'
-        @token ']', ']',        length: 2
-        @token 'CALL_END', ')', length: 2
+        @token ']', ']', length: 2, generated: yes
+        @token 'CALL_END', ')',
+          length: 2
+          generated: yes
+          data:
+            selfClosingSlashToken: @makeToken '/', '/'
+            closingBracketToken: @makeToken '>', '>', offset: 1
         @csxDepth--
         return 2
       else if firstChar is '{'
@@ -660,11 +664,14 @@ exports.Lexer = class Lexer
           @csxObjAttribute[@csxDepth] = yes
         @ends.push {tag: '}', origin: token}
         return 1
-      else if firstChar is '>'
+      else if firstChar is '>' # end of opening tag
         # Ignore terminators inside a tag.
-        @pair '/>' # As if the current tag was self-closing.
-        @token ']', ']'
-        @token ',', 'JSX_COMMA'
+        {origin: openingTagToken} = @pair '/>' # As if the current tag was self-closing.
+        @token ']', ']',
+          generated: yes
+          data:
+            closingBracketToken: @makeToken '>', '>'
+        @token ',', 'JSX_COMMA', generated: yes
         {tokens, index: end} =
           @matchWithInterpolations INSIDE_CSX, '>', '</', CSX_INTERPOLATION
         @mergeInterpolationTokens tokens, {endOffset: end}, (value) =>
@@ -677,7 +684,18 @@ exports.Lexer = class Lexer
         if @chunk[afterTag] isnt '>'
           @error "missing closing > after tag name", offset: afterTag, length: 1
         # +2 for the opening `</` and +1 for the closing `>`.
-        @token 'CALL_END', ')', offset: end - 2, length: match[1].length + 3
+        endToken = @token 'CALL_END', ')',
+          offset: end - 2
+          length: match[1].length + 3
+          generated: yes
+          data:
+            closingTagOpeningBracketToken: @makeToken '<', '<', offset: end - 2
+            closingTagSlashToken: @makeToken '/', '/', offset: end - 1
+            # TODO: individual tokens for complex tag name? eg < / A . B >
+            closingTagNameToken: @makeToken 'IDENTIFIER', match[1], offset: end
+            closingTagClosingBracketToken: @makeToken '>', '>', offset: end + match[1].length
+        # make the closing tag location data more easily accessible to the grammar
+        addTokenData openingTagToken, endToken.data
         @csxDepth--
         return afterTag + 1
       else
@@ -841,7 +859,7 @@ exports.Lexer = class Lexer
       @validateEscapes strPart, {isRegex: delimiter.charAt(0) is '/', offsetInChunk}
 
       # Push a fake `'NEOSTRING'` token, which will get turned into a real string later.
-      tokens.push @makeToken 'NEOSTRING', strPart, offset: offsetInChunk
+      tokens.push @makeToken 'NEOSTRING', strPart, offset: offsetInChunk, generated: strPart.length is 0
 
       str = str[strPart.length..]
       offsetInChunk += strPart.length
@@ -881,8 +899,8 @@ exports.Lexer = class Lexer
 
       unless braceInterpolator
         # We are not using `{` and `}`, so wrap the interpolated tokens instead.
-        open = @makeToken 'INTERPOLATION_START', '(', offset: offsetInChunk,         length: 0
-        close = @makeToken 'INTERPOLATION_END', ')',  offset: offsetInChunk + index, length: 0
+        open = @makeToken 'INTERPOLATION_START', '(', offset: offsetInChunk,         length: 0, generated: yes
+        close = @makeToken 'INTERPOLATION_END', ')',  offset: offsetInChunk + index, length: 0, generated: yes
         nested = [open, nested..., close]
 
       # Push a fake `'TOKENS'` token, which will get turned into real tokens later.
@@ -917,7 +935,7 @@ exports.Lexer = class Lexer
     {quote, indent, double, heregex, endOffset} = options
 
     if tokens.length > 1
-      lparen = @token 'STRING_START', '(', length: quote?.length ? 0, data: {quote}
+      lparen = @token 'STRING_START', '(', length: quote?.length ? 0, data: {quote}, generated: not quote?.length
 
     firstIndex = @tokens.length
     $ = tokens.length - 1
@@ -978,7 +996,7 @@ exports.Lexer = class Lexer
         ]
       ]
       # lparen[2] = lparen.origin[2]
-      rparen = @token 'STRING_END', ')', offset: endOffset - (quote ? '').length, length: quote?.length ? 0
+      rparen = @token 'STRING_END', ')', offset: endOffset - (quote ? '').length, length: quote?.length ? 0, generated: not quote?.length
       # rparen[2] =
       #   first_line:   lastToken[2].last_line
       #   first_column: lastToken[2].last_column
