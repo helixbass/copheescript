@@ -505,10 +505,13 @@ exports.Base = class Base
         astFields[key] = @[propName]
     astFields
 
-  withAstLocationData: (ast, node) ->
+  withAstLocationData: (ast, node, {force} = {}) ->
+    if node and 'force' of node and 'locationData' not of node
+      force = node.force
+      node = null
     return (@withAstLocationData(item, node) for item in ast) if Array.isArray ast
     {locationData} = node ? @
-    return ast unless locationData and ast and not ast.start?
+    return ast unless locationData and ast and (not ast.start? or force)
     merge ast, locationDataToAst locationData
 
   withAstReturns: (ast) ->
@@ -1584,6 +1587,10 @@ exports.IdentifierLiteral = class IdentifierLiteral extends Literal
     declaration: 'isDeclaration'
 
 exports.CSXTag = class CSXTag extends IdentifierLiteral
+  constructor: (value, {@tagNameLocationData}) ->
+    super value
+    dump @
+
   astType: 'JSXIdentifier'
   astProps:
     name: 'value'
@@ -2168,7 +2175,8 @@ exports.Call = class Call extends Base
   CSXToAst: (o) ->
     [attributes, content] = @args
     tagName = @variable.base
-    tagName.locationData = @args.openingBracketLocationData
+    dump {tagName}
+    tagName.locationData = tagName.tagNameLocationData
     {
       ...(
         unless tagName.value.length
@@ -2990,9 +2998,14 @@ exports.Obj = class Obj extends Base
       prop.eachName iterator if prop.eachName?
 
   CSXAttributesToAst: (o) ->
-    for prop in @properties
-      prop.csx = yes
-      prop.toAst o#, LEVEL_TOP
+    compiledProps =
+      for prop in @properties
+        prop.csx = yes
+        prop.toAst o#, LEVEL_TOP
+    if @properties.length is 1 and @properties[0] instanceof Splat
+      # include surrounding `{` and `}` of eg `{...b}` spread prop in location data
+      return @withAstLocationData compiledProps[0], force: yes
+    compiledProps
 
   compileCSXAttributes: (o) ->
     props = @properties

@@ -410,8 +410,7 @@ exports.Lexer = class Lexer
       # this comment to; and follow with a newline.
       commentAttachments[0].newLine = yes
       @lineToken chunk: @chunk[withLeadingWhitespace.length..], offset: withLeadingWhitespace.length # Set the indent.
-      placeholderToken = @makeToken 'JS', '', offset: withLeadingWhitespace.length
-      placeholderToken.generated = yes
+      placeholderToken = @makeToken 'JS', '', offset: withLeadingWhitespace.length, generated: yes
       placeholderToken.comments = commentAttachments
       @tokens.push placeholderToken
       @newlineToken offset: withLeadingWhitespace.length
@@ -628,16 +627,21 @@ exports.Lexer = class Lexer
         [id, properties...] = id.split '.'
       else
         properties = []
-      origin = @token 'CSX_TAG', id, length: id.length + 1
+      tagToken = @token 'CSX_TAG', id,
+        length: id.length + 1
+        data:
+          openingBracketToken: @makeToken '<', '<'
+          tagNameToken: @makeToken 'IDENTIFIER', id, offset: 1
+      dump {tagToken}
       offset = id.length + 1
       for prop in properties
         @token '.', '.', {offset}
         offset += 1
         @token 'PROPERTY', prop, {offset}
         offset += prop.length
-      @token 'CALL_START', '(', offset: 1, length: id.length # encode the opening tagname location
-      @token '[', '['
-      @ends.push {tag: '/>', origin, name: id, properties}
+      @token 'CALL_START', '(', generated: yes, offset: 1, length: id.length # encode the opening tagname location
+      @token '[', '[', generated: yes
+      @ends.push {tag: '/>', origin: tagToken, name: id, properties}
       @csxDepth++
       return fullId.length + 1
     else if csxTag = @atCSXTag()
@@ -923,8 +927,7 @@ exports.Lexer = class Lexer
         when 'TOKENS'
           # There are comments (and nothing else) in this interpolation.
           if value.length is 2 and (value[0].comments or value[1].comments)
-            placeholderToken = @makeToken 'JS', ''
-            placeholderToken.generated = yes
+            placeholderToken = @makeToken 'JS', '', generated: yes
             # Use the same location data as the first parenthesis.
             placeholderToken[2] = value[0][2]
             for val in value when val.comments
@@ -1052,9 +1055,11 @@ exports.Lexer = class Lexer
 
   # Same as `token`, except this just returns the token without adding it
   # to the results.
-  makeToken: (tag, value, {offset: offsetInChunk = 0, length = value.length, origin} = {}) ->
+  makeToken: (tag, value, {offset: offsetInChunk = 0, length = value.length, origin, data, generated} = {}) ->
     token = [tag, value, @makeLocationData {offsetInChunk, length}]
+    addTokenData token, data if data
     token.origin = origin if origin
+    token.generated = yes if generated
     token
 
   # Add a token to the results.
@@ -1063,9 +1068,8 @@ exports.Lexer = class Lexer
   # not specified, the length of `value` will be used.
   #
   # Returns the new token.
-  token: (tag, value, {offset, length, origin, data} = {}) ->
-    token = @makeToken tag, value, {offset, length, origin}
-    addTokenData token, data if data
+  token: (tag, value, {offset, length, origin, data, generated} = {}) ->
+    token = @makeToken tag, value, {offset, length, origin, data, generated}
     @tokens.push token
     token
 
