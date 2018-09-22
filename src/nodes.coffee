@@ -1448,11 +1448,20 @@ exports.StringLiteral = class StringLiteral extends Literal
     super o
 
   CSXTextToAst: (o) ->
-    unquoted = @unquote yes, yes
+    if o.compiling
+      unquoted = @unquote yes, yes
     type: 'JSXText'
-    value: unquoted
+    value:
+      if o.compiling
+        unquoted
+      else
+        @originalValue
     extra:
-      raw: unquoted
+      raw:
+        if o.compiling
+          unquoted
+        else
+          @originalValue
 
   astProps: (o) ->
     value:
@@ -6601,7 +6610,7 @@ exports.If = class If extends Base
     unless o.compiling
       return no if @postfix
       return yes if o?.level is LEVEL_TOP
-      return @bodyNode() instanceof Block or @elseBodyNode() instanceof Block
+      return @bodyNode() instanceof Block or @bodyNode().isStatement(o) or @elseBodyNode() instanceof Block or @elseBodyNode()?.isStatement o
     o?.level is LEVEL_TOP or
       @bodyNode().isStatement(o) or @elseBodyNode()?.isStatement(o)
 

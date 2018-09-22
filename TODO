@@ -18,3 +18,4 @@
 - should tagged template literal be able to have string/template literal as its tag?
 - should allow closing /> to be "indented"?
 - allow : in JSX tag names?
+- shouldn't JSX be allowed as default param values?
