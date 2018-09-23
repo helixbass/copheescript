@@ -856,6 +856,7 @@ exports.Lexer = class Lexer
     offsetInChunk = delimiter.length
     return null unless @chunk[...offsetInChunk] is delimiter
     str = @chunk[offsetInChunk..]
+    hasSeenInterpolation = no
     loop
       [strPart] = regex.exec str
 
@@ -867,8 +868,12 @@ exports.Lexer = class Lexer
       str = str[strPart.length..]
       offsetInChunk += strPart.length
 
-      break unless match = interpolators.exec str
+      unless match = interpolators.exec str
+        if strPart.length is 0 and not hasSeenInterpolation
+          tokens[tokens.length - 1].generated = no
+        break
       [interpolator] = match
+      hasSeenInterpolation = yes
 
       # To remove the `#` in `#{`.
       interpolationOffset = interpolator.length - 1
