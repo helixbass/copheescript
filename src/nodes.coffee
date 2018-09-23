@@ -914,6 +914,7 @@ exports.PropertyName = class PropertyName extends Literal
   isAssignable: YES
 
   astType: -> 'Identifier'
+
   astProperties: ->
     name: @value
 
@@ -1150,25 +1151,6 @@ exports.Value = class Value extends Base
 
     fragments
 
-  ast: ->
-    ret = @base.ast()
-    for prop, propIndex in @properties
-      ret =
-        mergeAstLocationData(
-          Object.assign {
-            type: 'MemberExpression'
-            object: ret
-            property: prop.ast()
-            computed: prop instanceof Index or prop.name?.unwrap() not instanceof PropertyName
-            optional: !!prop.soak
-            shorthand: !!prop.shorthand
-          }, prop.astLocationData()
-          ret
-        )
-      if propIndex is 0 and @base instanceof Parens and @base.locationData?
-        mergeAstLocationData ret, @base.astLocationData()
-    ret
-
   checkNewTarget: (o) ->
     return unless @base instanceof IdentifierLiteral and @base.value is 'new' and @properties.length
     if @properties[0] instanceof Access and @properties[0].name.value is 'target'
@@ -1202,6 +1184,33 @@ exports.Value = class Value extends Base
       @base.eachName iterator
     else
       @error 'tried to assign to unassignable value'
+
+  astType: ->
+    unless @hasProperties()
+      @base.astType()
+    else
+      'MemberExpression'
+
+  astProperties: ->
+    unless @hasProperties()
+      return @base.astProperties()
+    else
+      # If this `Value` has properties, the *last* property (e.g. `c` in `a.b.c`)
+      # becomes the `property`, and the preceding properties (e.g. `a.b`) become
+      # a child `Value` node assigned to the `object` property.
+      property = @properties[@properties.length - 1]
+      return
+        object: new Value(@base.unwrap(), @properties[0...(@properties.length - 1)], @tag, @isDefaultValue).ast()
+        property: property.ast()
+        computed: property instanceof Index or property.name?.unwrap() not instanceof PropertyName
+        optional: !!property.soak
+        shorthand: !!property.shorthand
+
+  astLocationData: ->
+    unless @hasProperties()
+      @base.astLocationData()
+    else
+      mergeAstLocationData @base.astLocationData(), @properties[@properties.length - 1].astLocationData()
 
 #### HereComment
 
@@ -1501,10 +1510,14 @@ exports.Access = class Access extends Base
     else
       [@makeCode('['), name..., @makeCode(']')]
 
-  ast: ->
-    @name.ast()
-
   shouldCache: NO
+
+  ast: ->
+    # Babel doesn’t have an AST node for `Access`, but rather just includes
+    # this Access node’s child `name` Identifier node as the direct child of
+    # whatever node contains this `Access`. So we skip a level directly down
+    # to `@name`.
+    @name.ast()
 
 #### Index
 
@@ -1518,11 +1531,15 @@ exports.Index = class Index extends Base
   compileToFragments: (o) ->
     [].concat @makeCode("["), @index.compileToFragments(o, LEVEL_PAREN), @makeCode("]")
 
-  ast: ->
-    @index.ast()
-
   shouldCache: ->
     @index.shouldCache()
+
+  ast: ->
+    # Babel doesn’t have an AST node for `Index`, but rather just includes
+    # this Index node’s child `index` Identifier node as the direct child of
+    # whatever node contains this `Index`. So we skip a level directly down
+    # to `@index`.
+    @index.ast()
 
 #### Range
 
@@ -3646,8 +3663,11 @@ exports.Parens = class Parens extends Base
     return @wrapInBraces fragments if @csxAttribute
     if bare then fragments else @wrapInParentheses fragments
 
-  ast: ->
-    @body.unwrap().ast()
+  astType: ->
+    @body.unwrap().astType()
+
+  astProperties: ->
+    @body.unwrap().astProperties()
 
 #### StringWithInterpolations
 
