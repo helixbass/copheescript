@@ -4,37 +4,52 @@
 # Recursively compare all values of enumerable properties of `expected` with
 # those of `actual`. Use `looseArray` helper function to skip array length
 # comparison.
-deepStrictEqualExpectedProperties = (actual, expected) ->
-  white = (text, values...) -> (text[i] + "#{reset}#{value}#{red}" for value, i in values).join('') + text[i]
+deepStrictIncludeExpectedProperties = (actual, expected) ->
   eq actual.length, expected.length if expected instanceof Array and not expected.loose
   for key, val of expected
     if 'object' is typeof val
-      fail white"Property #{key} expected, but was missing" unless actual[key]
-      deepStrictEqualExpectedProperties actual[key], val
+      fail "Property #{reset}#{key}#{red} expected, but was missing" unless actual[key]
+      deepStrictIncludeExpectedProperties actual[key], val
     else
-      eq actual[key], val, white"Property #{key}: expected #{actual[key]} to equal #{val}"
+      eq actual[key], val, """
+        Property #{reset}#{key}#{red}: expected #{reset}#{actual[key]}#{red} to equal #{reset}#{val}#{red}
+          Expected AST output to include:
+          #{reset}#{inspect expected, {depth: 10, colors: yes}}#{red}
+          but instead it was:
+          #{reset}#{inspect actual, {depth: 10, colors: yes}}#{red}
+      """
   actual
 
-testExpression = (code, expected) ->
-  ast = getExpressionAst code
-  if expected?
-    deepStrictEqualExpectedProperties ast, expected
-  else
-    # Convenience for creating new tests; call `testExpression` with no second
-    # parameter to see what the current AST generation is for your input code.
-    console.log require('util').inspect ast,
-      depth: 10
-      colors: yes
-
-# Flag array for loose comparision. See reference to `.loose` in
-# `deepStrictEqualExpectedProperties` above.
+# Flag array for loose comparison. See reference to `.loose` in
+# `deepStrictIncludeExpectedProperties` above.
 looseArray = (arr) ->
   Object.defineProperty arr, 'loose',
     value: yes
     enumerable: no
   arr
 
-test 'Confirm functionality of `deepStrictEqualExpectedProperties`', ->
+# Helpers to get AST nodes for a string of code. The root node is always a
+# `Block` node, so for brevity in the tests return its children from
+# `expressions`.
+getAstExpressions = (code) ->
+  ast = CoffeeScript.compile code, ast: yes
+  ast.expressions
+
+getAstExpression = (code) -> getAstExpressions(code)[0]
+
+testExpression = (code, expected) ->
+  ast = getAstExpression code
+  if expected?
+    deepStrictIncludeExpectedProperties ast, expected
+  else
+    # Convenience for creating new tests; call `testExpression` with no second
+    # parameter to see what the current AST generation is for your input code.
+    console.log inspect ast,
+      depth: 10
+      colors: yes
+
+
+test 'Confirm functionality of `deepStrictIncludeExpectedProperties`', ->
   actual =
     name: 'Name'
     a:
@@ -43,7 +58,7 @@ test 'Confirm functionality of `deepStrictEqualExpectedProperties`', ->
     x: [1, 2, 3]
 
   check = (message, test, expected) ->
-    test (-> deepStrictEqualExpectedProperties actual, expected), message
+    test (-> deepStrictIncludeExpectedProperties actual, expected), message
 
   check 'Expected property does not match', throws,
     name: '"Name"'
@@ -88,7 +103,7 @@ test 'Confirm functionality of `deepStrictEqualExpectedProperties`', ->
 # properties are as expected.
 
 test "AST as expected for Block node", ->
-  deepStrictEqualExpectedProperties CoffeeScript.compile('return', ast: yes),
+  deepStrictIncludeExpectedProperties CoffeeScript.compile('return', ast: yes),
     type: 'Block'
     expressions: [
       type: 'Return'

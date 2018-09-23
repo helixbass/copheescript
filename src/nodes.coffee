@@ -294,17 +294,17 @@ exports.Base = class Base
     return
       loc:
         start:
-          line: first_line + 1
+          line:   first_line + 1
           column: first_column
         end:
-          line: last_line + 1
+          line:   last_line + 1
           column: last_column + 1
       range: [
         range[0]
         range[1]
       ]
       start: range[0]
-      end: range[1]
+      end:   range[1]
 
   # Passes each child to a function, breaking when the function returns `false`.
   eachChild: (func) ->
@@ -398,7 +398,7 @@ exports.Base = class Base
 
   # For this node and all descendents, set the location data to `locationData`
   # if the location data is not already set.
-  updateLocationDataIfMissing: (locationData, {force} = {}) ->
+  updateLocationDataIfMissing: (locationData, force) ->
     @forceUpdateLocation = yes if force
     return this if @locationData and not @forceUpdateLocation
     delete @forceUpdateLocation
@@ -914,6 +914,7 @@ exports.PropertyName = class PropertyName extends Literal
   isAssignable: YES
 
   astType: -> 'Identifier'
+
   astProperties: ->
     name: @value
 
@@ -1150,25 +1151,6 @@ exports.Value = class Value extends Base
 
     fragments
 
-  ast: ->
-    ret = @base.ast()
-    for prop, propIndex in @properties
-      ret =
-        mergeAstLocationData(
-          Object.assign {
-            type: 'MemberExpression'
-            object: ret
-            property: prop.ast()
-            computed: prop instanceof Index or prop.name?.unwrap() not instanceof PropertyName
-            optional: !!prop.soak
-            shorthand: !!prop.shorthand
-          }, prop.astLocationData()
-          ret
-        )
-      if propIndex is 0 and @base instanceof Parens and @base.locationData?
-        mergeAstLocationData ret, @base.astLocationData()
-    ret
-
   checkNewTarget: (o) ->
     return unless @base instanceof IdentifierLiteral and @base.value is 'new' and @properties.length
     if @properties[0] instanceof Access and @properties[0].name.value is 'target'
@@ -1202,6 +1184,33 @@ exports.Value = class Value extends Base
       @base.eachName iterator
     else
       @error 'tried to assign to unassignable value'
+
+  astType: ->
+    unless @hasProperties()
+      @base.astType()
+    else
+      'MemberExpression'
+
+  astProperties: ->
+    unless @hasProperties()
+      return @base.astProperties()
+    else
+      # If this `Value` has properties, the *last* property (e.g. `c` in `a.b.c`)
+      # becomes the `property`, and the preceding properties (e.g. `a.b`) become
+      # a child `Value` node assigned to the `object` property.
+      property = @properties[@properties.length - 1]
+      return
+        object: new Value(@base.unwrap(), @properties[0...(@properties.length - 1)], @tag, @isDefaultValue).ast()
+        property: property.ast()
+        computed: property instanceof Index or property.name?.unwrap() not instanceof PropertyName
+        optional: !!property.soak
+        shorthand: !!property.shorthand
+
+  astLocationData: ->
+    unless @hasProperties()
+      @base.astLocationData()
+    else
+      mergeAstLocationData @base.astLocationData(), @properties[@properties.length - 1].astLocationData()
 
 #### HereComment
 
@@ -1501,10 +1510,14 @@ exports.Access = class Access extends Base
     else
       [@makeCode('['), name..., @makeCode(']')]
 
-  ast: ->
-    @name.ast()
-
   shouldCache: NO
+
+  ast: ->
+    # Babel doesn’t have an AST node for `Access`, but rather just includes
+    # this Access node’s child `name` Identifier node as the direct child of
+    # whatever node contains this `Access`. So we skip a level directly down
+    # to `@name`.
+    @name.ast()
 
 #### Index
 
@@ -1518,11 +1531,15 @@ exports.Index = class Index extends Base
   compileToFragments: (o) ->
     [].concat @makeCode("["), @index.compileToFragments(o, LEVEL_PAREN), @makeCode("]")
 
-  ast: ->
-    @index.ast()
-
   shouldCache: ->
     @index.shouldCache()
+
+  ast: ->
+    # Babel doesn’t have an AST node for `Index`, but rather just includes
+    # this Index node’s child `index` Identifier node as the direct child of
+    # whatever node contains this `Index`. So we skip a level directly down
+    # to `@index`.
+    @index.ast()
 
 #### Range
 
@@ -3646,8 +3663,11 @@ exports.Parens = class Parens extends Base
     return @wrapInBraces fragments if @csxAttribute
     if bare then fragments else @wrapInParentheses fragments
 
-  ast: ->
-    @body.unwrap().ast()
+  astType: ->
+    @body.unwrap().astType()
+
+  astProperties: ->
+    @body.unwrap().astProperties()
 
 #### StringWithInterpolations
 
@@ -4166,28 +4186,24 @@ makeDelimitedLiteral = (body, options = {}) ->
     when other     then (if options.double then "\\#{other}" else other)
   "#{options.delimiter}#{body}#{options.delimiter}"
 
-# Extends the location data of an AST node to include the location data from
-# another AST node.
-mergeAstLocationData = (intoNode, fromNode) ->
-  {range: intoRange} = intoNode
-  {range: fromRange} = fromNode
-  return intoNode unless intoRange and fromRange
-  if fromRange[0] < intoRange[0]
-    intoNode.range = intoRange = [
-      fromRange[0]
-      intoRange[1]
+# Take two AST nodes, or two AST nodes’ location data objects, and return a new
+# location data object that encompasses the location data of both nodes. So the
+# new `start` value will be the earlier of the two nodes’ `start` values, the
+# new `end` value will be the later of the two nodes’ `end` values, etc.
+lesser  = (a, b) -> if a < b then a else b
+greater = (a, b) -> if a > b then a else b
+mergeAstLocationData = (nodeA, nodeB) ->
+  return
+    loc:
+      start:
+        line:   lesser nodeA.loc.start.line,   nodeB.loc.start.line
+        column: lesser nodeA.loc.start.column, nodeB.loc.start.column
+      end:
+        line:   greater nodeA.loc.end.line,   nodeB.loc.end.line
+        column: greater nodeA.loc.end.column, nodeB.loc.end.column
+    range: [
+      lesser  nodeA.range[0], nodeB.range[0]
+      greater nodeA.range[1], nodeB.range[1]
     ]
-    intoNode.start = fromNode.start
-    intoNode.loc =
-      start: fromNode.loc.start
-      end: intoNode.loc.end
-  if fromRange[1] > intoRange[1]
-    intoNode.range = [
-      intoRange[0]
-      fromRange[1]
-    ]
-    intoNode.end = fromNode.end
-    intoNode.loc =
-      start: intoNode.loc.start
-      end: fromNode.loc.end
-  intoNode
+    start: lesser  nodeA.start, nodeB.start
+    end:   greater nodeA.end,   nodeB.end
