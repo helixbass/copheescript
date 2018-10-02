@@ -6080,6 +6080,8 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
           match
 
   compileNode: (o) ->
+    @comments ?= @startQuote?.comments
+
     if @csxAttribute
       wrapped = new Parens new StringWithInterpolations @body
       wrapped.csxAttribute = yes
