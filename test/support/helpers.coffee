@@ -87,7 +87,10 @@ exports.inspect = (obj) ->
 # `expressions`.
 exports.getAstExpressions = (code) ->
   ast = CoffeeScript.compile code, ast: yes
-  ast.expressions
+  ast.program.body
 
 # Many tests want just the root node.
-exports.getAstExpression = (code) -> getAstExpressions(code)[0]
+exports.getAstExpression = (code) ->
+  [statement] = getAstExpressions(code)
+  return statement unless statement.type is 'ExpressionStatement'
+  return statement.expression

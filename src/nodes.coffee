@@ -182,7 +182,7 @@ exports.Base = class Base
     assignEmptyTrailingLocationData @, other
 
   mergeLocationDataFrom: (node) ->
-    @locationData = mergeLocationData @locationData, node
+    @locationData = mergeLocationData @locationData, node.locationData
 
   withEmptyLocationData: ->
     @withLocationDataFrom emptyLocationData
@@ -409,7 +409,7 @@ exports.Base = class Base
   # as JSON. This is what the `ast` option in the Node API returns.
   # We try to follow the [Babel AST spec](https://github.com/babel/babel/blob/master/packages/babel-parser/ast/spec.md)
   # as closely as possible, for improved interoperability with other tools.
-  ast: (o) ->
+  ast: (o, level) ->
     return @compileToBabylon o, level if o.compiling
     o = extend {}, o
     o.level = level if level
@@ -423,7 +423,7 @@ exports.Base = class Base
     # These fields are all intermixed in the Babel spec; `type` and `start` and
     # `parsedValue` are all top level fields in the AST node object. We have
     # separate methods for returning each category, that we merge together here.
-    ast = Object.assign {}, @astProperties(), {type: @astType()}, @astLocationData()
+    ast = Object.assign {}, @astProperties(o), {type: @astType(o)}, @astLocationData()
     if @canBeReturned
       ast.returns = yes
     ast
@@ -1949,17 +1949,17 @@ exports.Value = class Value extends Base
         mergeLocationData @base.locationData, initialProperties[initialProperties.length - 1].locationData
     object
 
-  ast: (o) ->
+  ast: (o, level) ->
     # If the `Value` has no properties, the AST node is just whatever this
     # node’s `base` is.
-    return @base.ast o unless @hasProperties()
+    return @base.ast o, level unless @hasProperties()
     if o.compiling
       [..., property] = @properties
       if property instanceof Slice
         return property.compileValueToBabylon o, @object().ast o, LEVEL_ACCESS
     # Otherwise, call `Base::ast` which in turn calls the `astType` and
     # `astProperties` methods below.
-    super()
+    super o, level
 
   astType: ->
     if @base instanceof CSXTag
@@ -1975,7 +1975,7 @@ exports.Value = class Value extends Base
     property.name.csx = yes if @base instanceof CSXTag
     return
       object: @object().ast o, LEVEL_ACCESS
-      property: property.ast()
+      property: property.ast o
       computed: property instanceof Index or property.name?.unwrap() not instanceof PropertyName
       optional: !!property.soak
       shorthand: !!property.shorthand
@@ -5116,7 +5116,7 @@ exports.Splat = class Splat extends Base
     else
       'SpreadElement'
 
-  astProperties: {
+  astProperties: (o) -> {
     argument: @name.ast o, LEVEL_OP
     @postfix
   }
@@ -5542,10 +5542,10 @@ exports.Op = class Op extends Base
   toString: (idt) ->
     super idt, @constructor.name + ' ' + @operator
 
-  ast: (o) ->
+  ast: (o, level) ->
     @checkDeleteOperand o
     @checkContinuation o if @isYield() or @isAwait()
-    super o
+    super o, level
 
   astType: ->
     switch @operator
@@ -6966,16 +6966,16 @@ makeDelimitedLiteral = (body, options = {}) ->
       [match, delimiter] = args
     else
       [match, backslash, nul, delimiter, lf, cr, ls, ps, other] = args
-  switch
-    # Ignore escaped backslashes.
-    when backslash then (if options.double then backslash + backslash else backslash)
-    when nul       then '\\x00'
-    when delimiter then "\\#{delimiter}"
-    when lf        then '\\n'
-    when cr        then '\\r'
-    when ls        then '\\u2028'
-    when ps        then '\\u2029'
-    when other     then (if options.double then "\\#{other}" else other)
+    switch
+      # Ignore escaped backslashes.
+      when backslash then (if options.double then backslash + backslash else backslash)
+      when nul       then '\\x00'
+      when delimiter then "\\#{delimiter}"
+      when lf        then '\\n'
+      when cr        then '\\r'
+      when ls        then '\\u2028'
+      when ps        then '\\u2029'
+      when other     then (if options.double then "\\#{other}" else other)
   "#{options.delimiter}#{body}#{options.delimiter}"
 
 # Helpers for `mergeLocationData` and `mergeAstLocationData` below.
