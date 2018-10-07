@@ -140,7 +140,7 @@ exports.addDataToNode = (parserState, first, last, forceUpdateLocation = yes) ->
   (obj) ->
     # Add location data.
     if obj?.updateLocationDataIfMissing? and first?
-      obj.updateLocationDataIfMissing buildLocationData(first, last), forceUpdateLocation
+      obj.updateLocationDataIfMissing buildLocationData(first, last), force: forceUpdateLocation
 
     # Add comments, building the dictionary of token data if it hasn’t been
     # built yet.

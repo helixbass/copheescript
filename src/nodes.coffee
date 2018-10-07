@@ -182,7 +182,11 @@ exports.Base = class Base
     assignEmptyTrailingLocationData @, other
 
   mergeLocationDataFrom: (node) ->
-    @locationData = mergeLocationData @locationData, node.locationData
+    @locationData =
+      unless @locationData?
+        node.locationData
+      else
+        mergeLocationData @locationData, node.locationData
 
   withEmptyLocationData: ->
     @withLocationDataFrom emptyLocationData
