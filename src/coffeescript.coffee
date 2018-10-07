@@ -109,7 +109,7 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
   # If all that was requested was a POJO representation of the nodes, e.g.
   # the abstract syntax tree (AST), we can stop now and just return that.
   if options.ast
-    return nodes.toJSON options
+    return nodes.ast options
   js = do =>
     if options.usePrettier
       {formatted, ast} = nodes.prettier merge options, {code, returnWithAst: yes}

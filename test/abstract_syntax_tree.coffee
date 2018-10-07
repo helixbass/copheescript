@@ -1,23 +1,44 @@
 # Astract Syntax Tree generation
 # ------------------------------
 
-testExpression = expressionAstMatchesObject
+# Recursively compare all values of enumerable properties of `expected` with
+# those of `actual`. Use `looseArray` helper function to skip array length
+# comparison.
+deepStrictIncludeExpectedProperties = (actual, expected) ->
+  eq actual.length, expected.length if expected instanceof Array and not expected.loose
+  for key, val of expected
+    if 'object' is typeof val
+      fail "Property #{reset}#{key}#{red} expected, but was missing" unless actual[key]
+      deepStrictIncludeExpectedProperties actual[key], val
+    else
+      eq actual[key], val, """
+        Property #{reset}#{key}#{red}: expected #{reset}#{actual[key]}#{red} to equal #{reset}#{val}#{red}
+          Expected AST output to include:
+          #{reset}#{inspect expected}#{red}
+          but instead it was:
+          #{reset}#{inspect actual}#{red}
+      """
+  actual
 
-# Flag array for loose comparision. See above code/comment.
+# Flag array for loose comparison. See reference to `.loose` in
+# `deepStrictIncludeExpectedProperties` above.
 looseArray = (arr) ->
   Object.defineProperty arr, 'loose',
     value: yes
     enumerable: no
   arr
 
-singleExpressionBlock = (expression) ->
-  type: 'BlockStatement'
-  body: [{
-    type: 'ExpressionStatement'
-    expression
-  }]
+testExpression = (code, expected) ->
+  ast = getAstExpression code
+  if expected?
+    deepStrictIncludeExpectedProperties ast, expected
+  else
+    # Convenience for creating new tests; call `testExpression` with no second
+    # parameter to see what the current AST generation is for your input code.
+    console.log inspect ast
 
-test 'Confirm functionality of `deepStrictEqualExpectedProps`', ->
+
+test 'Confirm functionality of `deepStrictIncludeExpectedProperties`', ->
   actual =
     name: 'Name'
     a:
@@ -26,9 +47,9 @@ test 'Confirm functionality of `deepStrictEqualExpectedProps`', ->
     x: [1, 2, 3]
 
   check = (message, test, expected) ->
-    test (-> deepStrictEqualExpectedProps actual, expected), message
+    test (-> deepStrictIncludeExpectedProperties actual, expected), message
 
-  check 'Expected prop does not match', throws,
+  check 'Expected property does not match', throws,
     name: '"Name"'
 
   check 'Array length mismatch', throws,
@@ -71,7 +92,7 @@ test 'Confirm functionality of `deepStrictEqualExpectedProps`', ->
 # properties are as expected.
 
 # test "AST as expected for Block node", ->
-#   deepStrictEqualExpectedProps CoffeeScript.compile('return', ast: yes),
+#   deepStrictIncludeExpectedProperties CoffeeScript.compile('return', ast: yes),
 #     type: 'Block'
 #     expressions: [
 #       type: 'Return'
@@ -84,6 +105,13 @@ test "AST as expected for NumberLiteral node", ->
     extra:
       rawValue: 42
       raw: '42'
+
+  testExpression '0xE1',
+    type: 'NumericLiteral'
+    value: 225
+    extra:
+      rawValue: 225
+      raw: '0xE1'
 
 test "AST as expected for InfinityLiteral node", ->
   testExpression 'Infinity',
@@ -979,42 +1007,42 @@ test "AST as expected for Index node", ->
 #       type: 'Block'
 
 test "AST as expected for Op node", ->
-  testExpression '1 <= 2',
+  testExpression 'a <= 2',
     type: 'BinaryExpression'
     operator: '<='
     left:
-      type: 'NumericLiteral'
-      value: 1
+      type: 'Identifier'
+      name: 'a'
     right:
       type: 'NumericLiteral'
       value: 2
 
-  testExpression '1 is 2',
+  testExpression 'a is 2',
     type: 'BinaryExpression'
     operator: 'is'
     left:
-      type: 'NumericLiteral'
-      value: 1
+      type: 'Identifier'
+      name: 'a'
     right:
       type: 'NumericLiteral'
       value: 2
 
-  testExpression '1 // 2',
+  testExpression 'a // 2',
     type: 'BinaryExpression'
     operator: '//'
     left:
-      type: 'NumericLiteral'
-      value: 1
+      type: 'Identifier'
+      name: 'a'
     right:
       type: 'NumericLiteral'
       value: 2
 
-  testExpression '1 << 2',
+  testExpression 'a << 2',
     type: 'BinaryExpression'
     operator: '<<'
     left:
-      type: 'NumericLiteral'
-      value: 1
+      type: 'Identifier'
+      name: 'a'
     right:
       type: 'NumericLiteral'
       value: 2
@@ -1216,11 +1244,10 @@ test "AST as expected for Op node", ->
 
 #   # NOTE: Soaking is covered in `Call` and `Access` nodes.
 
-# test "AST as expected for Parens node", ->
-#   testExpression '(hmmmmm)',
-#     type: 'Parens',
-#     body:
-#       type: 'Value'
+test "AST as expected for Parens node", ->
+  testExpression '(hmmmmm)',
+    type: 'Identifier'
+    name: 'hmmmmm'
 
 #   testExpression '(a + b) / c',
 #     type: 'Op'
@@ -1231,19 +1258,9 @@ test "AST as expected for Op node", ->
 #         type: 'Op'
 #         operator: '+'
 
-#   testExpression '(((1)))',
-#     type: 'Parens',
-#     body:
-#       type: 'Value'
-#       base:
-#         type: 'Block'
-#         expressions: [
-#           type: 'Parens',
-#           body:
-#             type: 'Value'
-#             base:
-#               value: '1'
-#         ]
+  testExpression '(((1)))',
+    type: 'NumericLiteral'
+    value: 1
 
 # test "AST as expected for StringWithInterpolations node", ->
 #   testExpression '"#{o}/"',

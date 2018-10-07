@@ -4,14 +4,15 @@
 # Ensure that errors of different kinds (lexer, parser and compiler) are shown
 # in a consistent way.
 
-assertErrorFormat = (code, expectedErrorFormat, {ast} = {}) ->
-  errCallback = (err) ->
-    err.colorful = no
-    eq expectedErrorFormat, "#{err}"
-    yes
-
-  throws (-> CoffeeScript.run code), errCallback
-  throws (-> CoffeeScript.compile code, ast: yes), errCallback if ast
+errCallback = (expectedErrorFormat) -> (err) ->
+  err.colorful = no
+  eq expectedErrorFormat, "#{err}"
+  yes
+assertErrorFormat = (code, expectedErrorFormat) ->
+  throws (-> CoffeeScript.run code), errCallback(expectedErrorFormat)
+assertErrorFormatAst = (code, expectedErrorFormat) ->
+  assertErrorFormat code, expectedErrorFormat
+  throws (-> CoffeeScript.compile code, ast: yes), errCallback(expectedErrorFormat)
 
 test "lexer errors formatting", ->
   assertErrorFormat '''
@@ -766,20 +767,20 @@ test "strict mode errors", ->
     class eval
           ^^^^
   '''
-  assertErrorFormat '''
+  assertErrorFormatAst '''
     arguments++
   ''', '''
     [stdin]:1:1: error: 'arguments' can't be assigned
     arguments++
     ^^^^^^^^^
-  ''', ast: yes
-  assertErrorFormat '''
+  '''
+  assertErrorFormatAst '''
     --arguments
   ''', '''
     [stdin]:1:3: error: 'arguments' can't be assigned
     --arguments
       ^^^^^^^^^
-  ''', ast: yes
+  '''
 
 test "invalid numbers", ->
   assertErrorFormat '''
@@ -1918,4 +1919,22 @@ test "#3933: prevent implicit calls when cotrol flow is missing `THEN`", ->
     [stdin]:2:10: error: unexpected ->
       when a ->
              ^^
+  '''
+
+test "`new.target` outside of a function", ->
+  assertErrorFormat '''
+    new.target
+  ''', '''
+    [stdin]:1:1: error: new.target can only occur inside functions
+    new.target
+    ^^^^^^^^^^
+  '''
+
+test "`new.target` is only allowed meta property", ->
+  assertErrorFormat '''
+    -> new.something
+  ''', '''
+    [stdin]:1:4: error: the only valid meta property for new is new.target
+    -> new.something
+       ^^^^^^^^^^^^^
   '''

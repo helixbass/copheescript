@@ -12,9 +12,9 @@
 {Rewriter, INVERSES} = require './rewriter'
 
 # Import the helpers we need.
-{count, repeat, invertLiterate, merge, dump, makeDelimitedLiteral
+{count, repeat, invertLiterate, merge, dump
 attachCommentsToNode, throwSyntaxError
-replaceUnicodeCodePointEscapes, getNumberValue} = require './helpers'
+replaceUnicodeCodePointEscapes} = require './helpers'
 
 # The Lexer Class
 # ---------------
@@ -214,6 +214,8 @@ exports.Lexer = class Lexer
          @tokens.length > 1 and @tokens[@tokens.length - 2][0] not in ['.', '?.', '@']
         @error "'#{prev[1]}' cannot be used as a keyword, or as a function call
         without parentheses", prev[2]
+      else if prev[0] is '.' and @tokens.length > 1 and (prevprev = @tokens[@tokens.length - 2])[0] is 'UNARY' and prevprev[1] is 'new'
+        prevprev[0] = 'IDENTIFIER'
       else if @tokens.length > 2
         prevprev = @tokens[@tokens.length - 2]
         if prev[0] in ['@', 'THIS'] and prevprev and prevprev.spaced and
@@ -272,10 +274,12 @@ exports.Lexer = class Lexer
       when /^0\d+/.test number
         @error "octal literal '#{number}' must be prefixed with '0o'", length: lexedLength
 
-    numberValue = getNumberValue number
+    parsedValue = Number number
 
-    tag = if numberValue is Infinity then 'INFINITY' else 'NUMBER'
-    @token tag, number, length: lexedLength
+    tag = if Number.isFinite(parsedValue) then 'NUMBER' else 'INFINITY'
+    @token tag, number,
+      length: lexedLength
+      data: {parsedValue}
     lexedLength
 
   # Matches strings, including multiline strings, as well as heredocs, with or without

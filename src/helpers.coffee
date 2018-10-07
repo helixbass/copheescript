@@ -136,12 +136,11 @@ buildTokenDataDictionary = (parserState) ->
 # This returns a function which takes an object as a parameter, and if that
 # object is an AST node, updates that object's locationData.
 # The object is returned either way.
-exports.addDataToNode = (parserState, first, last, {forceUpdateLocation} = {}) ->
+exports.addDataToNode = (parserState, first, last, forceUpdateLocation = yes) ->
   (obj) ->
     # Add location data.
-    if first?
-      if obj?.updateLocationDataIfMissing?
-        obj.updateLocationDataIfMissing buildLocationData(first, last), force: forceUpdateLocation
+    if obj?.updateLocationDataIfMissing? and first?
+      obj.updateLocationDataIfMissing buildLocationData(first, last), forceUpdateLocation
 
     # Add comments, building the dictionary of token data if it hasn’t been
     # built yet.
@@ -284,98 +283,15 @@ exports.locationDataToAst = ({first_line, first_column, last_line, last_column, 
 
 exports.astLocationFields = locationFields = ['loc', 'range', 'start', 'end']
 
-# Extends the location data of an AST node to include the location data from
-# another AST node.
-exports.mergeAstLocationData = mergeAstLocationData = (intoNode, fromNode, {justLeading, justEnding} = {}) ->
-  if Array.isArray fromNode
-    mergeAstLocationData intoNode, fromItem for fromItem in fromNode
-    return intoNode
-  {range: intoRange} = intoNode
-  {range: fromRange} = fromNode
-  return intoNode unless intoRange and fromRange
-  unless justEnding
-    if fromRange[0] < intoRange[0]
-      intoNode.range = intoRange = [
-        fromRange[0]
-        intoRange[1]
-      ]
-      intoNode.start = fromNode.start
-      intoNode.loc =
-        start: fromNode.loc.start
-        end: intoNode.loc.end
-  unless justLeading
-    if fromRange[1] > intoRange[1]
-      intoNode.range = [
-        intoRange[0]
-        fromRange[1]
-      ]
-      intoNode.end = fromNode.end
-      intoNode.loc =
-        start: intoNode.loc.start
-        end: fromNode.loc.end
-  intoNode
-
 exports.isFunction = isFunction = (obj) -> Object::toString.call(obj) is '[object Function]'
 exports.isNumber = isNumber = (obj) -> Object::toString.call(obj) is '[object Number]'
 exports.isString = isString = (obj) -> Object::toString.call(obj) is '[object String]'
 exports.isBoolean = isBoolean = (obj) -> obj is yes or obj is no or Object::toString.call(obj) is '[object Boolean]'
 exports.isPlainObject = isPlainObject = (obj) -> typeof obj is 'object' and !!obj and not Array.isArray(obj) and not isNumber(obj) and not isString(obj) and not isBoolean(obj)
 
-# Converts a string to its corresponding number value.
-exports.parseNumber = parseNumber = (str) ->
-  base = switch str.charAt 1
-    when 'b' then 2
-    when 'o' then 8
-    when 'x' then 16
-    else null
-
-  if base? then parseInt(str[2..], base) else parseFloat(str)
-
-# Converts a number, string, or node (Value/NumberLiteral/unary +/- Op) to its
-# corresponding number value.
-exports.getNumberValue = getNumberValue = (number) ->
-  switch
-    when isNumber number
-      number
-    when isString number
-      parseNumber number
-    else
-      number = number.unwrap()
-      return number.parsedValue if number.parsedValue?
-      invert = no
-      val = getNumberValue(
-        if number.operator
-          invert = yes if number.operator is '-'
-          number.first
-        else
-          number.value
-      )
-      if invert then val * -1 else val
-
 exports.dump = dump = (args..., obj) ->
   util = require 'util'
   console.log args..., util.inspect obj, no, null
-
-exports.mergeLocationData = (intoNode, fromNode) ->
-  {locationData: intoLocationData} = intoNode
-  {locationData: fromLocationData} = fromNode
-  unless intoLocationData
-    intoNode.locationData = fromLocationData
-    return intoNode
-  {range: intoRange} = intoLocationData
-  {range: fromRange} = fromLocationData
-  return intoNode unless intoRange and fromRange # TODO: should figure out why don't have location data?
-  if fromRange[0] < intoRange[0]
-    intoLocationData = intoNode.locationData = {...intoLocationData}
-    intoLocationData.range = [fromRange[0], intoRange[1]]
-    intoLocationData.first_line = fromLocationData.first_line
-    intoLocationData.first_column = fromLocationData.first_column
-  if fromRange[1] > intoRange[1]
-    intoLocationData = intoNode.locationData = {...intoLocationData}
-    intoLocationData.range = [intoRange[0], fromRange[1]]
-    intoLocationData.last_line = fromLocationData.last_line
-    intoLocationData.last_column = fromLocationData.last_column
-  intoNode
 
 exports.assignEmptyTrailingLocationData = (intoNode, fromNode) ->
   {locationData: fromLocationData} = fromNode
@@ -421,39 +337,6 @@ exports.traverseBabylonAsts = traverseBabylonAsts = (node, correspondingNode, fu
   if isPlainObject node
     return unless isPlainObject correspondingNode
     traverseBabylonAsts(child, correspondingNode[key], func) for own key, child of node when key not in locationFields
-
-# Constructs a string or regex by escaping certain characters.
-exports.makeDelimitedLiteral = (body, options = {}) ->
-  body = '(?:)' if body is '' and options.delimiter is '/'
-  regex =
-    if options.justEscapeDelimiter
-      ///
-          \\?(#{options.delimiter})            # (Possibly escaped) delimiter.
-      ///g
-    else
-      ///
-          (\\\\)                               # Escaped backslash.
-        | (\\0(?=[1-7]))                       # Null character mistaken as octal escape.
-        | \\?(#{options.delimiter})            # (Possibly escaped) delimiter.
-        | \\?(?: (\n)|(\r)|(\u2028)|(\u2029) ) # (Possibly escaped) newlines.
-        | (\\.)                                # Other escapes.
-      ///g
-  body = body.replace regex, (args...) ->
-    if options.justEscapeDelimiter
-      [match, delimiter] = args
-    else
-      [match, backslash, nul, delimiter, lf, cr, ls, ps, other] = args
-    switch
-      # Ignore escaped backslashes.
-      when backslash then (if options.double then backslash + backslash else backslash)
-      when nul       then '\\x00'
-      when delimiter then "\\#{delimiter}"
-      when lf        then '\\n'
-      when cr        then '\\r'
-      when ls        then '\\u2028'
-      when ps        then '\\u2029'
-      when other     then (if options.double then "\\#{other}" else other)
-  "#{options.delimiter}#{body}#{options.delimiter}"
 
 unicodeCodePointToUnicodeEscapes = (codePoint) ->
   toUnicodeEscape = (val) ->

@@ -45,7 +45,7 @@ o = (patternString, action, options) ->
     # is added to the first parameter passed in, and the parameter is returned.
     # If the parameter is not a node, it will just be passed through unaffected.
     getAddDataToNodeFunctionString = (first, last) ->
-      "yy.addDataToNode(yy, @#{first}, #{if last then "@#{last}" else 'null'}, {forceUpdateLocation: true})"
+      "yy.addDataToNode(yy, @#{first}, #{if last then "@#{last}" else 'null'}, true)"
 
     returnsLoc = /^LOC/.test action
     action = action.replace /LOC\(([0-9]*)\)/g, getAddDataToNodeFunctionString('$1')
@@ -172,7 +172,7 @@ grammar =
   # Alphanumerics are separated from the other **Literal** matchers because
   # they can also serve as keys in object literals.
   AlphaNumeric: [
-    o 'NUMBER',                                 -> new NumberLiteral $1
+    o 'NUMBER',                                 -> new NumberLiteral $1.toString(), parsedValue: $1.parsedValue
     o 'String'
   ]
 
