@@ -2728,6 +2728,8 @@ exports.Range = class Range extends Base
     [@makeCode "(function() {#{pre}\n#{idt}for (#{body})#{post}}).apply(this#{args ? ''})"]
 
   astProperties: (o) -> {
+    from: @from?.ast(o) ? null
+    to: @to?.ast(o) ? null
     @exclusive
   }
 
