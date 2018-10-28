@@ -2858,7 +2858,7 @@ exports.Obj = class Obj extends Base
           key  = key.properties[0].name
           prop = prop.withLocationData new Assign key, prop, context: 'object'
         else
-          return new Assign prop, prop, context: 'object', shorthand: yes
+          return new Assign(key, prop, context: 'object', shorthand: yes).withLocationDataFrom(prop)
       return prop unless key is prop
       prop.withLocationData(
         if prop.shouldCache() and compiling
