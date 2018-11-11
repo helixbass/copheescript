@@ -7022,14 +7022,17 @@ greater = (a, b) -> if a > b then a else b
 
 lesserStartLoc = (a, b) ->
   return yes if a.first_line < b.first_line
+  return no unless a.first_line is b.first_line
   a.first_column < b.first_column
 
 lesserEndLoc = (a, b) ->
   return yes if a.last_line < b.last_line
+  return no unless a.last_line is b.last_line
   a.last_column < b.last_column
 
 lesserAstLoc = (a, b) ->
   return yes if a.line < b.line
+  return no unless a.line is b.line
   a.column < b.column
 
 # Take two nodes’ location data and return a new `locationData` object that
