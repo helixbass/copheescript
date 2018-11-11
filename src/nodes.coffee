@@ -134,7 +134,7 @@ exports.Base = class Base
       @withAstLocationData node._compileToBabylon o
 
   _compileToBabylon: (o) ->
-    Object.assign {type: @astType()}, @astProperties o
+    Object.assign {type: @astType(o)}, @astProperties o
 
   withBabylonComments: (o, compiled, {comments = @comments} = {}) ->
     return compiled unless comments
@@ -187,6 +187,7 @@ exports.Base = class Base
         node.locationData
       else
         mergeLocationData @locationData, node.locationData
+    @
 
   withEmptyLocationData: ->
     @withLocationDataFrom emptyLocationData
@@ -875,7 +876,7 @@ exports.Block = class Block extends Base
 
     if not top and not root
       return @withLocationData(new UndefinedLiteral).compileToBabylon o unless @expressions.length
-      return @wrapInParensIf(o.level >= LEVEL_LIST)(new Sequence(@expressions)).compileToBabylon o
+      return @wrapInParensIf(o.level >= LEVEL_LIST)(new Sequence(@expressions).withLocationDataFrom @).compileToBabylon o
 
     @directives = []
     @sniffDirectives @expressions, replace: yes if withDeclarations
@@ -1229,9 +1230,9 @@ exports.Block = class Block extends Base
   ast: (o, level) ->
     return @rootToAst o unless o.scope
 
-    if o.level isnt LEVEL_TOP and @expressions.length
+    if level isnt LEVEL_TOP and @expressions.length
       # return @withLocationData(new UndefinedLiteral).compileToBabylon o unless @expressions.length
-      return (new Sequence @expressions).ast o
+      return (new Sequence(@expressions).withLocationDataFrom @).ast o
 
     super o, level
 
@@ -1296,7 +1297,7 @@ exports.Block = class Block extends Base
     else
       'BlockStatement'
 
-  astProperties: -> {
+  astProperties: (o) -> {
     body: @bodyToAst o
     @directives
   }
@@ -1741,7 +1742,7 @@ exports.Return = class Return extends Base
   astType: -> 'ReturnStatement'
 
   astProperties: (o) ->
-    argument: @expression.ast o, LEVEL_PAREN
+    argument: @expression?.ast(o, LEVEL_PAREN) ? null
 
 # `yield return` works exactly like `return`, except that it turns the function
 # into a generator.
@@ -1769,7 +1770,7 @@ exports.AwaitReturn = class AwaitReturn extends Return
     @checkScope o
     super o
 
-  ast: (o) ->
+  ast: (o, level) ->
     @checkScope o
     return super o, level if o.compiling
     new Op 'await', new Return @expression
@@ -2195,11 +2196,11 @@ exports.Call = class Call extends Base
           closingFragment = Object.assign {
             type: 'JSXClosingFragment'
           }, closingFragmentLocationData
-          {
+          Object.assign {
             type: 'JSXFragment'
             openingFragment
             closingFragment
-          }
+          }, mergeAstLocationData openingFragmentLocationData, closingFragmentLocationData
         else
           openingElementLocationData = tagName.astLocationData()
           for prop in @variable.properties
@@ -2216,7 +2217,11 @@ exports.Call = class Call extends Base
                   """
                 attr.csx = yes
                 compiled = attr.ast o#, LEVEL_PAREN
-                openingElementLocationData = mergeAstLocationData openingElementLocationData, compiled
+                if Array.isArray compiled
+                  for compiledAttr in compiled
+                    openingElementLocationData = mergeAstLocationData openingElementLocationData, compiledAttr
+                else
+                  openingElementLocationData = mergeAstLocationData openingElementLocationData, compiled
                 if attr instanceof IdentifierLiteral
                   Object.assign {
                     type: 'JSXAttribute'
@@ -2241,7 +2246,7 @@ exports.Call = class Call extends Base
               type: 'JSXClosingElement'
               name: @withCopiedBabylonLocationData(
                 @variable.unwrap().ast o#, LEVEL_ACCESS
-                closingTagNameAstLocationData
+                locationDataToAst tagName.closingTagNameLocationData
               )
             }, closingElementLocationData
             if closingElement.name.type is 'JSXMemberExpression'
@@ -2260,10 +2265,14 @@ exports.Call = class Call extends Base
                 currentExpr = currentExpr.object
               shiftAstLocationData currentExpr
               
-          {
+          Object.assign {
             type: 'JSXElement'
             openingElement, closingElement
-          }
+          },
+            if closingElement?
+              mergeAstLocationData openingElementLocationData, closingElementLocationData
+            else
+              openingElementLocationData
       )
       children:
         if content and not content.base.isEmpty?()
@@ -3171,7 +3180,8 @@ exports.Arr = class Arr extends Base
       'ArrayExpression'
 
   astProperties: (o) ->
-    elements: @objects.ast o, LEVEL_LIST
+    elements:
+      object.ast(o, LEVEL_LIST) for object in @objects
 
 #### Class
 
@@ -3477,8 +3487,8 @@ exports.Class = class Class extends Base
       'ClassExpression'
 
   astProperties: (o) ->
-    id: @variable.ast o
-    superClass: @parent.ast o, LEVEL_PAREN
+    id: @variable?.ast(o) ? null
+    superClass: @parent?.ast(o, LEVEL_PAREN) ? null
     body: @body.ast o, LEVEL_TOP
 
 exports.ClassProperty = class ClassProperty extends Base
@@ -3489,8 +3499,8 @@ exports.ClassProperty = class ClassProperty extends Base
 
   astProperties: (o) ->
     Object.assign
-      key: @name.ast o
-      value: @value.ast o
+      key: @name.ast o, LEVEL_LIST
+      value: @value.ast o, LEVEL_LIST
       static: @isStatic
       computed: do =>
         return yes if @name instanceof Index
@@ -3948,18 +3958,20 @@ exports.Assign = class Assign extends Base
     super o
 
   CSXAttributeToAst: (o) ->
-    type: 'JSXAttribute'
-    name: @variable.base.withAstLocationData
-      type: 'JSXIdentifier'
-      name: @variable.base.value
-    value: do =>
-      val = @value.base
-      val.csxAttribute = yes
-      compiled = astAsBlock val, o
-      return compiled if val instanceof StringLiteral
-      val.withAstLocationData
-        type: 'JSXExpressionContainer'
-        expression: compiled
+    Object.assign
+      type: 'JSXAttribute'
+      name: @variable.base.withAstLocationData
+        type: 'JSXIdentifier'
+        name: @variable.base.value
+      value: do =>
+        val = @value.base
+        val.csxAttribute = yes
+        compiled = astAsBlock val, o
+        return compiled if val instanceof StringLiteral
+        val.withAstLocationData
+          type: 'JSXExpressionContainer'
+          expression: compiled
+    , @astLocationData()
 
   addScopeVariables: (o, {checkAssignability = yes} = {}) ->
     varBase = @variable.unwrapAll()
@@ -5212,7 +5224,7 @@ exports.While = class While extends Base
   astProperties: (o) -> {
     test: @condition.ast o, LEVEL_PAREN
     body: @body.ast o, LEVEL_TOP
-    guard: @guard.ast o
+    guard: @guard?.ast(o) ? null
     inverted: !!@invert
     postfix: !!@postfix
     loop: !!@isLoop
@@ -6482,6 +6494,11 @@ exports.Sequence = class Sequence extends Base
 
   astType: -> 'SequenceExpression'
 
+  astProperties: (o) ->
+    return
+      expressions:
+        expression.ast(o) for expression in @expressions
+
 #### Switch
 
 # A JavaScript *switch* statement. Converts into a returnable expression on-demand.
@@ -6556,7 +6573,7 @@ exports.Switch = class Switch extends Base
             Object.assign {
               type: 'SwitchCase'
               test: (if @subject or not compiling then test else test.invert()).ast o, LEVEL_PAREN
-              consequent
+              consequent: consequentAst
               trailing: testIndex is lastTestIndex
             }, caseLocationData
       )
@@ -7001,7 +7018,7 @@ mergeLocationData = (locationDataA, locationDataB) ->
 # location data object that encompasses the location data of both nodes. So the
 # new `start` value will be the earlier of the two nodes’ `start` values, the
 # new `end` value will be the later of the two nodes’ `end` values, etc.
-mergeAstLocationData = (nodeA, nodeB, {justLeading, justEnding}) ->
+mergeAstLocationData = (nodeA, nodeB, {justLeading, justEnding} = {}) ->
   return
     loc:
       start:
