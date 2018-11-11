@@ -233,7 +233,7 @@ exports.ast = withPrettyErrors (source, options) ->
   {tokens, comments} = lexer.tokenize source, options
   nodes = parser.parse tokens
   nodes.allComments = comments
-  ast = nodes.toJSON options
+  ast = nodes.ast options
   return ast unless options.withTokens
   {ast, tokens}
 
