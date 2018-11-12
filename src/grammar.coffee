@@ -257,9 +257,9 @@ grammar =
   # Object literal spread properties.
   ObjRestValue: [
     o 'SimpleObjAssignable ...', -> new Splat new Value $1
-    o '... SimpleObjAssignable', -> new Splat new Value($2), postfix: false
+    o '... SimpleObjAssignable', -> new Splat new Value($2), postfix: no
     o 'ObjSpreadExpr ...',       -> new Splat $1
-    o '... ObjSpreadExpr',       -> new Splat $2, postfix: false
+    o '... ObjSpreadExpr',       -> new Splat $2, postfix: no
   ]
 
   ObjSpreadExpr: [
@@ -359,7 +359,7 @@ grammar =
   # A splat that occurs outside of a parameter list.
   Splat: [
     o 'Expression ...',                         -> new Splat $1
-    o '... Expression',                         -> new Splat $2, postfix: false
+    o '... Expression',                         -> new Splat $2, {postfix: no}
   ]
 
   # Variables and properties that can be assigned to.
@@ -468,8 +468,8 @@ grammar =
   ImportSpecifier: [
     o 'Identifier',                             -> new ImportSpecifier $1
     o 'Identifier AS Identifier',               -> new ImportSpecifier $1, $3
-    o 'DEFAULT',                                -> new ImportSpecifier new DefaultLiteral $1
-    o 'DEFAULT AS Identifier',                  -> new ImportSpecifier new DefaultLiteral($1), $3
+    o 'DEFAULT',                                -> new ImportSpecifier LOC(1)(new DefaultLiteral $1)
+    o 'DEFAULT AS Identifier',                  -> new ImportSpecifier LOC(1)(new DefaultLiteral($1)), $3
   ]
 
   ImportDefaultSpecifier: [
@@ -505,9 +505,9 @@ grammar =
   ExportSpecifier: [
     o 'Identifier',                             -> new ExportSpecifier $1
     o 'Identifier AS Identifier',               -> new ExportSpecifier $1, $3
-    o 'Identifier AS DEFAULT',                  -> new ExportSpecifier $1, new DefaultLiteral $3
-    o 'DEFAULT',                                -> new ExportSpecifier new DefaultLiteral $1
-    o 'DEFAULT AS Identifier',                  -> new ExportSpecifier new DefaultLiteral($1), $3
+    o 'Identifier AS DEFAULT',                  -> new ExportSpecifier $1, LOC(3)(new DefaultLiteral $3)
+    o 'DEFAULT',                                -> new ExportSpecifier LOC(1)(new DefaultLiteral $1)
+    o 'DEFAULT AS Identifier',                  -> new ExportSpecifier LOC(1)(new DefaultLiteral($1)), $3
   ]
 
   # Ordinary function invocation, or a chained series of calls.

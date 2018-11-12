@@ -1416,8 +1416,9 @@ exports.StringLiteral = class StringLiteral extends Literal
     @value = @delimit val
 
   delimit: (val, opts = {}) ->
+    @delimiter = @quote.charAt 0
     makeDelimitedLiteral val, merge {
-      delimiter: @quote.charAt 0
+      @delimiter
       @double
     }, opts
 
@@ -1461,17 +1462,18 @@ exports.StringLiteral = class StringLiteral extends Literal
     super o
 
   astProperties: (o) ->
-    value:
-      if o.compiling
-        @unquote()
-      else
-        unicodeEscapesToString @originalValue
-    extra:
-      raw:
+    return
+      value:
         if o.compiling
-          @value
+          @unquote()
         else
-          @delimit @originalValue, justEscapeDelimiter: yes
+          unicodeEscapesToString @originalValue
+      extra:
+        raw:
+          if o.compiling
+            @value
+          else
+            @delimit @originalValue, justEscapeDelimiter: yes
 
   CSXTextToAst: (o) ->
     if o.compiling
@@ -1692,6 +1694,7 @@ exports.SuperLiteral = class SuperLiteral extends Literal
 
 exports.DefaultLiteral = class DefaultLiteral extends Literal
   astType: -> 'Identifier'
+
   astProperties: ->
     name: 'default'
 
@@ -1830,7 +1833,7 @@ exports.Value = class Value extends Base
   isBoolean      : -> @bareLiteral(BooleanLiteral)
   isAtomic       : ->
     for node in @properties.concat @base
-      return no if node.soak or node instanceof Call
+      return no if node.soak or node instanceof Call or node instanceof Op and node.operator is 'do'
     yes
 
   isNotCallable  : -> @isNumber() or @isString() or @isRegex() or
@@ -2093,20 +2096,24 @@ exports.Call = class Call extends Base
   # expands the range on the left, but not the right.
   updateLocationDataIfMissing: (locationData) ->
     if @locationData and @needsUpdatedStartLocation
-      @locationData.first_line = locationData.first_line
-      @locationData.first_column = locationData.first_column
-      @locationData.range = [
-        locationData.range[0]
-        @locationData.range[1]
-      ]
+      @locationData = Object.assign {},
+        @locationData,
+        first_line: locationData.first_line
+        first_column: locationData.first_column
+        range: [
+          locationData.range[0]
+          @locationData.range[1]
+        ]
       base = @variable?.base or @variable
       if base.needsUpdatedStartLocation
-        @variable.locationData.first_line = locationData.first_line
-        @variable.locationData.first_column = locationData.first_column
-        @variable.locationData.range = [
-          locationData.range[0]
-          @variable.locationData.range[1]
-        ]
+        @variable.locationData = Object.assign {},
+          @variable.locationData,
+          first_line: locationData.first_line
+          first_column: locationData.first_column
+          range: [
+            locationData.range[0]
+            @variable.locationData.range[1]
+          ]
         base.updateLocationDataIfMissing locationData
       delete @needsUpdatedStartLocation
     super locationData
@@ -2342,10 +2349,11 @@ exports.Call = class Call extends Base
       'CallExpression'
 
   astProperties: (o) ->
-    callee: @variable.ast o, LEVEL_ACCESS
-    arguments: arg.ast o, LEVEL_LIST for arg in @args
-    optional: !!@soak
-    implicit: !!@implicit
+    return
+      callee: @variable.ast o, LEVEL_ACCESS
+      arguments: arg.ast o, LEVEL_LIST for arg in @args
+      optional: !!@soak
+      implicit: !!@implicit
 
 #### Super
 
@@ -2759,11 +2767,12 @@ exports.Range = class Range extends Base
     args   = ', arguments' if hasArgs(@from) or hasArgs(@to)
     [@makeCode "(function() {#{pre}\n#{idt}for (#{body})#{post}}).apply(this#{args ? ''})"]
 
-  astProperties: (o) -> {
-    from: @from?.ast(o) ? null
-    to: @to?.ast(o) ? null
-    @exclusive
-  }
+  astProperties: (o) ->
+    return {
+      from: @from?.ast(o) ? null
+      to: @to?.ast(o) ? null
+      @exclusive
+    }
 
 #### Slice
 
@@ -3048,6 +3057,48 @@ exports.Obj = class Obj extends Base
       answer.push @makeCode join
     if @front then @wrapInParentheses answer else answer
 
+  # Convert “bare” properties to `ObjectProperty`s (or `Splat`s).
+  expandProperty: (property) ->
+    {variable, context, operatorToken} = property
+    key = if property instanceof Assign and context is 'object'
+      variable
+    else if property instanceof Assign
+      operatorToken.error "unexpected #{operatorToken.value}" unless @lhs
+      variable
+    else
+      property
+    if key instanceof Value and key.hasProperties()
+      key.error 'invalid object key' unless context isnt 'object' and key.this
+      if property instanceof Assign
+        return new ObjectProperty fromAssign: property
+      else
+        return new ObjectProperty key: property
+    return new ObjectProperty(fromAssign: property) unless key is property
+    return property if property instanceof Splat
+
+    new ObjectProperty key: property
+
+  expandProperties: ->
+    @expandProperty(property) for property in @properties
+
+  propagateLhs: (setLhs) ->
+    @lhs = yes if setLhs
+    return unless @lhs
+
+    for property in @properties
+      if property instanceof Assign and property.context is 'object'
+        {value} = property
+        unwrappedValue = value.unwrapAll()
+        if unwrappedValue instanceof Arr or unwrappedValue instanceof Obj
+          unwrappedValue.propagateLhs yes
+        else if unwrappedValue instanceof Assign
+          unwrappedValue.nestedLhs = yes
+      else if property instanceof Assign
+        # Shorthand property with default, e.g. `{a = 1} = b`.
+        property.nestedLhs = yes
+      else if property instanceof Splat
+        property.lhs = yes
+
   astFull: (o) ->
     return @CSXAttributesToAst o if @csx
     super o
@@ -3059,39 +3110,40 @@ exports.Obj = class Obj extends Base
       'ObjectExpression'
 
   astProperties: (o) ->
-    properties:
-      for prop in @expandProperties(o) then do =>
-        return prop.ast o if prop instanceof Splat
-        {variable, value, shorthand} = prop
-        isComputedPropertyName = variable instanceof Value and variable.base instanceof ComputedPropertyName
+    return
+      implicit: !!@generated
+      properties:
+        property.ast(o) for property in @expandProperties()
 
-        compiledKey =
-          (if isComputedPropertyName
-            variable.base.value
-          else
-            variable.unwrap()
-          ).ast o, LEVEL_LIST
-        isAssignmentPattern = prop instanceof Assign and prop.context isnt 'object' # TODO: restructure this Assign in expandProperties() to avoid this special case?
-        # key = merge {}, compiledKey
-        # key.declaration = no if key.declaration
-        compiledValue = value.ast o, LEVEL_LIST
-        prop.withAstLocationData
-          type: 'ObjectProperty'
-          key: compiledKey
-          value:
-            if isAssignmentPattern
-              type: 'AssignmentPattern'
-              left: compiledKey
-              right: compiledValue
-            else
-              compiledValue
-          shorthand: !!shorthand
-          computed: do =>
-            return yes if isComputedPropertyName
-            return no if @isClassBody
-            return no if not o.compiling# and variable.unwrap() instanceof StringWithInterpolations
-            variable.shouldCache()
-    implicit: !!@generated
+exports.ObjectProperty = class ObjectProperty extends Base
+  constructor: ({key, fromAssign}) ->
+    super()
+    if fromAssign
+      {variable: @key, value, context} = fromAssign
+      if context is 'object'
+        # All non-shorthand properties (i.e. includes `:`).
+        @value = value
+      else
+        # Left-hand-side shorthand with default e.g. `{a = 1} = b`.
+        @value = fromAssign
+        @shorthand = yes
+      @locationData = fromAssign.locationData
+    else
+      # Shorthand without default e.g. `{a}` or `{@a}` or `{[a]}`.
+      @key = key
+      @shorthand = yes
+      @locationData = key.locationData
+
+  astProperties: (o) ->
+    isComputedPropertyName = @key instanceof Value and @key.base instanceof ComputedPropertyName
+    keyAst = @key.ast o
+
+    return
+      key: keyAst
+      value: @value?.ast(o) ? keyAst
+      shorthand: !!@shorthand
+      computed: !!isComputedPropertyName
+      method: no
 
 #### Arr
 
@@ -3118,19 +3170,6 @@ exports.Arr = class Arr extends Base
 
   shouldCache: ->
     not @isAssignable()
-
-  # If this array is the left-hand side of an assignment, all its children
-  # are too.
-  propagateLhs: (setLhs) ->
-    @lhs = yes if setLhs
-    return unless @lhs
-    for obj in @objects
-      obj.lhs = yes if obj instanceof Splat
-      unwrappedObj = obj.unwrapAll()
-      if unwrappedObj instanceof Arr or unwrappedObj instanceof Obj
-        unwrappedObj.propagateLhs yes
-      else if unwrappedObj instanceof Assign
-        unwrappedObj.nestedLhs = yes
 
   compileNode: (o) ->
     return [@makeCode '[]'] unless @objects.length
@@ -3194,6 +3233,19 @@ exports.Arr = class Arr extends Base
       obj = obj.unwrapAll()
       obj.eachName iterator
 
+  # If this array is the left-hand side of an assignment, all its children
+  # are too.
+  propagateLhs: (setLhs) ->
+    @lhs = yes if setLhs
+    return unless @lhs
+    for object in @objects
+      object.lhs = yes if object instanceof Splat
+      unwrappedObject = object.unwrapAll()
+      if unwrappedObject instanceof Arr or unwrappedObject instanceof Obj
+        unwrappedObject.propagateLhs yes
+      else if unwrappedObject instanceof Assign
+        unwrappedObject.nestedLhs = yes
+
   astType: ->
     if @lhs
       'ArrayPattern'
@@ -3201,8 +3253,9 @@ exports.Arr = class Arr extends Base
       'ArrayExpression'
 
   astProperties: (o) ->
-    elements:
-      object.ast(o, LEVEL_LIST) for object in @objects
+    return
+      elements:
+        object.ast(o, LEVEL_LIST) for object in @objects
 
 #### Class
 
@@ -3721,13 +3774,11 @@ exports.ImportDeclaration = class ImportDeclaration extends ModuleDeclaration
     super o
 
   astProperties: (o) ->
-    Object.assign
+    ret =
       specifiers: @clause?.ast(o) ? []
-      source: @source.ast o
-    ,
-      if @clause
-        importKind: 'value'
-      else {}
+      source: @source.ast(o)
+    ret.importKind = 'value' if @clause
+    ret
 
 exports.ImportClause = class ImportClause extends Base
   constructor: (@defaultBinding, @namedImports) ->
@@ -3748,6 +3799,8 @@ exports.ImportClause = class ImportClause extends Base
     code
 
   astFull: (o) ->
+    # The AST for `ImportClause` is the non-nested list of import specifiers
+    # that will be the `specifiers` property of an `ImportDeclaration` AST
     compact flatten [
       @defaultBinding?.ast o
       @namedImports?.ast o
@@ -3790,16 +3843,17 @@ exports.ExportNamedDeclaration = class ExportNamedDeclaration extends ExportDecl
     super o
 
   astProperties: (o) ->
-    Object.assign(
-      if @clause instanceof ExportSpecifierList
-        specifiers: @clause.ast o
-      else
-        specifiers: []
-        declaration: @clause.ast o
-    ,
-      source: @source?.ast o
+    ret =
+      source: @source?.ast(o) ? null
       exportKind: 'value'
-    )
+    clauseAst = @clause.ast o
+    if @clause instanceof ExportSpecifierList
+      ret.specifiers = clauseAst
+      ret.declaration = null
+    else
+      ret.specifiers = []
+      ret.declaration = clauseAst
+    ret
 
 exports.ExportDefaultDeclaration = class ExportDefaultDeclaration extends ExportDeclaration
   astFull: (o) ->
@@ -3809,7 +3863,8 @@ exports.ExportDefaultDeclaration = class ExportDefaultDeclaration extends Export
     super o
 
   astProperties: (o) ->
-    declaration: @clause.ast o
+    return
+      declaration: @clause.ast o
 
 exports.ExportAllDeclaration = class ExportAllDeclaration extends ExportDeclaration
   astFull: (o) ->
@@ -3817,8 +3872,9 @@ exports.ExportAllDeclaration = class ExportAllDeclaration extends ExportDeclarat
     super o
 
   astProperties: (o) ->
-    source: @source.ast o
-    exportKind: 'value'
+    return
+      source: @source.ast o
+      exportKind: 'value'
 
 exports.ModuleSpecifierList = class ModuleSpecifierList extends Base
   constructor: (@specifiers) ->
@@ -3890,28 +3946,31 @@ exports.ImportSpecifier = class ImportSpecifier extends ModuleSpecifier
     super o
 
   astProperties: (o) ->
-    compiledOriginal = @original.ast o
-    imported: compiledOriginal
-    local: @alias?.ast(o) ? compiledOriginal
+    originalAst = @original.ast o
+    return
+      imported: originalAst
+      local: @alias?.ast(o) ? originalAst
+      importKind: null
 
 exports.ImportDefaultSpecifier = class ImportDefaultSpecifier extends ImportSpecifier
   astProperties: (o) ->
-    local: @original.ast o
+    return
+      local: @original.ast o
 
 exports.ImportNamespaceSpecifier = class ImportNamespaceSpecifier extends ImportSpecifier
   astProperties: (o) ->
-    local: do =>
-      return @alias.ast o if @alias
-      @original.ast o
+    return
+      local: @alias.ast o
 
 exports.ExportSpecifier = class ExportSpecifier extends ModuleSpecifier
   constructor: (local, exported) ->
     super local, exported, 'export'
 
   astProperties: (o) ->
-    compiledOriginal = @original.ast o
-    local: compiledOriginal
-    exported: @alias?.ast(o) ? compiledOriginal
+    originalAst = @original.ast o
+    return
+      local: originalAst
+      exported: @alias?.ast(o) ? originalAst
 
 #### Assign
 
@@ -3920,7 +3979,7 @@ exports.ExportSpecifier = class ExportSpecifier extends ModuleSpecifier
 exports.Assign = class Assign extends Base
   constructor: (@variable, @value, options = {}) ->
     super()
-    {@context, @param, @subpattern, @operatorToken, @moduleDeclaration, @shorthand, @originalContext = @context} = options
+    {@context, @param, @subpattern, @operatorToken, @moduleDeclaration, @originalContext = @context} = options
     @propagateLhs()
 
   children: ['variable', 'value']
@@ -3940,14 +3999,6 @@ exports.Assign = class Assign extends Base
 
   unfoldSoak: (o) ->
     unfoldSoak o, this, 'variable'
-
-  isDefaultAssignment: -> @param or @nestedLhs
-  propagateLhs: ->
-    return unless @variable?.isArray?() or @variable?.isObject?()
-    # This is the left-hand side of an assignment; let `Arr` and `Obj`
-    # know that, so that those nodes know that they’re assignable as
-    # destructured variables.
-    @variable.base.propagateLhs yes
 
   _compileToBabylon: (o) ->
     return @CSXAttributeToAst o if @csx
@@ -4475,6 +4526,15 @@ exports.Assign = class Assign extends Base
     return super opts if opts?.accumulator or opts?.mark
     @withLocationData new Return new Parens @
 
+  isDefaultAssignment: -> @param or @nestedLhs
+
+  propagateLhs: ->
+    return unless @variable?.isArray?() or @variable?.isObject?()
+    # This is the left-hand side of an assignment; let `Arr` and `Obj`
+    # know that, so that those nodes know that they’re assignable as
+    # destructured variables.
+    @variable.base.propagateLhs yes
+
   astFull: (o) ->
     return @CSXAttributeToAst o if @csx
     @addScopeVariables o, checkAssignability: no if not @context or @context is '**='
@@ -4487,14 +4547,14 @@ exports.Assign = class Assign extends Base
       'AssignmentExpression'
 
   astProperties: (o) ->
-    Object.assign
+    ret =
       right: @value.ast o, LEVEL_LIST
       left: @variable.ast o, LEVEL_LIST
-    ,
-      if @isDefaultAssignment()
-        {}
-      else
-        operator: (if o.compiling then @context else @originalContext) or '='
+
+    unless @isDefaultAssignment()
+      ret.operator = (if o.compiling then @context else @originalContext) ? '='
+
+    ret
 
 #### FuncGlyph
 
@@ -5202,7 +5262,8 @@ exports.Elision = class Elision extends Base
 
   eachName: (iterator) ->
 
-  astFull: -> null
+  astFull: ->
+    null
 
 #### While
 
@@ -5321,7 +5382,12 @@ exports.Op = class Op extends Base
     if op is 'new'
       if ((firstCall = unwrapped = first.unwrap()) instanceof Call or (firstCall = unwrapped.base) instanceof Call) and not firstCall.do and not firstCall.isNew
         return new Value firstCall.newInstance(), if firstCall is unwrapped then [] else unwrapped.properties
-      first = new Parens first if unwrapped instanceof Op and unwrapped.operator is 'do'
+      # first = new Parens first if unwrapped instanceof Op and unwrapped.operator is 'do'
+      first = new Parens first unless first instanceof Parens or first.unwrap() instanceof IdentifierLiteral or first.hasProperties?()
+      call = new Call first, []
+      call.locationData = @locationData
+      call.isNew = yes
+      return call
 
     @operator = CONVERSIONS[op] or op
     @first    = first
@@ -5529,9 +5595,9 @@ exports.Op = class Op extends Base
     if o.level >= LEVEL_ACCESS
       return (new Parens this).compileToFragments o
     plusMinus = op in ['+', '-']
-    parts.push [@makeCode(' ')] if op in ['new', 'typeof', 'delete'] or
+    parts.push [@makeCode(' ')] if op in ['typeof', 'delete'] or
                       plusMinus and @first instanceof Op and @first.operator is op
-    if (plusMinus and @first instanceof Op) or (op is 'new' and @first.isStatement o)
+    if plusMinus and @first instanceof Op
       @first = new Parens @first
     parts.push @first.compileToFragments o, LEVEL_OP
     parts.reverse() if @flip
@@ -5590,7 +5656,6 @@ exports.Op = class Op extends Base
 
   astType: ->
     switch @operator
-      when 'new'             then 'NewExpression'
       when '||', '&&', '?'   then 'LogicalExpression'
       when '++', '--'        then 'UpdateExpression'
       when 'await'           then 'AwaitExpression'
@@ -5608,14 +5673,13 @@ exports.Op = class Op extends Base
       else
         "#{if @invertOperator then "#{@invertOperator} " else ''}#{@originalOperator}"
     switch
-      when @operator is 'new'
-        return
-          callee: firstAst
-          arguments: []
       when @isUnary()
         argument =
           if @isYield() or @isAwait()
-            firstAst unless @first.unwrap().value is ''
+            unless @first.unwrap().value is ''
+              firstAst
+            else
+              null
           else
             firstAst
         return {argument} if @isAwait()

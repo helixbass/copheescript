@@ -7,7 +7,7 @@
 deepStrictIncludeExpectedProperties = (actual, expected) ->
   eq actual.length, expected.length if expected instanceof Array and not expected.loose
   for key, val of expected
-    if 'object' is typeof val
+    if val? and typeof val is 'object'
       fail "Property #{reset}#{key}#{red} expected, but was missing" unless actual[key]
       deepStrictIncludeExpectedProperties actual[key], val
     else
@@ -173,18 +173,33 @@ test "AST as expected for IdentifierLiteral node", ->
 #         value: 'assign'
 #     ]
 
-# test "AST as expected for ComputedPropertyName node", ->
-#   testExpression '[fn]: ->',
-#     type: 'Obj'
-#     properties: [
-#       type: 'Assign'
-#       context: 'object'
-#       variable:
-#         type: 'ComputedPropertyName'
-#       value:
-#         type: 'Code'
-#     ]
-#   # TODO: `'fn'` identifier is missing from AST.
+test "AST as expected for ComputedPropertyName node", ->
+  # testExpression '[fn]: ->',
+  #   type: 'Obj'
+  #   properties: [
+  #     type: 'Assign'
+  #     context: 'object'
+  #     variable:
+  #       type: 'ComputedPropertyName'
+  #     value:
+  #       type: 'Code'
+  #   ]
+
+  testExpression '[a]: b',
+    type: 'ObjectExpression'
+    properties: [
+      type: 'ObjectProperty'
+      key:
+        type: 'Identifier'
+        name: 'a'
+      value:
+        type: 'Identifier'
+        name: 'b'
+      computed: yes
+      shorthand: no
+      method: no
+    ]
+    implicit: yes
 
 test "AST as expected for StatementLiteral node", ->
   testExpression 'break',
@@ -270,41 +285,98 @@ test "AST as expected for BooleanLiteral node", ->
 
 # # Comments aren’t nodes, so they shouldn’t appear in the AST.
 
-# test "AST as expected for Call node", ->
-#   testExpression 'fn()',
-#     type: 'Call'
-#     variable:
-#       value: 'fn'
+test "AST as expected for Call node", ->
+  testExpression 'fn()',
+    type: 'CallExpression'
+    callee:
+      type: 'Identifier'
+      name: 'fn'
+    arguments: []
+    optional: no
+    implicit: no
 
-#   testExpression 'new Date()',
-#     type: 'Call'
-#     variable:
-#       value: 'Date'
-#     isNew: yes
+  testExpression 'new Date()',
+    type: 'NewExpression'
+    callee:
+      type: 'Identifier'
+      name: 'Date'
+    arguments: []
+    optional: no
+    implicit: no
 
-#   testExpression 'maybe?()',
-#     type: 'Call'
-#     soak: yes
+  testExpression 'new Date?()',
+    type: 'NewExpression'
+    callee:
+      type: 'Identifier'
+      name: 'Date'
+    arguments: []
+    optional: yes
+    implicit: no
 
-#   testExpression 'goDo this, that',
-#     type: 'Call'
-#     args: [
-#       {value: 'this'}
-#       {value: 'that'}
-#     ]
+  testExpression 'new Old',
+    type: 'NewExpression'
+    callee:
+      type: 'Identifier'
+      name: 'Old'
+    arguments: []
+    optional: no
+    implicit: no
 
-#   testExpression 'do ->',
-#     type: 'Call'
-#     do: yes
-#     variable:
-#       type: 'Code'
+  testExpression 'new Old(1)',
+    type: 'NewExpression'
+    callee:
+      type: 'Identifier'
+      name: 'Old'
+    arguments: [
+      type: 'NumericLiteral'
+      value: 1
+    ]
+    optional: no
+    implicit: no
 
-#   testExpression 'do fn',
-#     type: 'Call'
-#     do: yes
-#     variable:
-#       type: 'IdentifierLiteral'
-#       value: 'fn'
+  testExpression 'new Old 1',
+    type: 'NewExpression'
+    callee:
+      type: 'Identifier'
+      name: 'Old'
+    arguments: [
+      type: 'NumericLiteral'
+      value: 1
+    ]
+    optional: no
+    implicit: yes
+
+  testExpression 'maybe?()',
+    type: 'CallExpression'
+    optional: yes
+    implicit: no
+
+  testExpression 'maybe?(1 + 1)',
+    type: 'CallExpression'
+    arguments: [
+      type: 'BinaryExpression'
+    ]
+    optional: yes
+    implicit: no
+
+  testExpression 'maybe? 1 + 1',
+    type: 'CallExpression'
+    arguments: [
+      type: 'BinaryExpression'
+    ]
+    optional: yes
+    implicit: yes
+
+  testExpression 'goDo this, that',
+    type: 'CallExpression'
+    arguments: [
+      type: 'ThisExpression'
+    ,
+      type: 'Identifier'
+      name: 'that'
+    ]
+    implicit: yes
+    optional: no
 
 # test "AST as expected for SuperCall node", ->
 #   testExpression 'class child extends parent then constructor: -> super()',
@@ -366,6 +438,8 @@ test "AST as expected for Access node", ->
     shorthand: no
 
   testExpression 'obj?.prop',
+    # TODO: support Babel 7-style OptionalMemberExpression type
+    # type: 'OptionalMemberExpression'
     type: 'MemberExpression'
     object:
       type: 'Identifier'
@@ -502,167 +576,242 @@ test "AST as expected for Index node", ->
     optional: no
     shorthand: no
 
-# test "AST as expected for Range node", ->
-#   testExpression '[x..y]',
-#     type: 'Range'
-#     exclusive: no
-#     equals: '='
-#     from:
-#       value: 'x'
-#     to:
-#       value: 'y'
+test "AST as expected for Range node", ->
+  testExpression '[x..y]',
+    type: 'Range'
+    exclusive: no
+    from:
+      name: 'x'
+    to:
+      name: 'y'
 
-#   testExpression '[4...2]',
-#     type: 'Range'
-#     exclusive: yes
-#     equals: ''
-#     from:
-#       value: '4'
-#     to:
-#       value: '2'
+  testExpression '[4...2]',
+    type: 'Range'
+    exclusive: yes
+    from:
+      value: 4
+    to:
+      value: 2
 
-#   testExpression 'for x in [42...43] then',
-#     range: yes
-#     source:
-#       type: 'Range'
-#       exclusive: yes
-#       equals: ''
-#       from:
-#         value: '42'
-#       to:
-#         value: '43'
+  # testExpression 'for x in [42...43] then',
+  #   range: yes
+  #   source:
+  #     type: 'Range'
+  #     exclusive: yes
+  #     equals: ''
+  #     from:
+  #       value: '42'
+  #     to:
+  #       value: '43'
 
-#   testExpression 'for x in [y..z] then',
-#     range: yes
-#     source:
-#       type: 'Range'
-#       exclusive: no
-#       equals: '='
-#       from:
-#         value: 'y'
-#       to:
-#         value: 'z'
+  # testExpression 'for x in [y..z] then',
+  #   range: yes
+  #   source:
+  #     type: 'Range'
+  #     exclusive: no
+  #     equals: '='
+  #     from:
+  #       value: 'y'
+  #     to:
+  #       value: 'z'
 
-#   testExpression 'x[..y]',
-#     properties: [
-#       range:
-#         type: 'Range'
-#         exclusive: no
-#         equals: '='
-#         from: undefined
-#         to:
-#           value: 'y'
-#     ]
+test "AST as expected for Slice node", ->
+  testExpression 'x[..y]',
+    property:
+      type: 'Range'
+      exclusive: no
+      from: null
+      to:
+        name: 'y'
 
-#   testExpression 'x[y...]',
-#     properties: [
-#       range:
-#         type: 'Range'
-#         exclusive: yes
-#         equals: ''
-#         from:
-#           value: 'y'
-#         to: undefined
-#     ]
+  testExpression 'x[y...]',
+    property:
+      type: 'Range'
+      exclusive: yes
+      from:
+        name: 'y'
+      to: null
 
-#   testExpression 'x[...]',
-#     properties: [
-#       range:
-#         type: 'Range'
-#         exclusive: yes
-#         equals: ''
-#         from: undefined
-#         to: undefined
-#     ]
+  testExpression 'x[...]',
+    property:
+      type: 'Range'
+      exclusive: yes
+      from: null
+      to: null
 
-# test "AST as expected for Slice node", ->
-#   testExpression '"abc"[...2]',
-#     properties: [
-#       type: 'Slice'
-#     ]
+  # testExpression '"abc"[...2]',
+  #   type: 'MemberExpression'
+  #   property:
+  #     type: 'Range'
+  #     from: null
+  #     to:
+  #       type: 'NumericLiteral'
+  #       value: 2
+  #     exclusive: yes
+  #   computed: yes
+  #   optional: no
+  #   shorthand: no
 
-#   expression = getExpression 'x[...][a..][b...][..c][...d]'
-#   eq expression.properties.length, 5
-#   for slice in expression.properties
-#     eq slice.type, 'Slice'
-#     eq slice.range.type, 'Range'
+  testExpression 'x[...][a..][b...][..c][...d]',
+    type: 'MemberExpression'
+    object:
+      type: 'MemberExpression'
+      object:
+        type: 'MemberExpression'
+        object:
+          type: 'MemberExpression'
+          object:
+            type: 'MemberExpression'
+            property:
+              type: 'Range'
+              from: null
+              to: null
+              exclusive: yes
+          property:
+            type: 'Range'
+            from:
+              name: 'a'
+            to: null
+            exclusive: no
+        property:
+          type: 'Range'
+          from:
+            name: 'b'
+          to: null
+          exclusive: yes
+      property:
+        type: 'Range'
+        from: null
+        to:
+          name: 'c'
+        exclusive: no
+    property:
+      type: 'Range'
+      from: null
+      to:
+        name: 'd'
+      exclusive: yes
 
-# test "AST as expected for Obj node", ->
-#   testExpression '{a: a1: x, a2: y; b: b1: z, b2: w}',
-#     type: 'Obj'
-#     generated: no
-#     lhs: no
-#     properties: [
-#       type: 'Assign'
-#       variable:
-#         value: 'a'
-#       value:
-#         type: 'Obj'
-#         generated: yes
-#         lhs: no
-#         properties: [
-#           type: 'Assign'
-#           context: 'object'
-#           originalContext: 'object'
-#           variable:
-#             value: 'a1'
-#           value:
-#             value: 'x'
-#         ,
-#           type: 'Assign'
-#           context: 'object'
-#           originalContext: 'object'
-#           variable:
-#             value: 'a2'
-#           value:
-#             value: 'y'
-#         ]
-#     ,
-#       type: 'Assign'
-#       variable:
-#         value: 'b'
-#       value:
-#         type: 'Obj'
-#         generated: yes
-#         lhs: no
-#         properties: [
-#           type: 'Assign'
-#           context: 'object'
-#           originalContext: 'object'
-#           variable:
-#             value: 'b1'
-#           value:
-#             value: 'z'
-#         ,
-#           type: 'Assign'
-#           context: 'object'
-#           originalContext: 'object'
-#           variable:
-#             value: 'b2'
-#           value:
-#             value: 'w'
-#         ]
-#     ]
+test "AST as expected for Obj node", ->
+  testExpression "{a: 1, b, [c], @d, [e()]: f, 'g': 2, ...h, i...}",
+    type: 'ObjectExpression'
+    properties: [
+      type: 'ObjectProperty'
+      key:
+        type: 'Identifier'
+        name: 'a'
+      value:
+        type: 'NumericLiteral'
+        value: 1
+      computed: no
+      shorthand: no
+    ,
+      type: 'ObjectProperty'
+      key:
+        type: 'Identifier'
+        name: 'b'
+      value:
+        type: 'Identifier'
+        name: 'b'
+      computed: no
+      shorthand: yes
+    ,
+      type: 'ObjectProperty'
+      key:
+        type: 'Identifier'
+        name: 'c'
+      value:
+        type: 'Identifier'
+        name: 'c'
+      computed: yes
+      shorthand: yes
+    ,
+      type: 'ObjectProperty'
+      key:
+        type: 'MemberExpression'
+        object:
+          type: 'ThisExpression'
+        property:
+          type: 'Identifier'
+          name: 'd'
+      value:
+        type: 'MemberExpression'
+        object:
+          type: 'ThisExpression'
+        property:
+          type: 'Identifier'
+          name: 'd'
+      computed: no
+      shorthand: yes
+    ,
+      type: 'ObjectProperty'
+      key:
+        type: 'CallExpression'
+        callee:
+          type: 'Identifier'
+          name: 'e'
+        arguments: []
+      value:
+        type: 'Identifier'
+        name: 'f'
+      computed: yes
+      shorthand: no
+    ,
+      type: 'ObjectProperty'
+      key:
+        type: 'StringLiteral'
+        value: 'g'
+      value:
+        type: 'NumericLiteral'
+        value: 2
+      computed: no
+      shorthand: no
+    ,
+      type: 'SpreadElement'
+      argument:
+        type: 'Identifier'
+        name: 'h'
+      postfix: no
+    ,
+      type: 'SpreadElement'
+      argument:
+        type: 'Identifier'
+        name: 'i'
+      postfix: yes
+    ]
+    implicit: no
+
+  testExpression 'a: 1',
+    type: 'ObjectExpression'
+    properties: [
+      type: 'ObjectProperty'
+      key:
+        type: 'Identifier'
+        name: 'a'
+      value:
+        type: 'NumericLiteral'
+        value: 1
+      shorthand: no
+      computed: no
+    ]
+    implicit: yes
 
 #   # TODO: Test destructuring.
 
 #   # console.log JSON.stringify expression, ["type", "generated", "lhs", "value", "properties", "variable"], 2
 
-# test "AST as expected for Arr node", ->
-#   testExpression '[]',
-#     type: 'Arr'
-#     lhs: no
-#     objects: []
+test "AST as expected for Arr node", ->
+  testExpression '[]',
+    type: 'ArrayExpression'
+    elements: []
 
-#   testExpression '[3, "coffee", tables, !1]',
-#     type: 'Arr'
-#     lhs: no
-#     objects: [
-#       {value: '3'}
-#       {value: '"coffee"'}
-#       {value: 'tables'}     # TODO: File issue for `, value: whatever` syntax not splitting objects properly.
-#       {type: 'Op'}
-#     ]
+  testExpression '[3, tables, !1]',
+    type: 'ArrayExpression'
+    elements: [
+      {value: 3}
+      {name: 'tables'}
+      {operator: '!'}
+    ]
 
 #   # TODO: Test destructuring.
 
@@ -736,172 +885,316 @@ test "AST as expected for Index node", ->
 #         ]
 #       ]
 
-# test "AST as expected for ModuleDeclaration node", ->
-#   testExpression 'export {X}',
-#     clause:
-#       specifiers: [
-#         type: 'ExportSpecifier'
-#         moduleDeclarationType: 'export'
-#         identifier: 'X'
-#       ]
+test "AST as expected for ModuleDeclaration node", ->
+  testExpression 'export {X}',
+    type: 'ExportNamedDeclaration'
+    declaration: null
+    specifiers: [
+      type: 'ExportSpecifier'
+      local:
+        type: 'Identifier'
+        name: 'X'
+      exported:
+        type: 'Identifier'
+        name: 'X'
+    ]
+    source: null
+    exportKind: 'value'
 
-#   testExpression 'import X from "."',
-#     clause:
-#       defaultBinding:
-#         type: 'ImportDefaultSpecifier'
-#         moduleDeclarationType: 'import'
-#         identifier: 'X'
+  testExpression 'import X from "."',
+    type: 'ImportDeclaration'
+    specifiers: [
+      type: 'ImportDefaultSpecifier'
+      local:
+        type: 'Identifier'
+        name: 'X'
+    ]
+    importKind: 'value'
+    source:
+      type: 'StringLiteral'
+      value: '.'
 
-# test "AST as expected for ImportDeclaration node", ->
-#   testExpression 'import React, {Component} from "react"',
-#     type: 'ImportDeclaration'
-#     source:
-#       type: 'StringLiteral'
-#       value: '"react"'
-#       originalValue: 'react'
+test "AST as expected for ImportDeclaration node", ->
+  testExpression 'import React, {Component} from "react"',
+    type: 'ImportDeclaration'
+    specifiers: [
+      type: 'ImportDefaultSpecifier'
+      local:
+        type: 'Identifier'
+        name: 'React'
+    ,
+      type: 'ImportSpecifier'
+      imported:
+        type: 'Identifier'
+        name: 'Component'
+      importKind: null
+      local:
+        type: 'Identifier'
+        name: 'Component'
+    ]
+    importKind: 'value'
+    source:
+      type: 'StringLiteral'
+      value: 'react'
+      extra:
+        raw: '"react"'
 
-# test "AST as expected for ImportClause node", ->
-#   testExpression 'import React, {Component} from "react"',
-#     clause:
-#       type: 'ImportClause'
-#       defaultBinding:
-#         type: 'ImportDefaultSpecifier'
-#       namedImports:
-#         type: 'ImportSpecifierList'
+test "AST as expected for ExportNamedDeclaration node", ->
+  testExpression 'export {}',
+    type: 'ExportNamedDeclaration'
+    declaration: null
+    specifiers: []
+    source: null
+    exportKind: 'value'
 
-# test "AST as expected for ExportDeclaration node", ->
-#   testExpression 'export {X}',
-#     clause:
-#       specifiers: [
-#         type: 'ExportSpecifier'
-#         moduleDeclarationType: 'export'
-#         identifier: 'X'
-#       ]
+  # testExpression 'export fn = ->',
+  #   type: 'ExportNamedDeclaration'
+  #   clause:
+  #     type: 'Assign'
+  #     variable:
+  #       value: 'fn'
+  #     value:
+  #       type: 'Code'
 
-# test "AST as expected for ExportNamedDeclaration node", ->
-#   testExpression 'export fn = ->',
-#     type: 'ExportNamedDeclaration'
-#     clause:
-#       type: 'Assign'
-#       variable:
-#         value: 'fn'
-#       value:
-#         type: 'Code'
+  # testExpression 'export class A',
 
-# test "AST as expected for ExportDefaultDeclaration node", ->
-#   testExpression 'export default class',
-#     type: 'ExportDefaultDeclaration'
-#     clause:
-#       type: 'Class'
+  testExpression 'export {x as y, z as default}',
+    type: 'ExportNamedDeclaration'
+    declaration: null
+    specifiers: [
+      type: 'ExportSpecifier'
+      local:
+        type: 'Identifier'
+        name: 'x'
+      exported:
+        type: 'Identifier'
+        name: 'y'
+    ,
+      type: 'ExportSpecifier'
+      local:
+        type: 'Identifier'
+        name: 'z'
+      exported:
+        type: 'Identifier'
+        name: 'default'
+    ]
+    source: null
+    exportKind: 'value'
 
-# test "AST as expected for ExportAllDeclaration node", ->
-#   testExpression 'export * from "module-name"',
-#     type: 'ExportAllDeclaration'
-#     clause:
-#       type: 'Literal'
-#       value: '*'
-#     source:
-#       type: 'StringLiteral'
-#       value: '"module-name"'
-#       originalValue: 'module-name'
-#       quote: '"'
-#       initialChunk: yes
-#       finalChunk: yes
-#       fromSourceString: yes
+  testExpression 'export {default, default as b} from "./abc"',
+    type: 'ExportNamedDeclaration'
+    declaration: null
+    specifiers: [
+      type: 'ExportSpecifier'
+      local:
+        type: 'Identifier'
+        name: 'default'
+      exported:
+        type: 'Identifier'
+        name: 'default'
+    ,
+      type: 'ExportSpecifier'
+      local:
+        type: 'Identifier'
+        name: 'default'
+      exported:
+        type: 'Identifier'
+        name: 'b'
+    ]
+    source:
+      type: 'StringLiteral'
+      value: './abc'
+      extra:
+        raw: '"./abc"'
+    exportKind: 'value'
 
-# # `ModuleSpecifierList` never makes it into the AST.
+test "AST as expected for ExportDefaultDeclaration node", ->
+  # testExpression 'export default class',
+  #   type: 'ExportDefaultDeclaration'
+  #   clause:
+  #     type: 'Class'
 
-# test "AST as expected for ImportSpecifierList node", ->
-#   testExpression 'import React, {Component} from "react"',
-#     clause:
-#       namedImports:
-#         type: 'ImportSpecifierList'
-#         specifiers: [
-#           identifier: 'Component'
-#         ]
+  testExpression 'export default "abc"',
+    type: 'ExportDefaultDeclaration'
+    declaration:
+      type: 'StringLiteral'
+      value: 'abc'
+      extra:
+        raw: '"abc"'
 
-# test "AST as expected for ExportSpecifierList node", ->
-#   testExpression 'export {a, b, c}',
-#     clause:
-#       type: 'ExportSpecifierList'
-#       specifiers: [
-#         {identifier: 'a'}
-#         {identifier: 'b'}
-#         {identifier: 'c'}
-#       ]
+test "AST as expected for ExportAllDeclaration node", ->
+  testExpression 'export * from "module-name"',
+    type: 'ExportAllDeclaration'
+    source:
+      type: 'StringLiteral'
+      value: 'module-name'
+      extra:
+        raw: '"module-name"'
+    exportKind: 'value'
 
-# # `ModuleSpecifier` never makes it into the AST.
+test "AST as expected for ExportSpecifierList node", ->
+  testExpression 'export {a, b, c}',
+    type: 'ExportNamedDeclaration'
+    declaration: null
+    specifiers: [
+      type: 'ExportSpecifier'
+      local:
+        type: 'Identifier'
+        name: 'a'
+      exported:
+        type: 'Identifier'
+        name: 'a'
+    ,
+      type: 'ExportSpecifier'
+      local:
+        type: 'Identifier'
+        name: 'b'
+      exported:
+        type: 'Identifier'
+        name: 'b'
+    ,
+      type: 'ExportSpecifier'
+      local:
+        type: 'Identifier'
+        name: 'c'
+      exported:
+        type: 'Identifier'
+        name: 'c'
+    ]
 
-# test "AST as expected for ImportSpecifier node", ->
-#   testExpression 'import {Component, PureComponent} from "react"',
-#     clause:
-#       namedImports:
-#         specifiers: [
-#           type: 'ImportSpecifier'
-#           identifier: 'Component'
-#           moduleDeclarationType: 'import'
-#           original:
-#             type: 'IdentifierLiteral'
-#             value: 'Component'
-#         ,
-#           type: 'ImportSpecifier'
-#           identifier: 'PureComponent'
-#         ]
+test "AST as expected for ImportDefaultSpecifier node", ->
+  testExpression 'import React from "react"',
+    type: 'ImportDeclaration'
+    specifiers: [
+      type: 'ImportDefaultSpecifier'
+      local:
+        type: 'Identifier'
+        name: 'React'
+    ]
+    importKind: 'value'
+    source:
+      type: 'StringLiteral'
+      value: 'react'
 
-# test "AST as expected for ImportDefaultSpecifier node", ->
-#   testExpression 'import React from "react"',
-#     clause:
-#       defaultBinding:
-#         type: 'ImportDefaultSpecifier'
-#         moduleDeclarationType: 'import'
-#         identifier: 'React'
-#         original:
-#           type: 'IdentifierLiteral'
-#           value: 'React'
+test "AST as expected for ImportNamespaceSpecifier node", ->
+  testExpression 'import * as React from "react"',
+    type: 'ImportDeclaration'
+    specifiers: [
+      type: 'ImportNamespaceSpecifier'
+      local:
+        type: 'Identifier'
+        name: 'React'
+    ]
+    importKind: 'value'
+    source:
+      type: 'StringLiteral'
+      value: 'react'
 
-# test "AST as expected for ImportNamespaceSpecifier node", ->
-#   testExpression 'import * as React from "react"',
-#     clause:
-#       namedImports:
-#         type: 'ImportNamespaceSpecifier'
-#         moduleDeclarationType: 'import'
-#         identifier: 'React'
-#         original:
-#           type: 'Literal'
-#           value: '*'
-#         alias:
-#           type: 'IdentifierLiteral'
-#           value: 'React'
+  testExpression 'import React, * as ReactStar from "react"',
+    type: 'ImportDeclaration'
+    specifiers: [
+      type: 'ImportDefaultSpecifier'
+      local:
+        type: 'Identifier'
+        name: 'React'
+    ,
+      type: 'ImportNamespaceSpecifier'
+      local:
+        type: 'Identifier'
+        name: 'ReactStar'
+    ]
+    importKind: 'value'
+    source:
+      type: 'StringLiteral'
+      value: 'react'
 
-# test "AST as expected for ExportSpecifier node", ->
-#   testExpression 'export {X}',
-#     clause:
-#       specifiers: [
-#         type: 'ExportSpecifier'
-#         moduleDeclarationType: 'export'
-#         identifier: 'X'
-#         original:
-#           type: 'IdentifierLiteral'
-#       ]
+test "AST as expected for Assign node", ->
+  testExpression 'a = b',
+    type: 'AssignmentExpression'
+    left:
+      type: 'Identifier'
+      name: 'a'
+    right:
+      type: 'Identifier'
+      name: 'b'
+    operator: '='
 
-# test "AST as expected for Assign node", ->
-#   testExpression 'a = 1',
-#     type: 'Assign'
-#     variable:
-#       value: 'a'
-#     value:
-#       value: '1'
+  testExpression 'a += b',
+    type: 'AssignmentExpression'
+    left:
+      type: 'Identifier'
+      name: 'a'
+    right:
+      type: 'Identifier'
+      name: 'b'
+    operator: '+='
 
-#   testExpression 'a: 1',
-#     properties: [
-#       type: 'Assign'
-#       context: 'object'
-#       originalContext: 'object'
-#       variable:
-#         value: 'a'
-#       value:
-#         value: '1'
-#     ]
+  testExpression '[@a = 2, {b: {c = 3} = {}, d...}, ...e] = f',
+    type: 'AssignmentExpression'
+    left:
+      type: 'ArrayPattern'
+      elements: [
+        type: 'AssignmentPattern'
+        left:
+          type: 'MemberExpression'
+          object:
+            type: 'ThisExpression'
+          property:
+            name: 'a'
+        right:
+          type: 'NumericLiteral'
+      ,
+        type: 'ObjectPattern'
+        properties: [
+          type: 'ObjectProperty'
+          key:
+            name: 'b'
+          value:
+            type: 'AssignmentPattern'
+            left:
+              type: 'ObjectPattern'
+              properties: [
+                type: 'ObjectProperty'
+                key:
+                  name: 'c'
+                value:
+                  type: 'AssignmentPattern'
+                  left:
+                    name: 'c'
+                  right:
+                    value: 3
+                shorthand: yes
+              ]
+            right:
+              type: 'ObjectExpression'
+              properties: []
+        ,
+          type: 'RestElement'
+          postfix: yes
+        ]
+      ,
+        type: 'RestElement'
+        postfix: no
+      ]
+    right:
+      name: 'f'
+
+  testExpression '{a: [...b]} = c',
+    type: 'AssignmentExpression'
+    left:
+      type: 'ObjectPattern'
+      properties: [
+        type: 'ObjectProperty'
+        key:
+          name: 'a'
+        value:
+          type: 'ArrayPattern'
+          elements: [
+            type: 'RestElement'
+          ]
+      ]
+    right:
+      name: 'c'
 
 # # `FuncGlyph` node isn't exported.
 
@@ -944,14 +1237,36 @@ test "AST as expected for Index node", ->
 #         value: '1'
 #     ]
 
-# test "AST as expected for Splat node", ->
-#   testExpression '(a...) ->',
-#     params: [
-#       type: 'Param'
-#       splat: yes
-#       name:
-#         value: 'a'
-#     ]
+test "AST as expected for Splat node", ->
+  testExpression '[a...]',
+    type: 'ArrayExpression'
+    elements: [
+      type: 'SpreadElement'
+      argument:
+        type: 'Identifier'
+        name: 'a'
+      postfix: yes
+    ]
+
+  testExpression '[b, ...c]',
+    type: 'ArrayExpression'
+    elements: [
+      name: 'b'
+    ,
+      type: 'SpreadElement'
+      argument:
+        type: 'Identifier'
+        name: 'c'
+      postfix: no
+    ]
+
+  # testExpression '(a...) ->',
+  #   params: [
+  #     type: 'Param'
+  #     splat: yes
+  #     name:
+  #       value: 'a'
+  #   ]
 
 #   # TODO: Test object splats.
 
@@ -962,32 +1277,34 @@ test "AST as expected for Index node", ->
 #       {type: 'Expansion'}
 #     ]
 
-# test "AST as expected for Elision node", ->
-#   testExpression '[,,,a,,,b] = "asdfqwer"',
-#     type: 'Assign'
-#     variable:
-#       type: 'Arr'
-#       lhs: no
-#       objects: [
-#         {type: 'Elision'}
-#         {type: 'Elision'}
-#         {type: 'Elision'}
-#         {
-#           type: 'IdentifierLiteral'
-#           value: 'a'
-#         }
-#         {type: 'Elision'}
-#         {type: 'Elision'}
-#         {
-#           type: 'IdentifierLiteral'
-#           value: 'b'
-#         }
-#       ]
-#     value:
-#       type: 'StringLiteral'
-#       value: '"asdfqwer"'
-#       originalValue: 'asdfqwer'
-#       quote: '"'
+test "AST as expected for Elision node", ->
+  testExpression '[,,,a,,,b]',
+    type: 'ArrayExpression'
+    elements: [
+      null, null, null
+      name: 'a'
+      null, null
+      name: 'b'
+    ]
+
+  testExpression '[,,,a,,,b] = "asdfqwer"',
+    type: 'AssignmentExpression'
+    left:
+      type: 'ArrayPattern'
+      elements: [
+        null, null, null
+      ,
+        type: 'Identifier'
+        name: 'a'
+      ,
+        null, null
+      ,
+        type: 'Identifier'
+        name: 'b'
+      ]
+    right:
+      type: 'StringLiteral'
+      value: 'asdfqwer'
 
 # test "AST as expected for While node", ->
 #   testExpression 'loop 1',
@@ -1047,12 +1364,6 @@ test "AST as expected for Op node", ->
       type: 'NumericLiteral'
       value: 2
 
-  testExpression 'new Old',   # NOTE: `new` with params is a `Call` node.
-    type: 'NewExpression'
-    callee:
-      type: 'Identifier'
-      name: 'Old'
-
   testExpression 'typeof x',
     type: 'UnaryExpression'
     operator: 'typeof'
@@ -1075,6 +1386,13 @@ test "AST as expected for Op node", ->
     argument:
       type: 'Identifier'
       name: 'x'
+
+  # testExpression 'do ->',
+  #   type: 'UnaryExpression'
+  #   operator: 'do'
+  #   prefix: yes
+  #   argument:
+  #     type: 'FunctionExpression'
 
   testExpression '!x',
     type: 'UnaryExpression'
