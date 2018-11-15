@@ -3136,11 +3136,18 @@ exports.ObjectProperty = class ObjectProperty extends Base
 
   astProperties: (o) ->
     isComputedPropertyName = @key instanceof Value and @key.base instanceof ComputedPropertyName
-    keyAst = @key.ast o
+    # valueAst = @value?.ast o
+    # # Take care to literally reuse the same AST object eg for `a` in `{a = 5} = b`
+    # # Otherwise ESLint will trigger duplicate warnings
+    # keyAst =
+    #   if @shorthand and @value instanceof Assign
+    #     valueAst.left
+    #   else
+    #     @key.ast o
 
     return
-      key: keyAst
-      value: @value?.ast(o) ? keyAst
+      key: @key.ast o
+      value: @value?.ast(o) ? @key.ast o
       shorthand: !!@shorthand
       computed: !!isComputedPropertyName
       method: no
