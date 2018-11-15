@@ -2880,69 +2880,6 @@ exports.Obj = class Obj extends Base
 
     super o
 
-  expandProperties: (o) ->
-    {compiling} = o
-    return @properties if not compiling and @isClassBody
-    for prop in @properties then do =>
-      key = if prop instanceof Assign and prop.context is 'object'
-        prop.variable
-      else if prop instanceof Assign
-        prop.operatorToken.error "unexpected #{prop.operatorToken.value}" unless @lhs
-        prop.shorthand = yes
-        prop.variable
-      else
-        prop
-      if key instanceof Value and key.hasProperties()
-        key.error 'invalid object key' unless prop.context isnt 'object' and key.this
-        prop.nestedLhs = yes
-        if compiling
-          key  = key.properties[0].name
-          prop = prop.withLocationData new Assign key, prop, context: 'object'
-        else
-          return new Assign(key, prop, context: 'object', shorthand: yes).withLocationDataFrom(prop)
-      return prop unless key is prop
-      prop.withLocationData(
-        if prop.shouldCache() and compiling
-          [key, value] = prop.base.cache o
-          key  = key.withLocationData new PropertyName key.value if key instanceof IdentifierLiteral
-          new Assign key, value, context: 'object'
-        else if prop instanceof Value and prop.base instanceof ComputedPropertyName and compiling
-          # `{ [foo()] }` output as `{ [ref = foo()]: ref }`.
-          if prop.base.value.shouldCache()
-            [key, value] = prop.base.value.cache o
-            key = key.withLocationData new Value new ComputedPropertyName key.value if key instanceof IdentifierLiteral
-            new Assign key, value, context: 'object'
-          else
-            # `{ [expression] }` output as `{ [expression]: expression }`.
-            new Assign(
-              if prop.base.value.isNumber() or prop.base.value.isString()
-                prop.base.value
-              else
-                prop
-              prop.base.value
-              context: 'object'
-            )
-        else if prop instanceof Splat
-          prop
-        else
-          new Assign prop, prop, context: 'object', shorthand: not compiling or prop.bareLiteral? IdentifierLiteral
-      )
-
-  propagateLhs: (setLhs) ->
-    @lhs = yes if setLhs
-    return unless @lhs
-
-    for prop in @properties
-      if prop instanceof Assign and prop.context is 'object'
-        {value} = prop
-        unwrappedVal = value.unwrapAll()
-        if unwrappedVal instanceof Arr or unwrappedVal instanceof Obj
-          unwrappedVal.propagateLhs yes
-        else if unwrappedVal instanceof Assign
-          unwrappedVal.nestedLhs = yes
-      else if prop instanceof Splat
-        prop.lhs = yes
-
   # Move rest property to the end of the list.
   # `{a, rest..., b} = obj` -> `{a, b, rest...} = obj`
   # `foo = ({a, rest..., b}) ->` -> `foo = {a, b, rest...}) ->`
@@ -3069,6 +3006,12 @@ exports.Obj = class Obj extends Base
       property
     if key instanceof Value and key.hasProperties()
       key.error 'invalid object key' unless context isnt 'object' and key.this
+      # prop.nestedLhs = yes
+      # if compiling
+      #   key  = key.properties[0].name
+      #   prop = prop.withLocationData new Assign key, prop, context: 'object'
+      # else
+      #   return new Assign(key, prop, context: 'object', shorthand: yes).withLocationDataFrom(prop)
       if property instanceof Assign
         return new ObjectProperty fromAssign: property
       else
@@ -3076,9 +3019,37 @@ exports.Obj = class Obj extends Base
     return new ObjectProperty(fromAssign: property) unless key is property
     return property if property instanceof Splat
 
+    # prop.withLocationData(
+    #   if prop.shouldCache() and compiling
+    #     [key, value] = prop.base.cache o
+    #     key  = key.withLocationData new PropertyName key.value if key instanceof IdentifierLiteral
+    #     new Assign key, value, context: 'object'
+    #   else if prop instanceof Value and prop.base instanceof ComputedPropertyName and compiling
+    #     # `{ [foo()] }` output as `{ [ref = foo()]: ref }`.
+    #     if prop.base.value.shouldCache()
+    #       [key, value] = prop.base.value.cache o
+    #       key = key.withLocationData new Value new ComputedPropertyName key.value if key instanceof IdentifierLiteral
+    #       new Assign key, value, context: 'object'
+    #     else
+    #       # `{ [expression] }` output as `{ [expression]: expression }`.
+    #       new Assign(
+    #         if prop.base.value.isNumber() or prop.base.value.isString()
+    #           prop.base.value
+    #         else
+    #           prop
+    #         prop.base.value
+    #         context: 'object'
+    #       )
+    #   else if prop instanceof Splat
+    #     prop
+    #   else
+    #     new Assign prop, prop, context: 'object', shorthand: not compiling or prop.bareLiteral? IdentifierLiteral
+    # )
     new ObjectProperty key: property
 
-  expandProperties: ->
+  expandProperties: (o) ->
+    {compiling} = o
+    return @properties if not compiling and @isClassBody
     @expandProperty(property) for property in @properties
 
   propagateLhs: (setLhs) ->
@@ -3113,7 +3084,7 @@ exports.Obj = class Obj extends Base
     return
       implicit: !!@generated
       properties:
-        property.ast(o) for property in @expandProperties()
+        property.ast(o) for property in @expandProperties o
 
 exports.ObjectProperty = class ObjectProperty extends Base
   constructor: ({key, fromAssign}) ->
