@@ -3048,8 +3048,8 @@ exports.Obj = class Obj extends Base
     new ObjectProperty key: property
 
   expandProperties: (o) ->
-    {compiling} = o
-    return @properties if not compiling and @isClassBody
+    # {compiling} = o
+    # return @properties if not compiling and @isClassBody
     @expandProperty(property) for property in @properties
 
   propagateLhs: (setLhs) ->
@@ -5950,8 +5950,12 @@ exports.Existence = class Existence extends Base
       code = "#{code} #{cmp} #{@comparisonTarget}"
     [@makeCode(if o.level <= LEVEL_COND then code else "(#{code})")]
 
+  astType: -> 'UnaryExpression'
+
   astProperties: (o) ->
     argument: @expression.ast o
+    operator: '?'
+    prefix: no
 
 #### Parens
 
