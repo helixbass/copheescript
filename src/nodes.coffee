@@ -5218,6 +5218,9 @@ exports.Expansion = class Expansion extends Base
 
   astType: -> 'RestElement'
 
+  astProperties: ->
+    argument: null
+
 #### Elision
 
 # Array elision element (for example, [,a, , , b, , c, ,]).
