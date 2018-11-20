@@ -637,12 +637,12 @@ exports.Lexer = class Lexer
           openingBracketToken: @makeToken '<', '<'
           tagNameToken: @makeToken 'IDENTIFIER', id, offset: 1
       offset = id.length + 1
-      for prop in properties
+      for property in properties
         @token '.', '.', {offset}
         offset += 1
-        @token 'PROPERTY', prop, {offset}
-        offset += prop.length
-      @token 'CALL_START', '(', generated: yes, offset: 1, length: id.length # encode the opening tagname location
+        @token 'PROPERTY', property, {offset}
+        offset += property.length
+      @token 'CALL_START', '(', generated: yes
       @token '[', '[', generated: yes
       @ends.push {tag: '/>', origin: tagToken, name: id, properties}
       @csxDepth++
@@ -650,7 +650,9 @@ exports.Lexer = class Lexer
     else if csxTag = @atCSXTag()
       if @chunk[...2] is '/>' # self-closing tag
         @pair '/>'
-        @token ']', ']', length: 2, generated: yes
+        @token ']', ']',
+          length: 2
+          generated: yes
         @token 'CALL_END', ')',
           length: 2
           generated: yes
@@ -684,23 +686,24 @@ exports.Lexer = class Lexer
         @mergeInterpolationTokens tokens, {endOffset: end, csx: yes}, (value) =>
           @validateUnicodeCodePointEscapes value, delimiter: '>'
         match = CSX_IDENTIFIER.exec(@chunk[end...]) or CSX_FRAGMENT_IDENTIFIER.exec(@chunk[end...])
-        if not match or match[1] isnt "#{csxTag.name}#{(".#{prop}" for prop in csxTag.properties).join ''}"
+        if not match or match[1] isnt "#{csxTag.name}#{(".#{property}" for property in csxTag.properties).join ''}"
           @error "expected corresponding CSX closing tag for #{csxTag.name}",
             csxTag.origin[2]
-        afterTag = end + match[1].length
+        [, fullTagName] = match
+        afterTag = end + fullTagName.length
         if @chunk[afterTag] isnt '>'
           @error "missing closing > after tag name", offset: afterTag, length: 1
-        # +2 for the opening `</` and +1 for the closing `>`.
+        # -2/+2 for the opening `</` and +1 for the closing `>`.
         endToken = @token 'CALL_END', ')',
           offset: end - 2
-          length: match[1].length + 3
+          length: fullTagName.length + 3
           generated: yes
           data:
             closingTagOpeningBracketToken: @makeToken '<', '<', offset: end - 2
             closingTagSlashToken: @makeToken '/', '/', offset: end - 1
             # TODO: individual tokens for complex tag name? eg < / A . B >
-            closingTagNameToken: @makeToken 'IDENTIFIER', match[1], offset: end
-            closingTagClosingBracketToken: @makeToken '>', '>', offset: end + match[1].length
+            closingTagNameToken: @makeToken 'IDENTIFIER', fullTagName, offset: end
+            closingTagClosingBracketToken: @makeToken '>', '>', offset: end + fullTagName.length
         # make the closing tag location data more easily accessible to the grammar
         addTokenData openingTagToken, endToken.data
         @csxDepth--

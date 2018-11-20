@@ -444,21 +444,7 @@ exports.Base = class Base
   # The AST location data is a rearranged version of our Jison location data,
   # mutated into the structure that the Babel spec uses.
   astLocationData: ->
-    {first_line, first_column, last_line, last_column, range} = @locationData
-    return
-      loc:
-        start:
-          line:   first_line + 1
-          column: first_column
-        end:
-          line:   last_line + 1
-          column: last_column + 1
-      range: [
-        range[0]
-        range[1]
-      ]
-      start: range[0]
-      end:   range[1]
+    locationDataToAst @locationData
 
   astReturns: ->
     if @canBeReturned
@@ -1841,6 +1827,7 @@ exports.Value = class Value extends Base
                       @isUndefined() or @isNull() or @isBoolean()
 
   isStatement : (o)    -> not @properties.length and @base.isStatement o
+  isCSXTag    : -> @base instanceof CSXTag
   assigns     : (name) -> not @properties.length and @base.assigns name
   jumps       : (o)    -> not @properties.length and @base.jumps o
 
@@ -1981,7 +1968,7 @@ exports.Value = class Value extends Base
     super o
 
   astType: ->
-    if @base instanceof CSXTag
+    if @isCSXTag()
       'JSXMemberExpression'
     else
       'MemberExpression'
@@ -1991,7 +1978,7 @@ exports.Value = class Value extends Base
   # a child `Value` node assigned to the `object` property.
   astProperties: (o) ->
     [..., property] = @properties
-    property.name.csx = yes if @base instanceof CSXTag
+    property.name.csx = yes if @isCSXTag()
     return
       object: @object().ast o, LEVEL_ACCESS
       property: property.ast o
@@ -2000,9 +1987,12 @@ exports.Value = class Value extends Base
       shorthand: !!property.shorthand
 
   astLocationData: ->
-    return super() unless @base instanceof CSXTag
+    return super() unless @isCSXTag()
     # don't include leading < of JSX tag in location data
-    mergeAstLocationData locationDataToAst(@base.tagNameLocationData), locationDataToAst(@properties[@properties.length - 1].locationData)
+    mergeAstLocationData(
+      locationDataToAst @base.tagNameLocationData
+      locationDataToAst @properties[@properties.length - 1].locationData
+    )
 
 #### HereComment
 
@@ -2197,6 +2187,121 @@ exports.Call = class Call extends Base
     fragments.push @makeCode('('), compiledArgs..., @makeCode(')')
     fragments
 
+  compileCSX: (o) ->
+    [attributes, content] = @args
+    attributes.base.csx = yes
+    content?.base.csx = yes
+    fragments = [@makeCode('<')]
+    fragments.push (tag = @variable.compileToFragments(o, LEVEL_ACCESS))...
+    if attributes.base instanceof Arr
+      for obj in attributes.base.objects
+        attr = obj.base
+        attrProps = attr?.properties or []
+        # Catch invalid CSX attributes: <div {a:"b", props} {props} "value" />
+        if not (attr instanceof Obj or attr instanceof IdentifierLiteral) or (attr instanceof Obj and not attr.generated and (attrProps.length > 1 or not (attrProps[0] instanceof Splat)))
+          obj.error """
+            Unexpected token. Allowed CSX attributes are: id="val", src={source}, {props...} or attribute.
+          """
+        obj.base.csx = yes if obj.base instanceof Obj
+        fragments.push @makeCode ' '
+        fragments.push obj.compileToFragments(o, LEVEL_PAREN)...
+    if content
+      fragments.push @makeCode('>')
+      fragments.push content.compileNode(o, LEVEL_LIST)...
+      fragments.push [@makeCode('</'), tag..., @makeCode('>')]...
+    else
+      fragments.push @makeCode(' />')
+    fragments
+
+  CSXElementToAst: ({o, tagName, attributes, content}) ->
+    # The location data spanning the opening element < ... > is captured by
+    # the generated Arr which contains the element's attributes
+    openingElementLocationData = locationDataToAst attributes.base.locationData
+
+    attributesAst = flatten(
+      if attributes.base instanceof Arr
+        openingElementLocationData = mergeAstLocationData openingElementLocationData, locationDataToAst attributes.base.locationData
+        for obj in attributes.base.objects
+          {base: attr} = obj
+          attrProps = attr?.properties or []
+          if not (attr instanceof Obj or attr instanceof IdentifierLiteral) or (attr instanceof Obj and not attr.generated and (attrProps.length > 1 or not (attrProps[0] instanceof Splat)))
+            obj.error """
+              Unexpected token. Allowed CSX attributes are: id="val", src={source}, {props...} or attribute.
+            """
+          attr.csx = yes
+          compiled = attr.ast o#, LEVEL_PAREN
+          if Array.isArray compiled
+            for compiledAttr in compiled
+              openingElementLocationData = mergeAstLocationData openingElementLocationData, compiledAttr
+          else
+            openingElementLocationData = mergeAstLocationData openingElementLocationData, compiled
+          if attr instanceof IdentifierLiteral
+            Object.assign {
+              type: 'JSXAttribute'
+              name: compiled
+              value: null
+            }, attr.astLocationData()
+          else
+            compiled
+      else [])
+
+    openingElement = Object.assign {
+      type: 'JSXOpeningElement'
+      name: @variable.unwrap().ast o#, LEVEL_ACCESS
+      selfClosing: not content
+      attributes: attributesAst
+    }, openingElementLocationData
+
+    closingElement = null
+    if content
+      closingElementLocationData = mergeAstLocationData(
+        locationDataToAst tagName.closingTagOpeningBracketLocationData
+        locationDataToAst tagName.closingTagClosingBracketLocationData
+      )
+      closingElement = Object.assign {
+        type: 'JSXClosingElement'
+        name: Object.assign(
+          @variable.unwrap().ast o#, LEVEL_ACCESS
+          locationDataToAst tagName.closingTagNameLocationData
+        )
+      }, closingElementLocationData
+      if closingElement.name.type is 'JSXMemberExpression'
+        rangeDiff = closingElement.range[0] - openingElement.range[0] + '/'.length
+        shiftAstLocationData = (node) ->
+          node.range = [
+            node.range[0] + rangeDiff
+            node.range[1] + rangeDiff
+          ]
+          node.start += rangeDiff
+          node.end += rangeDiff
+          node.loc.start = {
+            line: node.loc.start.line
+            column: node.loc.start.column + rangeDiff
+          }
+          node.loc.end = {
+            line: node.loc.end.line
+            column: node.loc.end.column + rangeDiff
+          }
+        currentExpr = closingElement.name
+        while currentExpr.type is 'JSXMemberExpression'
+          shiftAstLocationData currentExpr unless currentExpr is closingElement.name
+          shiftAstLocationData currentExpr.property
+          currentExpr = currentExpr.object
+        shiftAstLocationData currentExpr
+              
+    Object.assign(
+      {
+        type: 'JSXElement'
+        openingElement, closingElement
+      },
+      if closingElement?
+        mergeAstLocationData openingElementLocationData, closingElementLocationData
+      else
+        openingElementLocationData
+    ,
+      @astReturns()
+    )
+
   CSXToAst: (o) ->
     [attributes, content] = @args
     tagName = @variable.base
@@ -2227,80 +2332,7 @@ exports.Call = class Call extends Base
             @astReturns()
           )
         else
-          openingElementLocationData = tagName.astLocationData()
-          for prop in @variable.properties
-            openingElementLocationData = mergeAstLocationData openingElementLocationData, locationDataToAst prop.locationData
-          attributesAst = flatten(
-            if attributes.base instanceof Arr
-              openingElementLocationData = mergeAstLocationData openingElementLocationData, locationDataToAst attributes.base.locationData
-              for obj in attributes.base.objects
-                {base: attr} = obj
-                attrProps = attr?.properties or []
-                if not (attr instanceof Obj or attr instanceof IdentifierLiteral) or (attr instanceof Obj and not attr.generated and (attrProps.length > 1 or not (attrProps[0] instanceof Splat)))
-                  obj.error """
-                    Unexpected token. Allowed CSX attributes are: id="val", src={source}, {props...} or attribute.
-                  """
-                attr.csx = yes
-                compiled = attr.ast o#, LEVEL_PAREN
-                if Array.isArray compiled
-                  for compiledAttr in compiled
-                    openingElementLocationData = mergeAstLocationData openingElementLocationData, compiledAttr
-                else
-                  openingElementLocationData = mergeAstLocationData openingElementLocationData, compiled
-                if attr instanceof IdentifierLiteral
-                  Object.assign {
-                    type: 'JSXAttribute'
-                    name: compiled
-                    value: null
-                  }, attr.astLocationData()
-                else
-                  compiled
-            else [])
-          openingElement = Object.assign {
-            type: 'JSXOpeningElement'
-            name: @variable.unwrap().ast o#, LEVEL_ACCESS
-            selfClosing: not content
-            attributes: attributesAst
-          }, openingElementLocationData
-          closingElement = null
-          if content
-            closingElementLocationData = locationDataToAst tagName.closingTagNameLocationData
-            closingElementLocationData = mergeAstLocationData closingElementLocationData, locationDataToAst tagName.closingTagOpeningBracketLocationData
-            closingElementLocationData = mergeAstLocationData closingElementLocationData, locationDataToAst tagName.closingTagClosingBracketLocationData
-            closingElement = Object.assign {
-              type: 'JSXClosingElement'
-              name: @withCopiedBabylonLocationData(
-                @variable.unwrap().ast o#, LEVEL_ACCESS
-                locationDataToAst tagName.closingTagNameLocationData
-              )
-            }, closingElementLocationData
-            if closingElement.name.type is 'JSXMemberExpression'
-              rangeDiff = closingElement.range[0] - openingElement.range[0] + '/'.length
-              shiftAstLocationData = (node) ->
-                node.range = [
-                  node.range[0] + rangeDiff
-                  node.range[1] + rangeDiff
-                ]
-                node.start += rangeDiff
-                node.end += rangeDiff
-              currentExpr = closingElement.name
-              while currentExpr.type is 'JSXMemberExpression'
-                shiftAstLocationData currentExpr unless currentExpr is closingElement.name
-                shiftAstLocationData currentExpr.property
-                currentExpr = currentExpr.object
-              shiftAstLocationData currentExpr
-              
-          Object.assign(
-            {
-              type: 'JSXElement'
-              openingElement, closingElement
-            },
-            if closingElement?
-              mergeAstLocationData openingElementLocationData, closingElementLocationData
-            else
-              openingElementLocationData
-            @astReturns()
-          )
+          @CSXElementToAst {o, tagName, attributes, content}
       )
       children:
         if content and not content.base.isEmpty?()
@@ -2311,31 +2343,25 @@ exports.Call = class Call extends Base
         else []
     }
 
-  compileCSX: (o) ->
+  CSXToAst: (o) ->
     [attributes, content] = @args
-    attributes.base.csx = yes
-    content?.base.csx = yes
-    fragments = [@makeCode('<')]
-    fragments.push (tag = @variable.compileToFragments(o, LEVEL_ACCESS))...
-    if attributes.base instanceof Arr
-      for obj in attributes.base.objects
-        attr = obj.base
-        attrProps = attr?.properties or []
-        # Catch invalid CSX attributes: <div {a:"b", props} {props} "value" />
-        if not (attr instanceof Obj or attr instanceof IdentifierLiteral) or (attr instanceof Obj and not attr.generated and (attrProps.length > 1 or not (attrProps[0] instanceof Splat)))
-          obj.error """
-            Unexpected token. Allowed CSX attributes are: id="val", src={source}, {props...} or attribute.
-          """
-        obj.base.csx = yes if obj.base instanceof Obj
-        fragments.push @makeCode ' '
-        fragments.push obj.compileToFragments(o, LEVEL_PAREN)...
-    if content
-      fragments.push @makeCode('>')
-      fragments.push content.compileNode(o, LEVEL_LIST)...
-      fragments.push [@makeCode('</'), tag..., @makeCode('>')]...
-    else
-      fragments.push @makeCode(' />')
-    fragments
+    tagName = @variable.base
+    tagName.locationData = tagName.tagNameLocationData
+    Object.assign(
+      # if tagName.value.length
+      @CSXElementToAst {o, tagName, attributes, content}
+      # else
+      #   @CSXFragmentToAst {tagName, attributes, content}
+    ,
+      children: []
+        # if content and not content.base.isEmpty?()
+        #   content.base.csx = yes
+        #   compact flatten [
+        #     content.ast()
+        #   ]
+        # else
+        #   []
+    )
 
   astFull: (o) ->
     return @CSXToAst o if @csx
@@ -7164,3 +7190,20 @@ getNumberValue = (node) ->
   return node.parsedValue if node.parsedValue?
   val = getNumberValue number.first
   if number.operator is '-' then val * -1 else val
+
+# Convert Jison-style node class location data to Babel-style location data
+locationDataToAst = ({first_line, first_column, last_line, last_column, range}) ->
+  return
+    loc:
+      start:
+        line:   first_line + 1
+        column: first_column
+      end:
+        line:   last_line + 1
+        column: last_column + 1
+    range: [
+      range[0]
+      range[1]
+    ]
+    start: range[0]
+    end:   range[1]
