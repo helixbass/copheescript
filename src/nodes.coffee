@@ -1461,24 +1461,30 @@ exports.Call = class Call extends Base
       fragments.push @makeCode(' />')
     fragments
 
-  CSXElementToAst: ({tagName, attributes, content}) ->
-    # The location data spanning the opening element < ... > is captured by
-    # the generated Arr which contains the element's attributes
-    openingElementLocationData = locationDataToAst attributes.base.locationData
+  CSXFragmentToAst: ({openingElementLocationData, closingElementLocationData}) ->
+    openingFragment = Object.assign {
+      type: 'JSXOpeningFragment'
+    }, openingElementLocationData
 
+    closingFragment = Object.assign {
+      type: 'JSXClosingFragment'
+    }, closingElementLocationData
+
+    Object.assign {
+      type: 'JSXFragment',
+      openingFragment, closingFragment
+    }, mergeAstLocationData openingElementLocationData, closingElementLocationData
+
+  CSXElementToAst: ({tagName, attributes, openingElementLocationData, closingElementLocationData}) ->
     openingElement = Object.assign {
       type: 'JSXOpeningElement'
       name: @variable.unwrap().ast()
-      selfClosing: not content
+      selfClosing: not closingElementLocationData?
       attributes: []
     }, openingElementLocationData
 
     closingElement = null
-    if content
-      closingElementLocationData = mergeAstLocationData(
-        locationDataToAst tagName.closingTagOpeningBracketLocationData
-        locationDataToAst tagName.closingTagClosingBracketLocationData
-      )
+    if closingElementLocationData?
       closingElement = Object.assign {
         type: 'JSXClosingElement'
         name: Object.assign(
@@ -1523,12 +1529,20 @@ exports.Call = class Call extends Base
     [attributes, content] = @args
     tagName = @variable.base
     tagName.locationData = tagName.tagNameLocationData
+    # The location data spanning the opening element < ... > is captured by
+    # the generated Arr which contains the element's attributes
+    openingElementLocationData = locationDataToAst attributes.base.locationData
+
+    closingElementLocationData = mergeAstLocationData(
+      locationDataToAst tagName.closingTagOpeningBracketLocationData
+      locationDataToAst tagName.closingTagClosingBracketLocationData
+    ) if tagName.closingTagOpeningBracketLocationData?
+
     Object.assign(
-      # TODO: uncomment when adding support for JSX fragment AST
-      # if tagName.value.length
-      @CSXElementToAst {tagName, attributes, content}
-      # else
-      #   @CSXFragmentToAst {tagName, attributes, content}
+      if tagName.value.length
+        @CSXElementToAst {tagName, attributes, openingElementLocationData, closingElementLocationData}
+      else
+        @CSXFragmentToAst {openingElementLocationData, closingElementLocationData}
     ,
       children: []
         # TODO: uncomment when adding support for JSX content AST
