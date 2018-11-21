@@ -270,7 +270,7 @@ exports.Base = class Base
   # as JSON. This is what the `ast` option in the Node API returns.
   # We try to follow the [Babel AST spec](https://github.com/babel/babel/blob/master/packages/babel-parser/ast/spec.md)
   # as closely as possible, for improved interoperability with other tools.
-  ast: ->
+  ast: (o) ->
     # Every abstract syntax tree node object has four categories of properties:
     # - type, stored in the `type` field and a string like `NumberLiteral`.
     # - location data, stored in the `loc`, `start`, `end` and `range` fields.
@@ -279,7 +279,7 @@ exports.Base = class Base
     # These fields are all intermixed in the Babel spec; `type` and `start` and
     # `parsedValue` are all top level fields in the AST node object. We have
     # separate methods for returning each category, that we merge together here.
-    Object.assign {}, @astProperties(), {type: @astType()}, @astLocationData()
+    Object.assign {}, {type: @astType(o)}, @astProperties(o), @astLocationData()
 
   # By default, a node class has no specific properties.
   astProperties: -> {}
@@ -581,15 +581,18 @@ exports.Block = class Block extends Base
     o.indent  = if o.bare then '' else TAB
     o.level   = LEVEL_TOP
     @spaced   = yes
-    o.scope   = new Scope null, this, null, o.referencedVars ? []
-    # Mark given local variables in the root scope as parameters so they don’t
-    # end up being declared on this block.
-    o.scope.parameter name for name in o.locals or []
+    @initializeScope o
     fragments = @compileWithDeclarations o
     HoistTarget.expand fragments
     fragments = @compileComments fragments
     return fragments if o.bare
     [].concat @makeCode("(function() {\n"), fragments, @makeCode("\n}).call(this);\n")
+
+  initializeScope: (o) ->
+    o.scope   = new Scope null, this, null, o.referencedVars ? []
+    # Mark given local variables in the root scope as parameters so they don’t
+    # end up being declared on this block.
+    o.scope.parameter name for name in o.locals or []
 
   # Compile the expressions body for the contents of a function, with
   # declarations of all inner variables pushed up to the top.
@@ -748,8 +751,49 @@ exports.Block = class Block extends Base
     return nodes[0] if nodes.length is 1 and nodes[0] instanceof Block
     new Block nodes
 
-  astProperties: ->
-    expressions: @expressions.map (child) => child.ast()
+  asExpressionStatementAst: (ast) ->
+    # return ast if ast.type in ['ImportDeclaration']
+
+    Object.assign
+      type: 'ExpressionStatement'
+      expression: ast
+    ,
+      extractAstLocationData ast
+
+  getExpressionAst: (expression, o) ->
+    root = del o, 'root'
+    expression.topLevel = yes if root
+    ast = expression.ast o
+    return ast if expression.isStatement o
+    @asExpressionStatementAst ast
+
+  bodyToAst: (o) ->
+    @getExpressionAst(expression, o) for expression in @expressions
+
+  rootToAst: (o) ->
+    @initializeScope o
+
+    programLocationData = @astLocationData()
+
+    programAst = Object.assign
+      type: 'Program'
+      sourceType: 'module'
+      body: @bodyToAst merge o, root: yes
+      directives: []
+    ,
+      programLocationData
+
+    Object.assign
+      type: 'File'
+      program: programAst
+      comments: []
+    ,
+      programLocationData
+
+  ast: (o) ->
+    return @rootToAst o unless o.scope
+
+    super o
 
 #### Literal
 
@@ -932,8 +976,8 @@ exports.ComputedPropertyName = class ComputedPropertyName extends PropertyName
   compileNode: (o) ->
     [@makeCode('['), @value.compileToFragments(o, LEVEL_LIST)..., @makeCode(']')]
 
-  ast: ->
-    @value.ast()
+  ast: (o) ->
+    @value.ast o
 
 exports.StatementLiteral = class StatementLiteral extends Literal
   isStatement: YES
@@ -1230,13 +1274,13 @@ exports.Value = class Value extends Base
         mergeLocationData @base.locationData, initialProperties[initialProperties.length - 1].locationData
     object
 
-  ast: ->
+  ast: (o) ->
     # If the `Value` has no properties, the AST node is just whatever this
     # node’s `base` is.
-    return @base.ast() unless @hasProperties()
+    return @base.ast o unless @hasProperties()
     # Otherwise, call `Base::ast` which in turn calls the `astType` and
     # `astProperties` methods below.
-    super()
+    super o
 
   astType: ->
     if @isCSXTag()
@@ -1247,12 +1291,12 @@ exports.Value = class Value extends Base
   # If this `Value` has properties, the *last* property (e.g. `c` in `a.b.c`)
   # becomes the `property`, and the preceding properties (e.g. `a.b`) become
   # a child `Value` node assigned to the `object` property.
-  astProperties: ->
+  astProperties: (o) ->
     [..., property] = @properties
     property.name.csx = yes if @isCSXTag()
     return
-      object: @object().ast()
-      property: property.ast()
+      object: @object().ast o
+      property: property.ast o
       computed: property instanceof Index or property.name?.unwrap() not instanceof PropertyName
       optional: !!property.soak
       shorthand: !!property.shorthand
@@ -1460,14 +1504,14 @@ exports.Call = class Call extends Base
       fragments.push @makeCode(' />')
     fragments
 
-  CSXElementToAst: ({tagName, attributes, content}) ->
+  CSXElementToAst: ({tagName, attributes, content, o}) ->
     # The location data spanning the opening element < ... > is captured by
     # the generated Arr which contains the element's attributes
     openingElementLocationData = locationDataToAst attributes.base.locationData
 
     openingElement = Object.assign {
       type: 'JSXOpeningElement'
-      name: @variable.unwrap().ast()
+      name: @variable.unwrap().ast o
       selfClosing: not content
       attributes: []
     }, openingElementLocationData
@@ -1481,7 +1525,7 @@ exports.Call = class Call extends Base
       closingElement = Object.assign {
         type: 'JSXClosingElement'
         name: Object.assign(
-          @variable.unwrap().ast(),
+          @variable.unwrap().ast(o),
           locationDataToAst tagName.closingTagNameLocationData
         )
       }, closingElementLocationData
@@ -1518,13 +1562,13 @@ exports.Call = class Call extends Base
     else
       openingElementLocationData
 
-  CSXToAst: ->
+  CSXToAst: (o) ->
     [attributes, content] = @args
     tagName = @variable.base
     tagName.locationData = tagName.tagNameLocationData
     Object.assign(
       # if tagName.value.length
-      @CSXElementToAst {tagName, attributes, content}
+      @CSXElementToAst {tagName, attributes, content, o}
       # else
       #   @CSXFragmentToAst {tagName, attributes, content}
     ,
@@ -1532,15 +1576,15 @@ exports.Call = class Call extends Base
         # if content and not content.base.isEmpty?()
         #   content.base.csx = yes
         #   compact flatten [
-        #     content.ast()
+        #     content.ast(o)
         #   ]
         # else
         #   []
     )
 
-  ast: ->
-    return @CSXToAst() if @csx
-    super()
+  ast: (o) ->
+    return @CSXToAst o if @csx
+    super o
 
   astType: ->
     if @isNew
@@ -1548,10 +1592,10 @@ exports.Call = class Call extends Base
     else
       'CallExpression'
 
-  astProperties: ->
+  astProperties: (o) ->
     return
-      callee: @variable.ast()
-      arguments: arg.ast() for arg in @args
+      callee: @variable.ast o
+      arguments: arg.ast o for arg in @args
       optional: !!@soak
       implicit: !!@implicit
 
@@ -1671,11 +1715,11 @@ exports.Access = class Access extends Base
 
   shouldCache: NO
 
-  ast: ->
+  ast: (o) ->
     # Babel doesn’t have an AST node for `Access`, but rather just includes
     # this Access node’s child `name` Identifier node as the `property` of
     # the `MemberExpression` node.
-    @name.ast()
+    @name.ast o
 
 #### Index
 
@@ -1692,13 +1736,13 @@ exports.Index = class Index extends Base
   shouldCache: ->
     @index.shouldCache()
 
-  ast: ->
+  ast: (o) ->
     # Babel doesn’t have an AST node for `Index`, but rather just includes
     # this Index node’s child `index` Identifier node as the `property` of
     # the `MemberExpression` node. The fact that the `MemberExpression`’s
     # `property` is an Index means that `computed` is `true` for the
     # `MemberExpression`.
-    @index.ast()
+    @index.ast o
 
 #### Range
 
@@ -1812,10 +1856,10 @@ exports.Range = class Range extends Base
     args   = ', arguments' if hasArgs(@from) or hasArgs(@to)
     [@makeCode "(function() {#{pre}\n#{idt}for (#{body})#{post}}).apply(this#{args ? ''})"]
 
-  astProperties: ->
+  astProperties: (o) ->
     return {
-      from: @from?.ast() ? null
-      to: @to?.ast() ? null
+      from: @from?.ast(o) ? null
+      to: @to?.ast(o) ? null
       @exclusive
     }
 
@@ -1855,8 +1899,8 @@ exports.Slice = class Slice extends Base
           "+#{fragmentsToText compiled} + 1 || 9e9"
     [@makeCode ".slice(#{ fragmentsToText fromCompiled }#{ toStr or '' })"]
 
-  ast: ->
-    @range.ast()
+  ast: (o) ->
+    @range.ast o
 
 #### Obj
 
@@ -2037,11 +2081,11 @@ exports.Obj = class Obj extends Base
     else
       'ObjectExpression'
 
-  astProperties: ->
+  astProperties: (o) ->
     return
       implicit: !!@generated
       properties:
-        property.ast() for property in @expandProperties()
+        property.ast(o) for property in @expandProperties()
 
 exports.ObjectProperty = class ObjectProperty extends Base
   constructor: ({key, fromAssign}) ->
@@ -2062,13 +2106,13 @@ exports.ObjectProperty = class ObjectProperty extends Base
       @shorthand = yes
       @locationData = key.locationData
 
-  astProperties: ->
+  astProperties: (o) ->
     isComputedPropertyName = @key instanceof Value and @key.base instanceof ComputedPropertyName
-    keyAst = @key.ast()
+    keyAst = @key.ast o
 
     return
       key: keyAst
-      value: @value?.ast() ? keyAst
+      value: @value?.ast(o) ? keyAst
       shorthand: !!@shorthand
       computed: !!isComputedPropertyName
       method: no
@@ -2180,10 +2224,10 @@ exports.Arr = class Arr extends Base
     else
       'ArrayExpression'
 
-  astProperties: ->
+  astProperties: (o) ->
     return
       elements:
-        object.ast() for object in @objects
+        object.ast(o) for object in @objects
 
 #### Class
 
@@ -2513,8 +2557,8 @@ exports.ModuleDeclaration = class ModuleDeclaration extends Base
       @source.error 'the name of the module to be imported from must be an uninterpolated string'
 
   checkScope: (o, moduleDeclarationType) ->
-    if o.indent.length isnt 0
-      @error "#{moduleDeclarationType} statements must be at top-level scope"
+    return if o.topLevel or o.indent?.length isnt 0
+    @error "#{moduleDeclarationType} statements must be at top-level scope"
 
 exports.ImportDeclaration = class ImportDeclaration extends ModuleDeclaration
   compileNode: (o) ->
@@ -2532,10 +2576,16 @@ exports.ImportDeclaration = class ImportDeclaration extends ModuleDeclaration
     code.push @makeCode ';'
     code
 
-  astProperties: ->
+  ast: (o) ->
+    @checkScope merge(o, {@topLevel}), 'import'
+    o.importedSymbols = []
+
+    super o
+
+  astProperties: (o) ->
     ret =
-      specifiers: @clause?.ast() ? []
-      source: @source.ast()
+      specifiers: @clause?.ast(o) ? []
+      source: @source.ast o
     ret.importKind = 'value' if @clause
     ret
 
@@ -2557,12 +2607,12 @@ exports.ImportClause = class ImportClause extends Base
 
     code
 
-  ast: ->
+  ast: (o) ->
     # The AST for `ImportClause` is the non-nested list of import specifiers
     # that will be the `specifiers` property of an `ImportDeclaration` AST
     compact flatten [
-      @defaultBinding?.ast()
-      @namedImports?.ast()
+      @defaultBinding?.ast o
+      @namedImports?.ast o
     ]
 
 exports.ExportDeclaration = class ExportDeclaration extends ModuleDeclaration
@@ -2592,11 +2642,18 @@ exports.ExportDeclaration = class ExportDeclaration extends ModuleDeclaration
     code
 
 exports.ExportNamedDeclaration = class ExportNamedDeclaration extends ExportDeclaration
-  astProperties: ->
+  ast: (o) ->
+    @checkScope merge(o, {@topLevel}), 'export'
+
+    @clause.moduleDeclaration = 'export'
+
+    super o
+
+  astProperties: (o) ->
     ret =
-      source: @source?.ast() ? null
+      source: @source?.ast(o) ? null
       exportKind: 'value'
-    clauseAst = @clause.ast()
+    clauseAst = @clause.ast o
     if @clause instanceof ExportSpecifierList
       ret.specifiers = clauseAst
       ret.declaration = null
@@ -2606,14 +2663,22 @@ exports.ExportNamedDeclaration = class ExportNamedDeclaration extends ExportDecl
     ret
 
 exports.ExportDefaultDeclaration = class ExportDefaultDeclaration extends ExportDeclaration
-  astProperties: ->
+  ast: (o) ->
+    @checkScope o, 'export'
+    super o
+
+  astProperties: (o) ->
     return
-      declaration: @clause.ast()
+      declaration: @clause.ast o
 
 exports.ExportAllDeclaration = class ExportAllDeclaration extends ExportDeclaration
-  astProperties: ->
+  ast: (o) ->
+    @checkScope o, 'export'
+    super o
+
+  astProperties: (o) ->
     return
-      source: @source.ast()
+      source: @source.ast o
       exportKind: 'value'
 
 exports.ModuleSpecifierList = class ModuleSpecifierList extends Base
@@ -2637,8 +2702,8 @@ exports.ModuleSpecifierList = class ModuleSpecifierList extends Base
       code.push @makeCode '{}'
     code
 
-  ast: ->
-    specifier.ast() for specifier in @specifiers
+  ast: (o) ->
+    specifier.ast(o) for specifier in @specifiers
 
 exports.ImportSpecifierList = class ImportSpecifierList extends ModuleSpecifierList
 
@@ -2658,18 +2723,25 @@ exports.ModuleSpecifier = class ModuleSpecifier extends Base
 
   children: ['original', 'alias']
 
-  compileNode: (o) ->
+  addIdentifierToScope: (o) ->
     o.scope.find @identifier, @moduleDeclarationType
+
+  compileNode: (o) ->
+    @addIdentifierToScope o
     code = []
     code.push @makeCode @original.value
     code.push @makeCode " as #{@alias.value}" if @alias?
     code
 
+  ast: (o) ->
+    @addIdentifierToScope o
+    super o
+
 exports.ImportSpecifier = class ImportSpecifier extends ModuleSpecifier
   constructor: (imported, local) ->
     super imported, local, 'import'
 
-  compileNode: (o) ->
+  addIdentifierToScope: (o) ->
     # Per the spec, symbols can’t be imported multiple times
     # (e.g. `import { foo, foo } from 'lib'` is invalid)
     if @identifier in o.importedSymbols or o.scope.check(@identifier)
@@ -2678,32 +2750,32 @@ exports.ImportSpecifier = class ImportSpecifier extends ModuleSpecifier
       o.importedSymbols.push @identifier
     super o
 
-  astProperties: ->
-    originalAst = @original.ast()
+  astProperties: (o) ->
+    originalAst = @original.ast o
     return
       imported: originalAst
-      local: @alias?.ast() ? originalAst
+      local: @alias?.ast(o) ? originalAst
       importKind: null
 
 exports.ImportDefaultSpecifier = class ImportDefaultSpecifier extends ImportSpecifier
-  astProperties: ->
+  astProperties: (o) ->
     return
-      local: @original.ast()
+      local: @original.ast o
 
 exports.ImportNamespaceSpecifier = class ImportNamespaceSpecifier extends ImportSpecifier
-  astProperties: ->
+  astProperties: (o) ->
     return
-      local: @alias.ast()
+      local: @alias.ast o
 
 exports.ExportSpecifier = class ExportSpecifier extends ModuleSpecifier
   constructor: (local, exported) ->
     super local, exported, 'export'
 
-  astProperties: ->
-    originalAst = @original.ast()
+  astProperties: (o) ->
+    originalAst = @original.ast o
     return
       local: originalAst
-      exported: @alias?.ast() ? originalAst
+      exported: @alias?.ast(o) ? originalAst
 
 #### Assign
 
@@ -3057,10 +3129,10 @@ exports.Assign = class Assign extends Base
     else
       'AssignmentExpression'
 
-  astProperties: ->
+  astProperties: (o) ->
     ret =
-      right: @value.ast()
-      left: @variable.ast()
+      right: @value.ast o
+      left: @variable.ast o
 
     unless @isDefaultAssignment()
       ret.operator = @originalContext ? '='
@@ -3522,8 +3594,8 @@ exports.Splat = class Splat extends Base
     else
       'SpreadElement'
 
-  astProperties: -> {
-    argument: @name.ast()
+  astProperties: (o) -> {
+    argument: @name.ast o
     @postfix
   }
 
@@ -3853,9 +3925,9 @@ exports.Op = class Op extends Base
         if @isUnary()      then 'UnaryExpression'
         else                    'BinaryExpression'
 
-  astProperties: ->
-    firstAst = @first.ast()
-    secondAst = @second?.ast()
+  astProperties: (o) ->
+    firstAst = @first.ast o
+    secondAst = @second?.ast o
     switch
       when @isUnary()
         return
@@ -3976,9 +4048,9 @@ exports.Throw = class Throw extends Base
 
   astType: -> 'ThrowStatement'
 
-  astProperties: ->
+  astProperties: (o) ->
     return
-      argument: @expression.ast()
+      argument: @expression.ast o
 
 #### Existence
 
@@ -4024,9 +4096,9 @@ exports.Existence = class Existence extends Base
 
   astType: -> 'UnaryExpression'
 
-  astProperties: ->
+  astProperties: (o) ->
     return
-      argument: @expression.ast()
+      argument: @expression.ast o
       operator: '?'
       prefix: no
 
@@ -4067,7 +4139,7 @@ exports.Parens = class Parens extends Base
     return @wrapInBraces fragments if @csxAttribute
     if bare then fragments else @wrapInParentheses fragments
 
-  ast: -> @body.unwrap().ast()
+  ast: (o) -> @body.unwrap().ast o
 
 #### StringWithInterpolations
 
@@ -4641,3 +4713,10 @@ locationDataToAst = ({first_line, first_column, last_line, last_column, range}) 
     ]
     start: range[0]
     end:   range[1]
+
+# Extract location data fields from an AST node
+extractAstLocationData = (ast) ->
+  loc: ast.loc
+  range: ast.range
+  start: ast.start
+  end: ast.end
