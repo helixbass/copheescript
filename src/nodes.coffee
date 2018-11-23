@@ -1578,7 +1578,8 @@ exports.CSXTag = class CSXTag extends IdentifierLiteral
   astType: -> 'JSXIdentifier'
 
   astProperties: ->
-    name: @value
+    return
+      name: @value
 
 exports.PropertyName = class PropertyName extends Literal
   isAssignable: YES
@@ -1990,8 +1991,8 @@ exports.Value = class Value extends Base
     return super() unless @isCSXTag()
     # don't include leading < of JSX tag in location data
     mergeAstLocationData(
-      locationDataToAst @base.tagNameLocationData
-      locationDataToAst @properties[@properties.length - 1].locationData
+      locationDataToAst(@base.tagNameLocationData),
+      locationDataToAst(@properties[@properties.length - 1].locationData)
     )
 
 #### HereComment
@@ -2195,14 +2196,9 @@ exports.Call = class Call extends Base
     fragments.push (tag = @variable.compileToFragments(o, LEVEL_ACCESS))...
     if attributes.base instanceof Arr
       for obj in attributes.base.objects
+        @checkValidCSXAttribute obj
         attr = obj.base
-        attrProps = attr?.properties or []
-        # Catch invalid CSX attributes: <div {a:"b", props} {props} "value" />
-        if not (attr instanceof Obj or attr instanceof IdentifierLiteral) or (attr instanceof Obj and not attr.generated and (attrProps.length > 1 or not (attrProps[0] instanceof Splat)))
-          obj.error """
-            Unexpected token. Allowed CSX attributes are: id="val", src={source}, {props...} or attribute.
-          """
-        obj.base.csx = yes if obj.base instanceof Obj
+        attr.csx = yes if attr instanceof Obj
         fragments.push @makeCode ' '
         fragments.push obj.compileToFragments(o, LEVEL_PAREN)...
     if content
@@ -2213,51 +2209,51 @@ exports.Call = class Call extends Base
       fragments.push @makeCode(' />')
     fragments
 
-  CSXElementToAst: ({o, tagName, attributes, content}) ->
-    # The location data spanning the opening element < ... > is captured by
-    # the generated Arr which contains the element's attributes
-    openingElementLocationData = locationDataToAst attributes.base.locationData
+  # Catch invalid CSX attributes: <div {a:"b", props} {props} "value" />
+  checkValidCSXAttribute: (object) ->
+    {base: attribute} = object
+    properties = attribute?.properties or []
+    if not (attribute instanceof Obj or attribute instanceof IdentifierLiteral) or (attribute instanceof Obj and not attribute.generated and (properties.length > 1 or not (properties[0] instanceof Splat)))
+      object.error """
+        Unexpected token. Allowed CSX attributes are: id="val", src={source}, {props...} or attribute.
+      """
 
-    attributesAst = flatten(
-      if attributes.base instanceof Arr
-        openingElementLocationData = mergeAstLocationData openingElementLocationData, locationDataToAst attributes.base.locationData
-        for obj in attributes.base.objects
-          {base: attr} = obj
-          attrProps = attr?.properties or []
-          if not (attr instanceof Obj or attr instanceof IdentifierLiteral) or (attr instanceof Obj and not attr.generated and (attrProps.length > 1 or not (attrProps[0] instanceof Splat)))
-            obj.error """
-              Unexpected token. Allowed CSX attributes are: id="val", src={source}, {props...} or attribute.
-            """
-          attr.csx = yes
-          compiled = attr.ast o#, LEVEL_PAREN
-          if Array.isArray compiled
-            for compiledAttr in compiled
-              openingElementLocationData = mergeAstLocationData openingElementLocationData, compiledAttr
-          else
-            openingElementLocationData = mergeAstLocationData openingElementLocationData, compiled
-          if attr instanceof IdentifierLiteral
-            Object.assign {
-              type: 'JSXAttribute'
-              name: compiled
-              value: null
-            }, attr.astLocationData()
-          else
-            compiled
-      else [])
+  CSXFragmentToAst: ({o, openingElementLocationData, closingElementLocationData}) ->
+    openingFragment = Object.assign {
+      type: 'JSXOpeningFragment'
+    }, openingElementLocationData
 
+    closingFragment = Object.assign {
+      type: 'JSXClosingFragment'
+    }, closingElementLocationData
+
+    Object.assign {
+      type: 'JSXFragment',
+      openingFragment, closingFragment
+    }, mergeAstLocationData openingElementLocationData, closingElementLocationData
+
+  getCSXAttributeAst: (object, o) ->
+    @checkValidCSXAttribute object
+    {base: attribute} = object
+    attribute.csx = yes
+    ast = attribute.ast o#, LEVEL_PAREN
+    return ast unless attribute instanceof IdentifierLiteral
+    Object.assign {
+      type: 'JSXAttribute'
+      name: ast
+      value: null
+    }, attribute.astLocationData()
+
+  CSXElementToAst: ({o, tagName, attributes, openingElementLocationData, closingElementLocationData}) ->
     openingElement = Object.assign {
       type: 'JSXOpeningElement'
       name: @variable.unwrap().ast o#, LEVEL_ACCESS
-      selfClosing: not content
-      attributes: attributesAst
+      selfClosing: not closingElementLocationData?
+      attributes: flatten(@getCSXAttributeAst(object, o) for object in attributes.base.objects)
     }, openingElementLocationData
 
     closingElement = null
-    if content
-      closingElementLocationData = mergeAstLocationData(
-        locationDataToAst tagName.closingTagOpeningBracketLocationData
-        locationDataToAst tagName.closingTagClosingBracketLocationData
-      )
+    if closingElementLocationData?
       closingElement = Object.assign {
         type: 'JSXClosingElement'
         name: Object.assign(
@@ -2298,42 +2294,27 @@ exports.Call = class Call extends Base
         mergeAstLocationData openingElementLocationData, closingElementLocationData
       else
         openingElementLocationData
-    ,
-      @astReturns()
     )
 
   CSXToAst: (o) ->
     [attributes, content] = @args
     tagName = @variable.base
     tagName.locationData = tagName.tagNameLocationData
-    {
-      ...(
-        unless tagName.value.length
-          openingFragmentLocationData = tagName.astLocationData()
-          if attributes.base instanceof Arr
-            openingFragmentLocationData = mergeAstLocationData openingFragmentLocationData, locationDataToAst attributes.base.locationData
-          openingFragment = Object.assign {
-            type: 'JSXOpeningFragment'
-          }, openingFragmentLocationData
-          closingFragmentLocationData = mergeAstLocationData(
-            locationDataToAst tagName.closingTagOpeningBracketLocationData
-            locationDataToAst tagName.closingTagClosingBracketLocationData
-          )
-          closingFragment = Object.assign {
-            type: 'JSXClosingFragment'
-          }, closingFragmentLocationData
-          Object.assign(
-            {
-              type: 'JSXFragment'
-              openingFragment
-              closingFragment
-            }
-            mergeAstLocationData openingFragmentLocationData, closingFragmentLocationData
-            @astReturns()
-          )
-        else
-          @CSXElementToAst {o, tagName, attributes, content}
-      )
+    # The location data spanning the opening element < ... > is captured by
+    # the generated Arr which contains the element's attributes
+    openingElementLocationData = locationDataToAst attributes.base.locationData
+
+    closingElementLocationData = mergeAstLocationData(
+      locationDataToAst tagName.closingTagOpeningBracketLocationData
+      locationDataToAst tagName.closingTagClosingBracketLocationData
+    ) if tagName.closingTagOpeningBracketLocationData?
+
+    Object.assign(
+      if tagName.value.length
+        @CSXElementToAst {o, tagName, attributes, openingElementLocationData, closingElementLocationData}
+      else
+        @CSXFragmentToAst {o, openingElementLocationData, closingElementLocationData}
+    ,
       children:
         if content and not content.base.isEmpty?()
           content.base.csx = yes
@@ -2341,26 +2322,6 @@ exports.Call = class Call extends Base
             content.ast o#, LEVEL_LIST
           ]
         else []
-    }
-
-  CSXToAst: (o) ->
-    [attributes, content] = @args
-    tagName = @variable.base
-    tagName.locationData = tagName.tagNameLocationData
-    Object.assign(
-      # if tagName.value.length
-      @CSXElementToAst {o, tagName, attributes, content}
-      # else
-      #   @CSXFragmentToAst {tagName, attributes, content}
-    ,
-      children: []
-        # if content and not content.base.isEmpty?()
-        #   content.base.csx = yes
-        #   compact flatten [
-        #     content.ast()
-        #   ]
-        # else
-        #   []
     )
 
   astFull: (o) ->
@@ -2999,16 +2960,6 @@ exports.Obj = class Obj extends Base
       prop = prop.unwrapAll()
       prop.eachName iterator if prop.eachName?
 
-  CSXAttributesToAst: (o) ->
-    compiledProps =
-      for prop in @properties
-        prop.csx = yes
-        prop.ast o#, LEVEL_TOP
-    if @properties.length is 1 and @properties[0] instanceof Splat
-      # include surrounding `{` and `}` of eg `{...b}` spread prop in location data
-      return @withAstLocationData compiledProps[0], force: yes
-    compiledProps
-
   compileCSXAttributes: (o) ->
     props = @properties
     answer = []
@@ -3095,6 +3046,15 @@ exports.Obj = class Obj extends Base
         property.nestedLhs = yes
       else if property instanceof Splat
         property.lhs = yes
+
+  CSXAttributesToAst: (o) ->
+    propertiesAst =
+      for property in @properties
+        property.csx = yes
+        property.ast o#, LEVEL_TOP
+    return propertiesAst unless @properties.length is 1 and @properties[0] instanceof Splat
+    # Include surrounding `{` and `}` of spread prop `{...b}` in location data.
+    Object.assign propertiesAst[0], @astLocationData()
 
   astFull: (o) ->
     return @CSXAttributesToAst o if @csx
@@ -4033,22 +3993,6 @@ exports.Assign = class Assign extends Base
 
     super o
 
-  CSXAttributeToAst: (o) ->
-    Object.assign
-      type: 'JSXAttribute'
-      name: @variable.base.withAstLocationData
-        type: 'JSXIdentifier'
-        name: @variable.base.value
-      value: do =>
-        val = @value.base
-        val.csxAttribute = yes
-        compiled = astAsBlock val, o
-        return compiled if val instanceof StringLiteral
-        val.withAstLocationData
-          type: 'JSXExpressionContainer'
-          expression: compiled
-    , @astLocationData()
-
   addScopeVariables: (o, {checkAssignability = yes} = {}) ->
     varBase = @variable.unwrapAll()
     if checkAssignability and not varBase.isAssignable()
@@ -4538,6 +4482,27 @@ exports.Assign = class Assign extends Base
     # know that, so that those nodes know that they’re assignable as
     # destructured variables.
     @variable.base.propagateLhs yes
+
+  getCSXAttributeValueAst: (o) ->
+    value = @value.base
+    value.csxAttribute = yes
+    ast = astAsBlock value, o
+    return ast if value instanceof StringLiteral
+    Object.assign
+      type: 'JSXExpressionContainer'
+      expression: ast
+    , value.astLocationData()
+
+  CSXAttributeToAst: (o) ->
+    Object.assign
+      type: 'JSXAttribute'
+      name:
+        Object.assign
+          type: 'JSXIdentifier'
+          name: @variable.base.value
+        , @variable.base.astLocationData()
+      value: @getCSXAttributeValueAst o
+    , @astLocationData()
 
   astFull: (o) ->
     return @CSXAttributeToAst o if @csx
