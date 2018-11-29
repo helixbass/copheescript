@@ -270,7 +270,7 @@ exports.Base = class Base
   # as JSON. This is what the `ast` option in the Node API returns.
   # We try to follow the [Babel AST spec](https://github.com/babel/babel/blob/master/packages/babel-parser/ast/spec.md)
   # as closely as possible, for improved interoperability with other tools.
-  ast: ->
+  ast: (o) ->
     # Every abstract syntax tree node object has four categories of properties:
     # - type, stored in the `type` field and a string like `NumberLiteral`.
     # - location data, stored in the `loc`, `start`, `end` and `range` fields.
@@ -279,7 +279,7 @@ exports.Base = class Base
     # These fields are all intermixed in the Babel spec; `type` and `start` and
     # `parsedValue` are all top level fields in the AST node object. We have
     # separate methods for returning each category, that we merge together here.
-    Object.assign {}, @astProperties(), {type: @astType()}, @astLocationData()
+    Object.assign {}, {type: @astType(o)}, @astProperties(o), @astLocationData()
 
   # By default, a node class has no specific properties.
   astProperties: -> {}
@@ -290,7 +290,7 @@ exports.Base = class Base
   # The AST location data is a rearranged version of our Jison location data,
   # mutated into the structure that the Babel spec uses.
   astLocationData: ->
-    jisonLocationDataToAstLocationData @locationData
+    locationDataToAst @locationData
 
   # Passes each child to a function, breaking when the function returns `false`.
   eachChild: (func) ->
@@ -461,34 +461,6 @@ exports.HoistTarget = class HoistTarget extends Base
   compileClosure: (o) ->
     @compileToFragments o
 
-#### Root
-
-# The root node of the node tree
-exports.Root = class Root extends Base
-  constructor: (@body) ->
-    super()
-
-  # Wrap everything in a safety closure, unless requested not to. It would be
-  # better not to generate them in the first place, but for now, clean up
-  # obvious double-parentheses.
-  compileNode: (o) ->
-    o.indent  = if o.bare then '' else TAB
-    o.level   = LEVEL_TOP
-    o.scope   = new Scope null, @body, null, o.referencedVars ? []
-    # Mark given local variables in the root scope as parameters so they don’t
-    # end up being declared on the root block.
-    o.scope.parameter name for name in o.locals or []
-    fragments = @body.compileRoot o
-    return fragments if o.bare
-    [].concat @makeCode("(function() {\n"), fragments, @makeCode("\n}).call(this);\n")
-
-  astType: -> 'File'
-
-  astProperties: ->
-    return
-      program: @body.ast()
-      comments: []
-
 #### Block
 
 # The block is the list of expressions that forms the body of an
@@ -547,7 +519,7 @@ exports.Block = class Block extends Base
       [..., penult, last] = expressions
       penult = penult.unwrap()
       last = last.unwrap()
-      if penult instanceof CSXElement and last instanceof CSXElement
+      if penult instanceof Call and penult.csx and last instanceof Call and last.csx
         expressions[expressions.length - 1].error 'Adjacent JSX elements must be wrapped in an enclosing tag'
     while len--
       expr = @expressions[len]
@@ -556,10 +528,9 @@ exports.Block = class Block extends Base
       break
     this
 
-  compile: (o, lvl) ->
-    return new Root(this).withLocationDataFrom(this).compile o, lvl unless o.scope
-
-    super o, lvl
+  # A **Block** is the only node that can serve as the root.
+  compileToFragments: (o = {}, level) ->
+    if o.scope then super o, level else @compileRoot o
 
   # Compile all expressions within the **Block** body. If we need to return
   # the result, and it’s an expression, simply return it. If it’s a statement,
@@ -603,11 +574,25 @@ exports.Block = class Block extends Base
       answer = [@makeCode 'void 0']
     if compiledNodes.length > 1 and o.level >= LEVEL_LIST then @wrapInParentheses answer else answer
 
+  # If we happen to be the top-level **Block**, wrap everything in a safety
+  # closure, unless requested not to. It would be better not to generate them
+  # in the first place, but for now, clean up obvious double-parentheses.
   compileRoot: (o) ->
-    @spaced = yes
+    o.indent  = if o.bare then '' else TAB
+    o.level   = LEVEL_TOP
+    @spaced   = yes
+    @initializeScope o
     fragments = @compileWithDeclarations o
     HoistTarget.expand fragments
-    @compileComments fragments
+    fragments = @compileComments fragments
+    return fragments if o.bare
+    [].concat @makeCode("(function() {\n"), fragments, @makeCode("\n}).call(this);\n")
+
+  initializeScope: (o) ->
+    o.scope   = new Scope null, this, null, o.referencedVars ? []
+    # Mark given local variables in the root scope as parameters so they don’t
+    # end up being declared on this block.
+    o.scope.parameter name for name in o.locals or []
 
   # Compile the expressions body for the contents of a function, with
   # declarations of all inner variables pushed up to the top.
@@ -775,21 +760,40 @@ exports.Block = class Block extends Base
     ,
       extractAstLocationData ast
 
-  getExpressionAst: (expression) ->
-    ast = expression.ast()
-    # return ast if expression.isStatement o
+  getExpressionAst: (expression, o) ->
+    root = del o, 'root'
+    expression.topLevel = yes if root
+    ast = expression.ast o
+    return ast if expression.isStatement o
     @asExpressionStatementAst ast
 
-  bodyToAst: ->
-    @getExpressionAst(expression) for expression in @expressions
+  bodyToAst: (o) ->
+    @getExpressionAst(expression, o) for expression in @expressions
 
-  astType: -> 'Program'
+  rootToAst: (o) ->
+    @initializeScope o
 
-  astProperties: ->
-    return
-      # sourceType: 'module'
-      body: @bodyToAst()
+    programLocationData = @astLocationData()
+
+    programAst = Object.assign
+      type: 'Program'
+      sourceType: 'module'
+      body: @bodyToAst merge o, root: yes
       directives: []
+    ,
+      programLocationData
+
+    Object.assign
+      type: 'File'
+      program: programAst
+      comments: []
+    ,
+      programLocationData
+
+  ast: (o) ->
+    return @rootToAst o unless o.scope
+
+    super o
 
 #### Literal
 
@@ -954,8 +958,7 @@ exports.CSXTag = class CSXTag extends IdentifierLiteral
   astType: -> 'JSXIdentifier'
 
   astProperties: ->
-    return
-      name: @value
+    name: @value
 
 exports.PropertyName = class PropertyName extends Literal
   isAssignable: YES
@@ -973,8 +976,8 @@ exports.ComputedPropertyName = class ComputedPropertyName extends PropertyName
   compileNode: (o) ->
     [@makeCode('['), @value.compileToFragments(o, LEVEL_LIST)..., @makeCode(']')]
 
-  ast: ->
-    @value.ast()
+  ast: (o) ->
+    @value.ast o
 
 exports.StatementLiteral = class StatementLiteral extends Literal
   isStatement: YES
@@ -1271,13 +1274,13 @@ exports.Value = class Value extends Base
         mergeLocationData @base.locationData, initialProperties[initialProperties.length - 1].locationData
     object
 
-  ast: ->
+  ast: (o) ->
     # If the `Value` has no properties, the AST node is just whatever this
     # node’s `base` is.
-    return @base.ast() unless @hasProperties()
+    return @base.ast o unless @hasProperties()
     # Otherwise, call `Base::ast` which in turn calls the `astType` and
     # `astProperties` methods below.
-    super()
+    super o
 
   astType: ->
     if @isCSXTag()
@@ -1288,12 +1291,12 @@ exports.Value = class Value extends Base
   # If this `Value` has properties, the *last* property (e.g. `c` in `a.b.c`)
   # becomes the `property`, and the preceding properties (e.g. `a.b`) become
   # a child `Value` node assigned to the `object` property.
-  astProperties: ->
+  astProperties: (o) ->
     [..., property] = @properties
     property.name.csx = yes if @isCSXTag()
     return
-      object: @object().ast()
-      property: property.ast()
+      object: @object().ast o
+      property: property.ast o
       computed: property instanceof Index or property.name?.unwrap() not instanceof PropertyName
       optional: !!property.soak
       shorthand: !!property.shorthand
@@ -1302,8 +1305,8 @@ exports.Value = class Value extends Base
     return super() unless @isCSXTag()
     # don't include leading < of JSX tag in location data
     mergeAstLocationData(
-      jisonLocationDataToAstLocationData(@base.tagNameLocationData),
-      jisonLocationDataToAstLocationData(@properties[@properties.length - 1].locationData)
+      locationDataToAst @base.tagNameLocationData
+      locationDataToAst @properties[@properties.length - 1].locationData
     )
 
 #### HereComment
@@ -1354,113 +1357,6 @@ exports.LineComment = class LineComment extends Base
 
 #### Call
 
-exports.CSXElement = class CSXElement extends Base
-  constructor: ({@tagName, @attributes, @content}) ->
-    super()
-
-  children: ['tagName', 'attributes', 'content']
-
-  compileNode: (o) ->
-    @attributes.base.csx = yes
-    @content?.base.csx = yes
-    fragments = [@makeCode('<')]
-    fragments.push (tag = @tagName.compileToFragments(o, LEVEL_ACCESS))...
-    if @attributes.base instanceof Arr
-      for obj in @attributes.base.objects
-        attr = obj.base
-        attrProps = attr?.properties or []
-        # Catch invalid CSX attributes: <div {a:"b", props} {props} "value" />
-        if not (attr instanceof Obj or attr instanceof IdentifierLiteral) or (attr instanceof Obj and not attr.generated and (attrProps.length > 1 or not (attrProps[0] instanceof Splat)))
-          obj.error """
-            Unexpected token. Allowed CSX attributes are: id="val", src={source}, {props...} or attribute.
-          """
-        obj.base.csx = yes if obj.base instanceof Obj
-        fragments.push @makeCode ' '
-        fragments.push obj.compileToFragments(o, LEVEL_PAREN)...
-    if @content
-      fragments.push @makeCode('>')
-      fragments.push @content.compileNode(o, LEVEL_LIST)...
-      fragments.push [@makeCode('</'), tag..., @makeCode('>')]...
-    else
-      fragments.push @makeCode(' />')
-    fragments
-
-  ast: ->
-    # The location data spanning the opening element < ... > is captured by
-    # the generated Arr which contains the element's attributes
-    @openingElementLocationData = jisonLocationDataToAstLocationData @attributes.base.locationData
-
-    tagName = @tagName.base
-    tagName.locationData = tagName.tagNameLocationData
-    if @content?
-      @closingElementLocationData = mergeAstLocationData(
-        jisonLocationDataToAstLocationData tagName.closingTagOpeningBracketLocationData
-        jisonLocationDataToAstLocationData tagName.closingTagClosingBracketLocationData
-      )
-
-    super()
-
-  astType: ->
-    'JSXElement'
-
-  astProperties: ->
-    openingElement = Object.assign {
-      type: 'JSXOpeningElement'
-      name: @tagName.unwrap().ast()
-      selfClosing: not @closingElementLocationData?
-      attributes: []
-    }, @openingElementLocationData
-
-    closingElement = null
-    if @closingElementLocationData?
-      closingElement = Object.assign {
-        type: 'JSXClosingElement'
-        name: Object.assign(
-          @tagName.unwrap().ast(),
-          jisonLocationDataToAstLocationData @tagName.base.closingTagNameLocationData
-        )
-      }, @closingElementLocationData
-      if closingElement.name.type is 'JSXMemberExpression'
-        rangeDiff = closingElement.range[0] - openingElement.range[0] + '/'.length
-        shiftAstLocationData = (node) ->
-          node.range = [
-            node.range[0] + rangeDiff
-            node.range[1] + rangeDiff
-          ]
-          node.start += rangeDiff
-          node.end += rangeDiff
-          node.loc.start =
-            line: node.loc.start.line
-            column: node.loc.start.column + rangeDiff
-          node.loc.end =
-            line: node.loc.end.line
-            column: node.loc.end.column + rangeDiff
-        currentExpr = closingElement.name
-        while currentExpr.type is 'JSXMemberExpression'
-          shiftAstLocationData currentExpr unless currentExpr is closingElement.name
-          shiftAstLocationData currentExpr.property
-          currentExpr = currentExpr.object
-        shiftAstLocationData currentExpr
-
-    return {
-      openingElement, closingElement
-      children: []
-        # TODO: uncomment when adding support for JSX content AST
-        # if content and not content.base.isEmpty?()
-        #   content.base.csx = yes
-        #   compact flatten [
-        #     content.ast()
-        #   ]
-        # else
-        #   []
-    }
-
-  astLocationData: ->
-    if @closingElementLocationData?
-      mergeAstLocationData @openingElementLocationData, @closingElementLocationData
-    else
-      @openingElementLocationData
-
 # Node for a function invocation.
 exports.Call = class Call extends Base
   constructor: (@variable, @args = [], @soak, @token) ->
@@ -1471,12 +1367,7 @@ exports.Call = class Call extends Base
     if @variable instanceof Value and @variable.isNotCallable()
       @variable.error "literal is not a function"
 
-    if @variable.base instanceof CSXTag
-      return new CSXElement(
-        tagName: @variable
-        attributes: @args[0]
-        content: @args[1]
-      )
+    @csx = @variable.base instanceof CSXTag
 
     # `@variable` never gets output as a result of this node getting created as
     # part of `RegexWithInterpolations`, so for that case move any comments to
@@ -1559,6 +1450,7 @@ exports.Call = class Call extends Base
 
   # Compile a vanilla function call.
   compileNode: (o) ->
+    return @compileCSX o if @csx
     @variable?.front = @front
     compiledArgs = []
     # If variable is `Accessor` fragments are cached and used later
@@ -1586,16 +1478,124 @@ exports.Call = class Call extends Base
     fragments.push @makeCode('('), compiledArgs..., @makeCode(')')
     fragments
 
+  compileCSX: (o) ->
+    [attributes, content] = @args
+    attributes.base.csx = yes
+    content?.base.csx = yes
+    fragments = [@makeCode('<')]
+    fragments.push (tag = @variable.compileToFragments(o, LEVEL_ACCESS))...
+    if attributes.base instanceof Arr
+      for obj in attributes.base.objects
+        attr = obj.base
+        attrProps = attr?.properties or []
+        # Catch invalid CSX attributes: <div {a:"b", props} {props} "value" />
+        if not (attr instanceof Obj or attr instanceof IdentifierLiteral) or (attr instanceof Obj and not attr.generated and (attrProps.length > 1 or not (attrProps[0] instanceof Splat)))
+          obj.error """
+            Unexpected token. Allowed CSX attributes are: id="val", src={source}, {props...} or attribute.
+          """
+        obj.base.csx = yes if obj.base instanceof Obj
+        fragments.push @makeCode ' '
+        fragments.push obj.compileToFragments(o, LEVEL_PAREN)...
+    if content
+      fragments.push @makeCode('>')
+      fragments.push content.compileNode(o, LEVEL_LIST)...
+      fragments.push [@makeCode('</'), tag..., @makeCode('>')]...
+    else
+      fragments.push @makeCode(' />')
+    fragments
+
+  CSXElementToAst: ({tagName, attributes, content, o}) ->
+    # The location data spanning the opening element < ... > is captured by
+    # the generated Arr which contains the element's attributes
+    openingElementLocationData = locationDataToAst attributes.base.locationData
+
+    openingElement = Object.assign {
+      type: 'JSXOpeningElement'
+      name: @variable.unwrap().ast o
+      selfClosing: not content
+      attributes: []
+    }, openingElementLocationData
+
+    closingElement = null
+    if content
+      closingElementLocationData = mergeAstLocationData(
+        locationDataToAst tagName.closingTagOpeningBracketLocationData
+        locationDataToAst tagName.closingTagClosingBracketLocationData
+      )
+      closingElement = Object.assign {
+        type: 'JSXClosingElement'
+        name: Object.assign(
+          @variable.unwrap().ast(o),
+          locationDataToAst tagName.closingTagNameLocationData
+        )
+      }, closingElementLocationData
+      if closingElement.name.type is 'JSXMemberExpression'
+        rangeDiff = closingElement.range[0] - openingElement.range[0] + '/'.length
+        shiftAstLocationData = (node) ->
+          node.range = [
+            node.range[0] + rangeDiff
+            node.range[1] + rangeDiff
+          ]
+          node.start += rangeDiff
+          node.end += rangeDiff
+          node.loc.start = {
+            line: node.loc.start.line
+            column: node.loc.start.column + rangeDiff
+          }
+          node.loc.end = {
+            line: node.loc.end.line
+            column: node.loc.end.column + rangeDiff
+          }
+        currentExpr = closingElement.name
+        while currentExpr.type is 'JSXMemberExpression'
+          shiftAstLocationData currentExpr unless currentExpr is closingElement.name
+          shiftAstLocationData currentExpr.property
+          currentExpr = currentExpr.object
+        shiftAstLocationData currentExpr
+
+    Object.assign {
+      type: 'JSXElement',
+      openingElement, closingElement
+    },
+    if closingElement?
+      mergeAstLocationData openingElementLocationData, closingElementLocationData
+    else
+      openingElementLocationData
+
+  CSXToAst: (o) ->
+    [attributes, content] = @args
+    tagName = @variable.base
+    tagName.locationData = tagName.tagNameLocationData
+    Object.assign(
+      # if tagName.value.length
+      @CSXElementToAst {tagName, attributes, content, o}
+      # else
+      #   @CSXFragmentToAst {tagName, attributes, content}
+    ,
+      children: []
+        # if content and not content.base.isEmpty?()
+        #   content.base.csx = yes
+        #   compact flatten [
+        #     content.ast(o)
+        #   ]
+        # else
+        #   []
+    )
+
+  ast: (o) ->
+    return @CSXToAst o if @csx
+    super o
+
   astType: ->
     if @isNew
       'NewExpression'
     else
       'CallExpression'
 
-  astProperties: ->
+  astProperties: (o) ->
     return
-      callee: @variable.ast()
-      arguments: arg.ast() for arg in @args
+      callee: @variable.ast o
+      arguments: arg.ast o for arg in @args
       optional: !!@soak
       implicit: !!@implicit
 
@@ -1715,11 +1715,11 @@ exports.Access = class Access extends Base
 
   shouldCache: NO
 
-  ast: ->
+  ast: (o) ->
     # Babel doesn’t have an AST node for `Access`, but rather just includes
     # this Access node’s child `name` Identifier node as the `property` of
     # the `MemberExpression` node.
-    @name.ast()
+    @name.ast o
 
 #### Index
 
@@ -1736,13 +1736,13 @@ exports.Index = class Index extends Base
   shouldCache: ->
     @index.shouldCache()
 
-  ast: ->
+  ast: (o) ->
     # Babel doesn’t have an AST node for `Index`, but rather just includes
     # this Index node’s child `index` Identifier node as the `property` of
     # the `MemberExpression` node. The fact that the `MemberExpression`’s
     # `property` is an Index means that `computed` is `true` for the
     # `MemberExpression`.
-    @index.ast()
+    @index.ast o
 
 #### Range
 
@@ -1856,10 +1856,10 @@ exports.Range = class Range extends Base
     args   = ', arguments' if hasArgs(@from) or hasArgs(@to)
     [@makeCode "(function() {#{pre}\n#{idt}for (#{body})#{post}}).apply(this#{args ? ''})"]
 
-  astProperties: ->
+  astProperties: (o) ->
     return {
-      from: @from?.ast() ? null
-      to: @to?.ast() ? null
+      from: @from?.ast(o) ? null
+      to: @to?.ast(o) ? null
       @exclusive
     }
 
@@ -1899,8 +1899,8 @@ exports.Slice = class Slice extends Base
           "+#{fragmentsToText compiled} + 1 || 9e9"
     [@makeCode ".slice(#{ fragmentsToText fromCompiled }#{ toStr or '' })"]
 
-  ast: ->
-    @range.ast()
+  ast: (o) ->
+    @range.ast o
 
 #### Obj
 
@@ -2081,11 +2081,11 @@ exports.Obj = class Obj extends Base
     else
       'ObjectExpression'
 
-  astProperties: ->
+  astProperties: (o) ->
     return
       implicit: !!@generated
       properties:
-        property.ast() for property in @expandProperties()
+        property.ast(o) for property in @expandProperties()
 
 exports.ObjectProperty = class ObjectProperty extends Base
   constructor: ({key, fromAssign}) ->
@@ -2106,13 +2106,13 @@ exports.ObjectProperty = class ObjectProperty extends Base
       @shorthand = yes
       @locationData = key.locationData
 
-  astProperties: ->
+  astProperties: (o) ->
     isComputedPropertyName = @key instanceof Value and @key.base instanceof ComputedPropertyName
-    keyAst = @key.ast()
+    keyAst = @key.ast o
 
     return
       key: keyAst
-      value: @value?.ast() ? keyAst
+      value: @value?.ast(o) ? keyAst
       shorthand: !!@shorthand
       computed: !!isComputedPropertyName
       method: no
@@ -2224,10 +2224,10 @@ exports.Arr = class Arr extends Base
     else
       'ArrayExpression'
 
-  astProperties: ->
+  astProperties: (o) ->
     return
       elements:
-        object.ast() for object in @objects
+        object.ast(o) for object in @objects
 
 #### Class
 
@@ -2557,8 +2557,8 @@ exports.ModuleDeclaration = class ModuleDeclaration extends Base
       @source.error 'the name of the module to be imported from must be an uninterpolated string'
 
   checkScope: (o, moduleDeclarationType) ->
-    if o.indent.length isnt 0
-      @error "#{moduleDeclarationType} statements must be at top-level scope"
+    return if o.topLevel or o.indent?.length isnt 0
+    @error "#{moduleDeclarationType} statements must be at top-level scope"
 
 exports.ImportDeclaration = class ImportDeclaration extends ModuleDeclaration
   compileNode: (o) ->
@@ -2576,10 +2576,16 @@ exports.ImportDeclaration = class ImportDeclaration extends ModuleDeclaration
     code.push @makeCode ';'
     code
 
-  astProperties: ->
+  ast: (o) ->
+    @checkScope merge(o, {@topLevel}), 'import'
+    o.importedSymbols = []
+
+    super o
+
+  astProperties: (o) ->
     ret =
-      specifiers: @clause?.ast() ? []
-      source: @source.ast()
+      specifiers: @clause?.ast(o) ? []
+      source: @source.ast o
     ret.importKind = 'value' if @clause
     ret
 
@@ -2601,12 +2607,12 @@ exports.ImportClause = class ImportClause extends Base
 
     code
 
-  ast: ->
+  ast: (o) ->
     # The AST for `ImportClause` is the non-nested list of import specifiers
     # that will be the `specifiers` property of an `ImportDeclaration` AST
     compact flatten [
-      @defaultBinding?.ast()
-      @namedImports?.ast()
+      @defaultBinding?.ast o
+      @namedImports?.ast o
     ]
 
 exports.ExportDeclaration = class ExportDeclaration extends ModuleDeclaration
@@ -2636,11 +2642,18 @@ exports.ExportDeclaration = class ExportDeclaration extends ModuleDeclaration
     code
 
 exports.ExportNamedDeclaration = class ExportNamedDeclaration extends ExportDeclaration
-  astProperties: ->
+  ast: (o) ->
+    @checkScope merge(o, {@topLevel}), 'export'
+
+    @clause.moduleDeclaration = 'export'
+
+    super o
+
+  astProperties: (o) ->
     ret =
-      source: @source?.ast() ? null
+      source: @source?.ast(o) ? null
       exportKind: 'value'
-    clauseAst = @clause.ast()
+    clauseAst = @clause.ast o
     if @clause instanceof ExportSpecifierList
       ret.specifiers = clauseAst
       ret.declaration = null
@@ -2650,14 +2663,22 @@ exports.ExportNamedDeclaration = class ExportNamedDeclaration extends ExportDecl
     ret
 
 exports.ExportDefaultDeclaration = class ExportDefaultDeclaration extends ExportDeclaration
-  astProperties: ->
+  ast: (o) ->
+    @checkScope o, 'export'
+    super o
+
+  astProperties: (o) ->
     return
-      declaration: @clause.ast()
+      declaration: @clause.ast o
 
 exports.ExportAllDeclaration = class ExportAllDeclaration extends ExportDeclaration
-  astProperties: ->
+  ast: (o) ->
+    @checkScope o, 'export'
+    super o
+
+  astProperties: (o) ->
     return
-      source: @source.ast()
+      source: @source.ast o
       exportKind: 'value'
 
 exports.ModuleSpecifierList = class ModuleSpecifierList extends Base
@@ -2681,8 +2702,8 @@ exports.ModuleSpecifierList = class ModuleSpecifierList extends Base
       code.push @makeCode '{}'
     code
 
-  ast: ->
-    specifier.ast() for specifier in @specifiers
+  ast: (o) ->
+    specifier.ast(o) for specifier in @specifiers
 
 exports.ImportSpecifierList = class ImportSpecifierList extends ModuleSpecifierList
 
@@ -2702,18 +2723,25 @@ exports.ModuleSpecifier = class ModuleSpecifier extends Base
 
   children: ['original', 'alias']
 
-  compileNode: (o) ->
+  addIdentifierToScope: (o) ->
     o.scope.find @identifier, @moduleDeclarationType
+
+  compileNode: (o) ->
+    @addIdentifierToScope o
     code = []
     code.push @makeCode @original.value
     code.push @makeCode " as #{@alias.value}" if @alias?
     code
 
+  ast: (o) ->
+    @addIdentifierToScope o
+    super o
+
 exports.ImportSpecifier = class ImportSpecifier extends ModuleSpecifier
   constructor: (imported, local) ->
     super imported, local, 'import'
 
-  compileNode: (o) ->
+  addIdentifierToScope: (o) ->
     # Per the spec, symbols can’t be imported multiple times
     # (e.g. `import { foo, foo } from 'lib'` is invalid)
     if @identifier in o.importedSymbols or o.scope.check(@identifier)
@@ -2722,32 +2750,32 @@ exports.ImportSpecifier = class ImportSpecifier extends ModuleSpecifier
       o.importedSymbols.push @identifier
     super o
 
-  astProperties: ->
-    originalAst = @original.ast()
+  astProperties: (o) ->
+    originalAst = @original.ast o
     return
       imported: originalAst
-      local: @alias?.ast() ? originalAst
+      local: @alias?.ast(o) ? originalAst
       importKind: null
 
 exports.ImportDefaultSpecifier = class ImportDefaultSpecifier extends ImportSpecifier
-  astProperties: ->
+  astProperties: (o) ->
     return
-      local: @original.ast()
+      local: @original.ast o
 
 exports.ImportNamespaceSpecifier = class ImportNamespaceSpecifier extends ImportSpecifier
-  astProperties: ->
+  astProperties: (o) ->
     return
-      local: @alias.ast()
+      local: @alias.ast o
 
 exports.ExportSpecifier = class ExportSpecifier extends ModuleSpecifier
   constructor: (local, exported) ->
     super local, exported, 'export'
 
-  astProperties: ->
-    originalAst = @original.ast()
+  astProperties: (o) ->
+    originalAst = @original.ast o
     return
       local: originalAst
-      exported: @alias?.ast() ? originalAst
+      exported: @alias?.ast(o) ? originalAst
 
 #### Assign
 
@@ -3101,10 +3129,10 @@ exports.Assign = class Assign extends Base
     else
       'AssignmentExpression'
 
-  astProperties: ->
+  astProperties: (o) ->
     ret =
-      right: @value.ast()
-      left: @variable.ast()
+      right: @value.ast o
+      left: @variable.ast o
 
     unless @isDefaultAssignment()
       ret.operator = @originalContext ? '='
@@ -3566,8 +3594,8 @@ exports.Splat = class Splat extends Base
     else
       'SpreadElement'
 
-  astProperties: -> {
-    argument: @name.ast()
+  astProperties: (o) -> {
+    argument: @name.ast o
     @postfix
   }
 
@@ -3897,9 +3925,9 @@ exports.Op = class Op extends Base
         if @isUnary()      then 'UnaryExpression'
         else                    'BinaryExpression'
 
-  astProperties: ->
-    firstAst = @first.ast()
-    secondAst = @second?.ast()
+  astProperties: (o) ->
+    firstAst = @first.ast o
+    secondAst = @second?.ast o
     switch
       when @isUnary()
         return
@@ -4020,9 +4048,9 @@ exports.Throw = class Throw extends Base
 
   astType: -> 'ThrowStatement'
 
-  astProperties: ->
+  astProperties: (o) ->
     return
-      argument: @expression.ast()
+      argument: @expression.ast o
 
 #### Existence
 
@@ -4068,9 +4096,9 @@ exports.Existence = class Existence extends Base
 
   astType: -> 'UnaryExpression'
 
-  astProperties: ->
+  astProperties: (o) ->
     return
-      argument: @expression.ast()
+      argument: @expression.ast o
       operator: '?'
       prefix: no
 
@@ -4111,7 +4139,7 @@ exports.Parens = class Parens extends Base
     return @wrapInBraces fragments if @csxAttribute
     if bare then fragments else @wrapInParentheses fragments
 
-  ast: -> @body.unwrap().ast()
+  ast: (o) -> @body.unwrap().ast o
 
 #### StringWithInterpolations
 
@@ -4206,7 +4234,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
 
   isNestedTag: (element) ->
     call = element.unwrapAll?()
-    @csx and call instanceof CSXElement
+    @csx and call instanceof Call and call.csx
 
 exports.Interpolation = class Interpolation extends Base
   constructor: (@expression) ->
@@ -4670,7 +4698,7 @@ mergeAstLocationData = (nodeA, nodeB) ->
     end:   greater nodeA.end,   nodeB.end
 
 # Convert Jison-style node class location data to Babel-style location data
-jisonLocationDataToAstLocationData = ({first_line, first_column, last_line, last_column, range}) ->
+locationDataToAst = ({first_line, first_column, last_line, last_column, range}) ->
   return
     loc:
       start:
