@@ -3,7 +3,6 @@
 - should test that all expected errors (that would occur when compiling) occur when generating AST
 - location data for ClassMethod for static method should include @
 - StringLiteral extra.raw escaping - seems like maybe extra.raw should include triple quotes if it's a heredoc and then not escape the quote (in makeDelimitedLiteral())?
-- should update to OptionalCallExpression/OptionalMemberExpression? Is that where babel 7 landed?
 - alternate location data includes "else" for inline eg if a then b else c
 - (implicit?) object location data should include trailing indented comma? eg
   obj =
@@ -14,3 +13,7 @@
     ### comment ###
     a: 1
 - use ClassProperty for static class fields eg @a: 2?
+
+- should update to OptionalCallExpression/OptionalMemberExpression? Is that where babel 7 landed?
+- sourceType
+- always use inclusive end loc to avoid col + 1?
