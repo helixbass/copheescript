@@ -17,3 +17,4 @@
 - should update to OptionalCallExpression/OptionalMemberExpression? Is that where babel 7 landed?
 - sourceType
 - always use inclusive end loc to avoid col + 1?
+- root location data - File/Program should match and not include generated TERMINATOR/include non-generated TERMINATOR
