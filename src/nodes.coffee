@@ -134,7 +134,7 @@ exports.Base = class Base
       @withAstLocationData node._compileToBabylon o
 
   _compileToBabylon: (o) ->
-    Object.assign {type: @astType(o)}, @astProperties o
+    @astFull o
 
   withBabylonComments: (o, compiled, {comments = @comments} = {}) ->
     return compiled unless comments
@@ -444,6 +444,7 @@ exports.Base = class Base
   # The AST location data is a rearranged version of our Jison location data,
   # mutated into the structure that the Babel spec uses.
   astLocationData: ->
+    dump @ unless @locationData?
     locationDataToAst @locationData
 
   astReturns: ->
@@ -889,10 +890,10 @@ exports.Block = class Block extends Base
     body = @compileBodyToBabylon merge o, {root}
     body = [...@compileDeclarationsToBabylon(o), ...body] if withDeclarations
     return body if root
-    @includeCommentsInLocationData @withAstLocationData @withAstType {
+    @includeCommentsInLocationData Object.assign {type: @astType()}, {
       body
       @directives
-    }
+    }, @astLocationData()
 
   compileWithDeclarationsToBabylon: (o) ->
     @withBabylonComments o, @_compileToBabylon merge o, level: LEVEL_TOP, withDeclarations: yes
@@ -4611,6 +4612,7 @@ exports.Code = class Code extends Base
               ref =
                 if value?
                   new Assign new Value(asRef), value, param: yes
+                  .withLocationDataFrom param
                 else
                   asRef
               if name instanceof Arr or name instanceof Obj
