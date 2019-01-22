@@ -47,6 +47,7 @@ exports.Rewriter = class Rewriter
     if process?.env?.DEBUG_TOKEN_STREAM
       console.log 'Initial token stream:' if process.env.DEBUG_REWRITTEN_TOKEN_STREAM
       console.log (t[0] + '/' + t[1] + (if t.comments then '*' else '') for t in @tokens).join ' '
+    # dump @tokens
     @removeLeadingNewlines()
     @closeOpenCalls()
     @closeOpenIndexes()
@@ -55,12 +56,14 @@ exports.Rewriter = class Rewriter
     @addImplicitBracesAndParens()
     @rescueStowawayComments()
     @addLocationDataToGeneratedTokens()
+    # dump added: @tokens
     @enforceValidCSXAttributes()
     @fixOutdentLocationData()
     @exposeTokenDataToGrammar()
     if process?.env?.DEBUG_REWRITTEN_TOKEN_STREAM
       console.log 'Rewritten token stream:' if process.env.DEBUG_TOKEN_STREAM
       console.log (t[0] + '/' + t[1] + (if t.comments then '*' else '') for t in @tokens).join ' '
+    # dump @tokens
     @tokens
 
   # Rewrite the token stream, looking one token ahead and behind.
@@ -512,18 +515,24 @@ exports.Rewriter = class Rewriter
       return 1 if     token[2]
       return 1 unless token.generated or token.explicit
       if token[0] is '{' and nextLocation=tokens[i + 1]?[2]
-        {first_line: line, first_column: column, range} = nextLocation
+        {first_line: line, first_column: column, range: [rangeIndex]} = nextLocation
       else if prevLocation = tokens[i - 1]?[2]
-        {last_line: line, last_column: column, range} = prevLocation
+        {last_line: line, last_column: column, range: [, rangeIndex], ends_line} = prevLocation
+        if ends_line
+          line += 1
+          column = 0
+        else
+          column += 1
       else
         line = column = 0
-        range = [0, 0]
+        rangeIndex = 0
       token[2] = {
         first_line:   line
         first_column: column
         last_line:    line
         last_column:  column
-        range
+        range: [rangeIndex, rangeIndex]
+        # ends_line:    no TODO: does this matter? can it be calculated if we're "one after the last char of prev token"?
       }
       return 1
 
@@ -754,3 +763,4 @@ DISCARDED = ['(', ')', '[', ']', '{', '}', '.', '..', '...', ',', '=', '++', '--
   'INTERPOLATION_START', 'INTERPOLATION_END', 'LEADING_WHEN', 'OUTDENT', 'PARAM_END',
   'REGEX_START', 'REGEX_END', 'RETURN', 'STRING_END', 'THROW', 'UNARY', 'YIELD'
 ].concat IMPLICIT_UNSPACED_CALL.concat IMPLICIT_END.concat CALL_CLOSERS.concat CONTROL_IN_IMPLICIT
+dump = (obj) -> console.log require('util').inspect obj, no, null

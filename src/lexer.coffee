@@ -911,6 +911,7 @@ exports.Lexer = class Lexer
           lparen[2].range[0]
           lastToken[2].range[1]
         ]
+        ends_line:    lastToken[2].ends_line
       ]
       lparen[2] = lparen.origin[2]
       rparen = @token 'STRING_END', ')'
@@ -920,6 +921,7 @@ exports.Lexer = class Lexer
         last_line:    lastToken[2].last_line
         last_column:  lastToken[2].last_column
         range:        lastToken[2].range
+        ends_line:    lastToken[2].ends_line
 
   # Pairs up a closing token, ensuring that all listed pairs of tokens are
   # correctly balanced throughout the course of the token stream.
@@ -973,6 +975,7 @@ exports.Lexer = class Lexer
     lastCharacter = if length > 0 then (length - 1) else 0
     [locationData.last_line, locationData.last_column, endOffset] =
       @getLineAndColumnFromChunk offsetInChunk + lastCharacter
+    locationData.ends_line = @chunk[offsetInChunk + lastCharacter] is '\n'
     locationData.range[1] = if length > 0 then endOffset + 1 else endOffset
 
     locationData

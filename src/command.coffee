@@ -210,7 +210,7 @@ compileScript = (file, input, base = null) ->
       printLine CoffeeScript.nodes(task.input, task.options).toString().trim()
     else if opts.ast
       compiled = CoffeeScript.compile task.input, task.options
-      printLine JSON.stringify(compiled, null, 2)
+      printLine require('util').inspect(compiled, no, null)
     else if opts.run
       CoffeeScript.register()
       CoffeeScript.eval opts.prelude, task.options if opts.prelude

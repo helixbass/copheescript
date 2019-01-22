@@ -111,6 +111,7 @@ buildLocationData = (first, last) ->
       first.range[0]
       last.range[1]
     ]
+    ends_line: last.ends_line
 
 buildLocationHash = (loc) ->
   "#{loc.first_line}x#{loc.first_column}-#{loc.last_line}x#{loc.last_column}"
