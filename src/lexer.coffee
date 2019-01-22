@@ -508,7 +508,7 @@ exports.Lexer = class Lexer
     @outdebt -= moveOut if dent
     @suppressSemicolons()
 
-    @token 'TERMINATOR', '\n', offset: outdentLength, length: 0 unless @tag() is 'TERMINATOR' or noNewlines
+    @token 'TERMINATOR', '\n', offset: outdentLength, length: 1 unless @tag() is 'TERMINATOR' or noNewlines
     @indent = decreasedIndent
     @indentLiteral = @indentLiteral[...decreasedIndent]
     this
@@ -525,7 +525,7 @@ exports.Lexer = class Lexer
   # Generate a newline token. Consecutive newlines get merged together.
   newlineToken: (offset) ->
     @suppressSemicolons()
-    @token 'TERMINATOR', '\n', {offset, length: 0} unless @tag() is 'TERMINATOR'
+    @token 'TERMINATOR', '\n', {offset, length: 1} unless @tag() is 'TERMINATOR'
     this
 
   # Use a `\` at a line-ending to suppress the newline.
@@ -975,6 +975,7 @@ exports.Lexer = class Lexer
     lastCharacter = if length > 0 then (length - 1) else 0
     [locationData.last_line, locationData.last_column, endOffset] =
       @getLineAndColumnFromChunk offsetInChunk + lastCharacter
+    # console.log {@chunk, last: @chunk[offsetInChunk + lastCharacter]}
     locationData.ends_line = @chunk[offsetInChunk + lastCharacter] is '\n'
     locationData.range[1] = if length > 0 then endOffset + 1 else endOffset
 
