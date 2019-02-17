@@ -316,7 +316,7 @@ exports.Lexer = class Lexer
       @validateUnicodeCodePointEscapes value, delimiter: quote
 
     if @atCSXTag()
-      @token ',', ',', length: 0, origin: @prev
+      @token ',', ',', length: 0, origin: @prev, generated: yes
 
     end
 

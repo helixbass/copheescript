@@ -6696,7 +6696,7 @@ exports.If = class If extends Base
   # to be a statement. Otherwise a conditional operator is safe.
   isStatement: (o) ->
     unless o.compiling
-      return no if @postfix
+      # return no if @postfix
       return yes if o?.level is LEVEL_TOP
       return @bodyNode() instanceof Block or @bodyNode().isStatement(o) or @elseBodyNode() instanceof Block or @elseBodyNode()?.isStatement o
     o?.level is LEVEL_TOP or
