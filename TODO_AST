@@ -18,3 +18,4 @@
 - sourceType
 - ESLint plugin to catch grammar rules that wouldn't allow passing along necessary location data? Eg check for rules that return something other than a new object/array and which are then used in a LOC() call (an explicit one or implicitly by being the first/last thing in the production)
 - make assertErrorFormat() check AST by default
+- chained Ops eg a < b < c
