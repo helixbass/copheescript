@@ -523,18 +523,21 @@ exports.Rewriter = class Rewriter
         token[2] = token.origin[2]
         return 1
       if token[0] is '{' and nextLocation=tokens[i + 1]?[2]
-        {first_line: line, first_column: column, range} = nextLocation
+        {first_line: line, first_column: column, range: [rangeIndex]} = nextLocation
       else if prevLocation = tokens[i - 1]?[2]
-        {last_line: line, last_column: column, range} = prevLocation
+        {last_line: line, last_column: column, range: [, rangeIndex]} = prevLocation
+        column += 1
       else
         line = column = 0
-        range = [0, 0]
+        rangeIndex = 0
       token[2] = {
-        first_line:   line
-        first_column: column
-        last_line:    line
-        last_column:  column
-        range
+        first_line:            line
+        first_column:          column
+        last_line:             line
+        last_column:           column
+        last_line_exclusive:   line
+        last_column_exclusive: column
+        range: [rangeIndex, rangeIndex]
       }
       return 1
 
@@ -573,11 +576,13 @@ exports.Rewriter = class Rewriter
       return 1 if token.generated and token[0] is 'CALL_END' and precedingComment?.indented
       prevLocationData = precedingComment.locationData if precedingComment?
       token[2] =
-        first_line:   if precedingComment? then prevLocationData.first_line   else prevLocationData.last_line
-        first_column: if precedingComment? then prevLocationData.first_column else prevLocationData.last_column
-        last_line:    prevLocationData.last_line
-        last_column:  prevLocationData.last_column
-        range:        prevLocationData.range
+        first_line:             if precedingComment? then prevLocationData.first_line   else prevLocationData.last_line
+        first_column:           if precedingComment? then prevLocationData.first_column else prevLocationData.last_column
+        last_line:              prevLocationData.last_line
+        last_column:            prevLocationData.last_column
+        last_line_exclusive:    prevLocationData.last_line_exclusive
+        last_column_exclusive:  prevLocationData.last_column_exclusive
+        range:                  prevLocationData.range
       return 1
 
   findPrecedingComment: (token, {indented, first, afterPos, indentSize}) ->

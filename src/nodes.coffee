@@ -14,7 +14,7 @@ babylon = require 'babylon'
 {compact, flatten, extend, merge, del, starts, ends, some,
 addDataToNode, attachCommentsToNode, locationDataToString,
 throwSyntaxError,  replaceUnicodeCodePointEscapes,
-locationDataToAst, astLocationFields
+astLocationFields
 isFunction, isPlainObject, isBoolean, isNumber
 dump,
 mapValues, traverseBabylonAst
@@ -416,8 +416,8 @@ exports.Base = class Base
   # as closely as possible, for improved interoperability with other tools.
   ast: (o, level) ->
     return @compileToBabylon o, level if o.compiling
-    o = extend {}, o
-    o.level = level if level
+    o = Object.assign {}, o
+    o.level = level if level?
     @makeReturn mark: yes if @isStatement(o) and o.level isnt LEVEL_TOP and o.scope
 
     fullAst = @astFull o
@@ -445,7 +445,7 @@ exports.Base = class Base
   # mutated into the structure that the Babel spec uses.
   astLocationData: ->
     dump @ unless @locationData?
-    locationDataToAst @locationData
+    jisonLocationDataToAstLocationData @locationData
 
   astReturns: ->
     if @canBeReturned
@@ -473,7 +473,12 @@ exports.Base = class Base
     return (@withAstLocationData(item, node) for item in ast) if Array.isArray ast
     {locationData} = node ? @
     return ast unless locationData and ast and (not ast.start? or force)
-    merge ast, locationDataToAst locationData
+    merge ast, jisonLocationDataToAstLocationData locationData
+
+  # Determines whether an AST node needs an `ExpressionStatement` wrapper.
+  # Typically matches our `isStatement()` logic but this allows overriding.
+  isStatementAst: (o) ->
+    @isStatement o
 
   # Passes each child to a function, breaking when the function returns `false`.
   eachChild: (func) ->
@@ -581,6 +586,13 @@ exports.Base = class Base
   withLocationDataFrom: ({locationData}) ->
     @updateLocationDataIfMissing locationData
 
+  # Add location data and comments from another node
+  withLocationDataAndCommentsFrom: (node) ->
+    @withLocationDataFrom node
+    {comments} = node
+    @comments = comments if comments?.length
+    this
+
   # Throw a SyntaxError associated with this node’s location.
   error: (message) ->
     throwSyntaxError message, @locationData
@@ -679,6 +691,44 @@ exports.HoistTarget = class HoistTarget extends Base
   compileClosure: (o) ->
     @compileToFragments o
 
+#### Root
+
+# The root node of the node tree
+exports.Root = class Root extends Base
+  constructor: (@body) ->
+    super()
+
+  # Wrap everything in a safety closure, unless requested not to. It would be
+  # better not to generate them in the first place, but for now, clean up
+  # obvious double-parentheses.
+  compileNode: (o) ->
+    o.indent  = if o.bare then '' else TAB
+    o.level   = LEVEL_TOP
+    o.compiling = yes
+    @initializeScope o
+    fragments = @body.compileRoot o
+    return fragments if o.bare
+    [].concat @makeCode("(function() {\n"), fragments, @makeCode("\n}).call(this);\n")
+
+  initializeScope: (o) ->
+    o.scope = new Scope null, @body, null, o.referencedVars ? []
+    # Mark given local variables in the root scope as parameters so they don’t
+    # end up being declared on the root block.
+    o.scope.parameter name for name in o.locals or []
+
+  ast: (o) ->
+    o.level = LEVEL_TOP
+    @initializeScope o
+    super o
+
+  astType: -> 'File'
+
+  astProperties: (o) ->
+    @body.isRootBlock = yes
+    return
+      program: Object.assign @body.ast(o), @astLocationData()
+      comments: []
+
 #### Block
 
 # The block is the list of expressions that forms the body of an
@@ -737,7 +787,7 @@ exports.Block = class Block extends Base
       [..., penult, last] = expressions
       penult = penult.unwrap()
       last = last.unwrap()
-      if penult instanceof Call and penult.csx and last instanceof Call and last.csx
+      if penult instanceof CSXElement and last instanceof CSXElement
         expressions[expressions.length - 1].error 'Adjacent JSX elements must be wrapped in an enclosing tag'
     if opts?.mark
       return @expressions[len - 1]?.makeReturn opts
@@ -748,9 +798,10 @@ exports.Block = class Block extends Base
       break
     this
 
-  # A **Block** is the only node that can serve as the root.
-  compileToFragments: (o = {}, level) ->
-    if o.scope then super o, level else @compileRoot o
+  compile: (o, lvl) ->
+    return new Root(this).withLocationDataFrom(this).compile o, lvl unless o.scope
+
+    super o, lvl
 
   # Compile all expressions within the **Block** body. If we need to return
   # the result, and it’s an expression, simply return it. If it’s a statement,
@@ -1050,20 +1101,11 @@ exports.Block = class Block extends Base
     @directives.push nodes
     null
 
-  # If we happen to be the top-level **Block**, wrap everything in a safety
-  # closure, unless requested not to. It would be better not to generate them
-  # in the first place, but for now, clean up obvious double-parentheses.
   compileRoot: (o) ->
-    o.indent  = if o.bare then '' else TAB
-    o.level   = LEVEL_TOP
-    o.compiling = yes
-    @spaced   = yes
-    @initializeScope(o)
+    @spaced = yes
     fragments = @compileWithDeclarations o
     HoistTarget.expand fragments
-    fragments = @compileComments fragments
-    return fragments if o.bare
-    [].concat @makeCode("(function() {\n"), fragments, @makeCode("\n}).call(this);\n")
+    @compileComments fragments
 
   # Compile the expressions body for the contents of a function, with
   # declarations of all inner variables pushed up to the top.
@@ -1223,33 +1265,28 @@ exports.Block = class Block extends Base
     new Block nodes
 
   astFull: (o) ->
-    return @rootToAst o unless o.scope
-
     if o.level isnt LEVEL_TOP and @expressions.length
       # return @withLocationData(new UndefinedLiteral).compileToBabylon o unless @expressions.length
       return (new Sequence(@expressions).withLocationDataFrom @).ast o
 
     super o
 
-  rootToAst: (o) ->
-    @initializeScope o
+  # rootToAst: (o) ->
+  #   comments = @commentsToAst()
 
-    body = @bodyToAst merge o, level: LEVEL_TOP, root: yes
-    comments = @commentsToAst()
+  #   programLocationData = @astLocationData()
+  #   for comment in comments
+  #     programLocationData = mergeAstLocationData programLocationData, comment
+  #   program = Object.assign {
+  #     type: 'Program'
+  #     sourceType: 'module'
+  #     body, @directives
+  #   }, programLocationData
 
-    programLocationData = @astLocationData()
-    for comment in comments
-      programLocationData = mergeAstLocationData programLocationData, comment
-    program = Object.assign {
-      type: 'Program'
-      sourceType: 'module'
-      body, @directives
-    }, programLocationData
-
-    Object.assign {
-      type: 'File'
-      program, comments
-    }, programLocationData
+  #   Object.assign {
+  #     type: 'File'
+  #     program, comments
+  #   }, programLocationData
 
   commentsToAst: ->
     return [] unless @allComments?.length
@@ -1262,40 +1299,60 @@ exports.Block = class Block extends Base
           else
             'CommentLine'
         value: content
-        locationDataToAst(locationData)...
+        jisonLocationDataToAstLocationData(locationData)...
         indent
       }
 
-  bodyToAst: (o) ->
-    root = del o, 'root'
-    checkForDirectives = del o, 'checkForDirectives'
-
-    @directives = []
-    @sniffDirectives @expressions, replace: yes, notFinalExpression: checkForDirectives if root or checkForDirectives
-
-    flatten(
-      for node in @expressions then do =>
-        node.topLevel = root
-        ast = node.ast o
-        return [] unless ast
-        return @extractDirectives ast.body, o if node instanceof Block or ast.type is 'BlockStatement'
-        return ast if node.isStatement(o) or node instanceof Class
-        ast = @extractDirectives ast, o
-        return [] unless ast
-        return @asExpressionStatement ast unless Array.isArray ast
-        @asExpressionStatement item for item in ast
-    )
-
   astType: ->
-    if @isClassBody
+    if @isRootBlock
+      'Program'
+    else if @isClassBody
       'ClassBody'
     else
       'BlockStatement'
 
-  astProperties: (o) -> {
-    body: @bodyToAst o
-    @directives
-  }
+  astProperties: (o) ->
+    checkForDirectives = del o, 'checkForDirectives'
+
+    @directives = []
+    @sniffDirectives @expressions, replace: yes, notFinalExpression: checkForDirectives if @isRootBlock or checkForDirectives
+
+    body = []
+    for expression in @expressions
+      expression.topLevel = @isRootBlock
+      # return @extractDirectives ast.body, o if node instanceof Block or ast.type is 'BlockStatement'
+      # return ast if node.isStatement(o) or node instanceof Class
+      # ast = @extractDirectives ast, o
+      # return [] unless ast
+      # return @asExpressionStatement ast unless Array.isArray ast
+      # @asExpressionStatement item for item in ast
+      # If an expression is a statement, it can be added to the body as is.
+      if expression.isStatementAst o
+        body.push expression.ast o
+      # Otherwise, we need to wrap it in an `ExpressionStatement` AST node.
+      else
+        body.push Object.assign
+            type: 'ExpressionStatement'
+            expression: expression.ast o
+          ,
+            expression.astLocationData()
+
+    return {
+      # For now, we’re not including `sourceType` on the `Program` AST node.
+      # Its value could be either `'script'` or `'module'`, and there’s no way
+      # for CoffeeScript to always know which it should be. The presence of an
+      # `import` or `export` statement in source code would imply that it should
+      # be a `module`, but a project may consist of mostly such files and also
+      # an outlier file that lacks `import` or `export` but is still imported
+      # into the project and therefore expects to be treated as a `module`.
+      # Determining the value of `sourceType` is essentially the same challenge
+      # posed by determining the parse goal of a JavaScript file, also `module`
+      # or `script`, and so if Node figures out a way to do so for `.js` files
+      # then CoffeeScript can copy Node’s algorithm.
+
+      # sourceType: 'module'
+      body, @directives
+    }
 
 #### Literal
 
@@ -1321,7 +1378,8 @@ exports.Literal = class Literal extends Base
     " #{if @isStatement() then super() else @constructor.name}: #{@value}"
 
   astProperties: ->
-    value: @value
+    return
+      value: @value
 
 exports.NumberLiteral = class NumberLiteral extends Literal
   constructor: (@value, {@parsedValue} = {}) ->
@@ -1336,10 +1394,11 @@ exports.NumberLiteral = class NumberLiteral extends Literal
   astType: -> 'NumericLiteral'
 
   astProperties: ->
-    value: @parsedValue
-    extra:
-      rawValue: @parsedValue
-      raw: @value
+    return
+      value: @parsedValue
+      extra:
+        rawValue: @parsedValue
+        raw: @value
 
 exports.InfinityLiteral = class InfinityLiteral extends NumberLiteral
   compileNode: ->
@@ -1348,7 +1407,8 @@ exports.InfinityLiteral = class InfinityLiteral extends NumberLiteral
   astType: -> 'Identifier'
 
   astProperties: ->
-    name: 'Infinity'
+    return
+      name: 'Infinity'
 
   _compileToBabylon: (o) ->
     new NumberLiteral('2e308').compileToBabylon o
@@ -1364,7 +1424,8 @@ exports.NaNLiteral = class NaNLiteral extends NumberLiteral
   astType: -> 'Identifier'
 
   astProperties: ->
-    name: 'NaN'
+    return
+      name: 'NaN'
 
   _compileToBabylon: (o) ->
     new Op('/', new NumberLiteral('0'), new NumberLiteral('0')).compileToBabylon o
@@ -1563,8 +1624,9 @@ exports.IdentifierLiteral = class IdentifierLiteral extends Literal
       'Identifier'
 
   astProperties: ->
-    name: @value
-    declaration: !!@isDeclaration
+    return
+      name: @value
+      declaration: !!@isDeclaration
 
 exports.CSXTag = class CSXTag extends IdentifierLiteral
   constructor: (value, {
@@ -1592,7 +1654,8 @@ exports.PropertyName = class PropertyName extends Literal
       'Identifier'
 
   astProperties: ->
-    name: @value
+    return
+      name: @value
 
 exports.ComputedPropertyName = class ComputedPropertyName extends PropertyName
   compileNode: (o) ->
@@ -1662,7 +1725,8 @@ exports.UndefinedLiteral = class UndefinedLiteral extends Literal
   astType: -> 'Identifier'
 
   astProperties: ->
-    name: @value
+    return
+      name: @value
 
 exports.NullLiteral = class NullLiteral extends Literal
   constructor: ->
@@ -1684,7 +1748,8 @@ exports.DefaultLiteral = class DefaultLiteral extends Literal
   astType: -> 'Identifier'
 
   astProperties: ->
-    name: 'default'
+    return
+      name: 'default'
 
 exports.Directive = class Directive extends Base
   constructor: (@value) ->
@@ -1743,38 +1808,43 @@ exports.Return = class Return extends Base
   astProperties: (o) ->
     argument: @expression?.ast(o, LEVEL_PAREN) ? null
 
+# Parent class for `YieldReturn`/`AwaitReturn`.
+exports.FuncDirectiveReturn = class FuncDirectiveReturn extends Return
+  constructor: (expression, {@returnKeyword}) ->
+    super expression
+
+  compileNode: (o) ->
+    @checkScope o
+    super o
+
+  checkScope: (o) ->
+    unless o.scope.parent?
+      @error "#{@keyword} can only occur inside functions"
+
+  isStatementAst: NO
+
+  astFull: (o) ->
+    @checkScope o
+    return super o if o.compiling
+
+    new Op @keyword,
+      new Return @expression
+      .withLocationDataFrom(
+        if @expression?
+          locationData: mergeLocationData @returnKeyword.locationData, @expression.locationData
+        else
+          @returnKeyword
+      )
+    .withLocationDataFrom @
+    .astFull o
+
 # `yield return` works exactly like `return`, except that it turns the function
 # into a generator.
-exports.YieldReturn = class YieldReturn extends Return
-  checkScope: (o) ->
-    unless o.scope.parent?
-      @error 'yield can only occur inside functions'
-  compileNode: (o) ->
-    @checkScope o
-    super o
+exports.YieldReturn = class YieldReturn extends FuncDirectiveReturn
+  keyword: 'yield'
 
-  astFull: (o) ->
-    @checkScope o
-    return super o if o.compiling
-    new Op 'yield', new Return @expression
-    .withLocationDataFrom @
-    .ast o
-
-exports.AwaitReturn = class AwaitReturn extends Return
-  checkScope: (o) ->
-    unless o.scope.parent?
-      @error 'await can only occur inside functions'
-
-  compileNode: (o) ->
-    @checkScope o
-    super o
-
-  astFull: (o) ->
-    @checkScope o
-    return super o if o.compiling
-    new Op 'await', new Return @expression
-    .withLocationDataFrom @
-    .ast o
+exports.AwaitReturn = class AwaitReturn extends FuncDirectiveReturn
+  keyword: 'await'
 
 #### Value
 
@@ -1992,8 +2062,8 @@ exports.Value = class Value extends Base
     return super() unless @isCSXTag()
     # don't include leading < of JSX tag in location data
     mergeAstLocationData(
-      locationDataToAst(@base.tagNameLocationData),
-      locationDataToAst(@properties[@properties.length - 1].locationData)
+      jisonLocationDataToAstLocationData(@base.tagNameLocationData),
+      jisonLocationDataToAstLocationData(@properties[@properties.length - 1].locationData)
     )
 
 #### HereComment
@@ -2060,6 +2130,220 @@ exports.LineComment = class LineComment extends Base
     fragment.isComment = fragment.isLineComment = yes
     fragment
 
+#### CSX
+
+exports.CSXIdentifier = class CSXIdentifier extends IdentifierLiteral
+  astType: -> 'JSXIdentifier'
+
+exports.CSXExpressionContainer = class CSXExpressionContainer extends Base
+  constructor: (@expression) ->
+    super()
+    @expression.csxAttribute = yes
+    @locationData = @expression.locationData
+
+  children: ['expression']
+
+  compileNode: (o) ->
+    @expression.compileNode(o)
+
+  astType: -> 'JSXExpressionContainer'
+
+  astProperties: (o) ->
+    return
+      expression: @expression.ast o
+
+exports.CSXAttribute = class CSXAttribute extends Base
+  constructor: ({@name, value}) ->
+    super()
+    @value =
+      if value?
+        value = value.base
+        if value instanceof StringLiteral
+          value
+        else
+          new CSXExpressionContainer value
+      else
+        null
+    @value?.comments = value.comments
+
+  children: ['name', 'value']
+
+  compileNode: (o) ->
+    compiledName = @name.compileToFragments o, LEVEL_LIST
+    return compiledName unless @value?
+    val = @value.compileToFragments o, LEVEL_LIST
+    compiledName.concat @makeCode('='), val
+
+  astType: -> 'JSXAttribute'
+
+  astProperties: (o) ->
+    return
+      name: @name.ast o
+      value: @value?.ast(o) ? null
+
+exports.CSXAttributes = class CSXAttributes extends Base
+  constructor: (arr) ->
+    super()
+    @attributes = []
+    for object in arr.objects
+      @checkValidAttribute object
+      {base} = object
+      if base instanceof IdentifierLiteral
+        # attribute with no value eg disabled
+        attribute = new CSXAttribute name: new CSXIdentifier(base.value).withLocationDataAndCommentsFrom base
+        attribute.locationData = base.locationData
+        @attributes.push attribute
+      else if not base.generated
+        # object spread attribute eg {...props}
+        attribute = base.properties[0]
+        attribute.csx = yes
+        attribute.locationData = base.locationData
+        @attributes.push attribute
+      else
+        # Obj containing attributes with values eg a="b" c={d}
+        for property in base.properties
+          {variable, value} = property
+          attribute = new CSXAttribute {
+            name: new CSXIdentifier(variable.base.value).withLocationDataAndCommentsFrom variable.base
+            value
+          }
+          attribute.locationData = property.locationData
+          @attributes.push attribute
+    @locationData = arr.locationData
+
+  children: ['attributes']
+
+  # Catch invalid attributes: <div {a:"b", props} {props} "value" />
+  checkValidAttribute: (object) ->
+    {base: attribute} = object
+    properties = attribute?.properties or []
+    if not (attribute instanceof Obj or attribute instanceof IdentifierLiteral) or (attribute instanceof Obj and not attribute.generated and (properties.length > 1 or not (properties[0] instanceof Splat)))
+      object.error """
+        Unexpected token. Allowed CSX attributes are: id="val", src={source}, {props...} or attribute.
+      """
+
+  compileNode: (o) ->
+    fragments = []
+    for attribute in @attributes
+      fragments.push @makeCode ' '
+      fragments.push attribute.compileToFragments(o, LEVEL_TOP)...
+    fragments
+
+  ast: (o) ->
+    attribute.ast(o) for attribute in @attributes
+
+# Node for a CSX element
+exports.CSXElement = class CSXElement extends Base
+  constructor: ({@tagName, @attributes, @content}) ->
+    super()
+
+  children: ['tagName', 'attributes', 'content']
+
+  compileNode: (o) ->
+    @content?.base.csx = yes
+    fragments = [@makeCode('<')]
+    fragments.push (tag = @tagName.compileToFragments(o, LEVEL_ACCESS))...
+    fragments.push @attributes.compileToFragments(o)...
+    if @content
+      fragments.push @makeCode('>')
+      fragments.push @content.compileNode(o, LEVEL_LIST)...
+      fragments.push [@makeCode('</'), tag..., @makeCode('>')]...
+    else
+      fragments.push @makeCode(' />')
+    fragments
+
+  isFragment: ->
+    !@tagName.base.value.length
+
+  ast: (o, level) ->
+    # The location data spanning the opening element < ... > is captured by
+    # the generated Arr which contains the element's attributes
+    @openingElementLocationData = jisonLocationDataToAstLocationData @attributes.locationData
+
+    tagName = @tagName.base
+    tagName.locationData = tagName.tagNameLocationData
+    if @content?
+      @closingElementLocationData = mergeAstLocationData(
+        jisonLocationDataToAstLocationData tagName.closingTagOpeningBracketLocationData
+        jisonLocationDataToAstLocationData tagName.closingTagClosingBracketLocationData
+      )
+
+    super o, level
+
+  astType: ->
+    if @isFragment()
+      'JSXFragment'
+    else
+      'JSXElement'
+
+  elementAstProperties: (o) ->
+    openingElement = Object.assign {
+      type: 'JSXOpeningElement'
+      name: @tagName.unwrap().ast o
+      selfClosing: not @closingElementLocationData?
+      attributes: @attributes.ast o
+    }, @openingElementLocationData
+
+    closingElement = null
+    if @closingElementLocationData?
+      closingElement = Object.assign {
+        type: 'JSXClosingElement'
+        name: Object.assign(
+          @tagName.unwrap().ast(o),
+          jisonLocationDataToAstLocationData @tagName.base.closingTagNameLocationData
+        )
+      }, @closingElementLocationData
+      if closingElement.name.type is 'JSXMemberExpression'
+        rangeDiff = closingElement.range[0] - openingElement.range[0] + '/'.length
+        shiftAstLocationData = (node) ->
+          node.range = [
+            node.range[0] + rangeDiff
+            node.range[1] + rangeDiff
+          ]
+          node.start += rangeDiff
+          node.end += rangeDiff
+          node.loc.start =
+            line: node.loc.start.line
+            column: node.loc.start.column + rangeDiff
+          node.loc.end =
+            line: node.loc.end.line
+            column: node.loc.end.column + rangeDiff
+        currentExpr = closingElement.name
+        while currentExpr.type is 'JSXMemberExpression'
+          shiftAstLocationData currentExpr unless currentExpr is closingElement.name
+          shiftAstLocationData currentExpr.property
+          currentExpr = currentExpr.object
+        shiftAstLocationData currentExpr
+
+    {openingElement, closingElement}
+
+  fragmentAstProperties: (o) ->
+    openingFragment = Object.assign {
+      type: 'JSXOpeningFragment'
+    }, @openingElementLocationData
+
+    closingFragment = Object.assign {
+      type: 'JSXClosingFragment'
+    }, @closingElementLocationData
+
+    {openingFragment, closingFragment}
+
+  astProperties: (o) ->
+    Object.assign(
+      if @isFragment()
+        @fragmentAstProperties o
+      else
+        @elementAstProperties o
+    ,
+      children: []
+    )
+
+  astLocationData: ->
+    if @closingElementLocationData?
+      mergeAstLocationData @openingElementLocationData, @closingElementLocationData
+    else
+      @openingElementLocationData
+
 #### Call
 
 # Node for a function invocation.
@@ -2072,7 +2356,12 @@ exports.Call = class Call extends Base
     if @variable instanceof Value and @variable.isNotCallable()
       @variable.error "literal is not a function"
 
-    @csx = @variable.base instanceof CSXTag
+    if @variable.base instanceof CSXTag
+      return new CSXElement(
+        tagName: @variable
+        attributes: new CSXAttributes @args[0].base
+        content: @args[1]
+      )
 
     # `@variable` never gets output as a result of this node getting created as
     # part of `RegexWithInterpolations`, so for that case move any comments to
@@ -2162,7 +2451,6 @@ exports.Call = class Call extends Base
   # Compile a vanilla function call.
   compileNode: (o) ->
     @prohibitNewSuper()
-    return @compileCSX o if @csx
     @variable?.front = @front
     compiledArgs = []
     # If variable is `Accessor` fragments are cached and used later
@@ -2189,144 +2477,7 @@ exports.Call = class Call extends Base
     fragments.push @makeCode('('), compiledArgs..., @makeCode(')')
     fragments
 
-  compileCSX: (o) ->
-    [attributes, content] = @args
-    attributes.base.csx = yes
-    content?.base.csx = yes
-    fragments = [@makeCode('<')]
-    fragments.push (tag = @variable.compileToFragments(o, LEVEL_ACCESS))...
-    if attributes.base instanceof Arr
-      for obj in attributes.base.objects
-        @checkValidCSXAttribute obj
-        attr = obj.base
-        attr.csx = yes if attr instanceof Obj
-        fragments.push @makeCode ' '
-        fragments.push obj.compileToFragments(o, LEVEL_PAREN)...
-    if content
-      fragments.push @makeCode('>')
-      fragments.push content.compileNode(o, LEVEL_LIST)...
-      fragments.push [@makeCode('</'), tag..., @makeCode('>')]...
-    else
-      fragments.push @makeCode(' />')
-    fragments
-
-  # Catch invalid CSX attributes: <div {a:"b", props} {props} "value" />
-  checkValidCSXAttribute: (object) ->
-    {base: attribute} = object
-    properties = attribute?.properties or []
-    if not (attribute instanceof Obj or attribute instanceof IdentifierLiteral) or (attribute instanceof Obj and not attribute.generated and (properties.length > 1 or not (properties[0] instanceof Splat)))
-      object.error """
-        Unexpected token. Allowed CSX attributes are: id="val", src={source}, {props...} or attribute.
-      """
-
-  CSXFragmentToAst: ({o, openingElementLocationData, closingElementLocationData}) ->
-    openingFragment = Object.assign {
-      type: 'JSXOpeningFragment'
-    }, openingElementLocationData
-
-    closingFragment = Object.assign {
-      type: 'JSXClosingFragment'
-    }, closingElementLocationData
-
-    Object.assign {
-      type: 'JSXFragment',
-      openingFragment, closingFragment
-    }, mergeAstLocationData openingElementLocationData, closingElementLocationData
-
-  getCSXAttributeAst: (object, o) ->
-    @checkValidCSXAttribute object
-    {base: attribute} = object
-    attribute.csx = yes
-    ast = attribute.ast o#, LEVEL_PAREN
-    return ast unless attribute instanceof IdentifierLiteral
-    Object.assign {
-      type: 'JSXAttribute'
-      name: ast
-      value: null
-    }, attribute.astLocationData()
-
-  CSXElementToAst: ({o, tagName, attributes, openingElementLocationData, closingElementLocationData}) ->
-    openingElement = Object.assign {
-      type: 'JSXOpeningElement'
-      name: @variable.unwrap().ast o#, LEVEL_ACCESS
-      selfClosing: not closingElementLocationData?
-      attributes: flatten(@getCSXAttributeAst(object, o) for object in attributes.base.objects)
-    }, openingElementLocationData
-
-    closingElement = null
-    if closingElementLocationData?
-      closingElement = Object.assign {
-        type: 'JSXClosingElement'
-        name: Object.assign(
-          @variable.unwrap().ast o#, LEVEL_ACCESS
-          locationDataToAst tagName.closingTagNameLocationData
-        )
-      }, closingElementLocationData
-      if closingElement.name.type is 'JSXMemberExpression'
-        rangeDiff = closingElement.range[0] - openingElement.range[0] + '/'.length
-        shiftAstLocationData = (node) ->
-          node.range = [
-            node.range[0] + rangeDiff
-            node.range[1] + rangeDiff
-          ]
-          node.start += rangeDiff
-          node.end += rangeDiff
-          node.loc.start = {
-            line: node.loc.start.line
-            column: node.loc.start.column + rangeDiff
-          }
-          node.loc.end = {
-            line: node.loc.end.line
-            column: node.loc.end.column + rangeDiff
-          }
-        currentExpr = closingElement.name
-        while currentExpr.type is 'JSXMemberExpression'
-          shiftAstLocationData currentExpr unless currentExpr is closingElement.name
-          shiftAstLocationData currentExpr.property
-          currentExpr = currentExpr.object
-        shiftAstLocationData currentExpr
-              
-    Object.assign(
-      {
-        type: 'JSXElement'
-        openingElement, closingElement
-      },
-      if closingElement?
-        mergeAstLocationData openingElementLocationData, closingElementLocationData
-      else
-        openingElementLocationData
-    )
-
-  CSXToAst: (o) ->
-    [attributes, content] = @args
-    tagName = @variable.base
-    tagName.locationData = tagName.tagNameLocationData
-    # The location data spanning the opening element < ... > is captured by
-    # the generated Arr which contains the element's attributes
-    openingElementLocationData = locationDataToAst attributes.base.locationData
-
-    closingElementLocationData = mergeAstLocationData(
-      locationDataToAst tagName.closingTagOpeningBracketLocationData
-      locationDataToAst tagName.closingTagClosingBracketLocationData
-    ) if tagName.closingTagOpeningBracketLocationData?
-
-    Object.assign(
-      if tagName.value.length
-        @CSXElementToAst {o, tagName, attributes, openingElementLocationData, closingElementLocationData}
-      else
-        @CSXFragmentToAst {o, openingElementLocationData, closingElementLocationData}
-    ,
-      children:
-        if content and not content.base.isEmpty?()
-          content.base.csx = yes
-          compact flatten [
-            content.ast o#, LEVEL_LIST
-          ]
-        else []
-    )
-
   astFull: (o) ->
-    return @CSXToAst o if @csx
     @prohibitNewSuper()
     super o
 
@@ -2339,7 +2490,7 @@ exports.Call = class Call extends Base
   astProperties: (o) ->
     return
       callee: @variable.ast o, LEVEL_ACCESS
-      arguments: arg.ast o, LEVEL_LIST for arg in @args
+      arguments: arg.ast(o, LEVEL_LIST) for arg in @args
       optional: !!@soak
       implicit: !!@implicit
 
@@ -2961,17 +3112,6 @@ exports.Obj = class Obj extends Base
       prop = prop.unwrapAll()
       prop.eachName iterator if prop.eachName?
 
-  compileCSXAttributes: (o) ->
-    props = @properties
-    answer = []
-    for prop, i in props
-      prop.csx = yes
-      join = if i is props.length - 1 then '' else ' '
-      prop = new Literal "{#{prop.compile(o)}}" if prop instanceof Splat
-      answer.push prop.compileToFragments(o, LEVEL_TOP)...
-      answer.push @makeCode join
-    if @front then @wrapInParentheses answer else answer
-
   # Convert “bare” properties to `ObjectProperty`s (or `Splat`s).
   expandProperty: (property) ->
     {variable, context, operatorToken} = property
@@ -3509,6 +3649,8 @@ exports.Class = class Class extends Base
 
     null
 
+  isStatementAst: (o) -> yes
+
   astFull: (o) ->
     @declareName o
     @fixBodyLocationData()
@@ -3741,7 +3883,7 @@ exports.ImportDeclaration = class ImportDeclaration extends ModuleDeclaration
   astProperties: (o) ->
     ret =
       specifiers: @clause?.ast(o) ? []
-      source: @source.ast(o)
+      source: @source.ast o
     ret.importKind = 'value' if @clause
     ret
 
@@ -3863,7 +4005,7 @@ exports.ModuleSpecifierList = class ModuleSpecifierList extends Base
     code
 
   astFull: (o) ->
-    specifier.ast o for specifier in @specifiers
+    specifier.ast(o) for specifier in @specifiers
 
 exports.ImportSpecifierList = class ImportSpecifierList extends ModuleSpecifierList
 
@@ -4066,7 +4208,6 @@ exports.Assign = class Assign extends Base
         [properties..., prototype, name] = @variable.properties
         @value.name = name if prototype.name?.value is 'prototype'
 
-    @value.base.csxAttribute = yes if @csx
     val = @value.compileToFragments o, LEVEL_LIST
     compiledName = @variable.compileToFragments o, LEVEL_LIST
 
@@ -4074,7 +4215,7 @@ exports.Assign = class Assign extends Base
       if @variable.shouldCache()
         compiledName.unshift @makeCode '['
         compiledName.push @makeCode ']'
-      return compiledName.concat @makeCode(if @csx then '=' else ': '), val
+      return compiledName.concat @makeCode(': '), val
 
     answer = compiledName.concat @makeCode(" #{ @context or '=' } "), val
     # Per https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Destructuring_assignment#Assignment_without_declaration,
@@ -4918,6 +5059,13 @@ exports.Code = class Code extends Base
     return indentInitial answer, @ if @isMethod
     if @front or (o.level >= LEVEL_ACCESS) then @wrapInParentheses answer else answer
 
+  updateOptions: (o) ->
+    o.scope         = del(o, 'classScope') or @makeScope o.scope
+    o.scope.shared  = del(o, 'sharedScope')
+    o.indent        += TAB
+    delete o.bare
+    delete o.isExistentialEquals
+
   eachParamName: (iterator) ->
     param.eachName iterator for param in @params
 
@@ -4986,37 +5134,22 @@ exports.Code = class Code extends Base
   astType: ->
     if @isMethod
       'ClassMethod'
+    else if @bound
+      'ArrowFunctionExpression'
     else
       'FunctionExpression'
 
-  astProperties: (o) -> {
-    params: @paramsToAst o
-    body: {
-      ...@body.ast merge(o, checkForDirectives: yes), LEVEL_TOP
-      indented: @body.locationData.first_line > @funcGlyph.locationData.first_line
-    }
-    generator: @isGenerator
-    async: @isAsync
-    @bound
-    id: null
-    ...@methodAstFields o
-  }
-
-  paramsToAst: (o) ->
-    for param in @params
-      (do ->
-        return param if param instanceof Expansion
-        {name, value, splat} = param
-        if splat
-          new Splat name, lhs: yes, postfix: splat.postfix
-          .withLocationDataFrom name
-        else if value?
-          new Assign name, value, param: yes
-          .withLocationDataFrom name
-          .mergeLocationDataFrom value
-        else
-          name
-      ).ast o
+  paramForAst: (param) ->
+    return param if param instanceof Expansion
+    {name, value, splat} = param
+    if splat
+      new Splat name, lhs: yes, postfix: splat.postfix
+      .withLocationDataFrom name
+    else if value?
+      new Assign name, value, null, param: yes
+      .withLocationDataFrom locationData: mergeLocationData name.locationData, value.locationData
+    else
+      name
 
   methodAstFields: (o) ->
     return {} unless @isMethod
@@ -5044,6 +5177,21 @@ exports.Code = class Code extends Base
       fields.staticClassName = @isStatic.className if @isStatic?.className
       fields.operator = @operatorToken?.value ? '='
     fields
+
+  astProperties: (o) ->
+    return {
+      params: @paramForAst(param).ast(o) for param in @params
+      body: {
+        ...@body.ast merge(o, checkForDirectives: yes), LEVEL_TOP
+        indented: @body.locationData.first_line > @funcGlyph.locationData.first_line
+      }
+      generator: !!@isGenerator
+      async: !!@isAsync
+      # We never generate named functions, so specify `id` as `null`, which
+      # matches the Babel AST for anonymous function expressions/arrow functions
+      id: null
+      ...@methodAstFields o
+    }
 
 #### Param
 
@@ -5176,7 +5324,9 @@ exports.Splat = class Splat extends Base
     @name.assigns name
 
   compileNode: (o) ->
-    [@makeCode('...'), @name.compileToFragments(o, LEVEL_OP)...]
+    compiledSplat = [@makeCode('...'), @name.compileToFragments(o, LEVEL_OP)...]
+    return compiledSplat unless @csx
+    return [@makeCode('{'), compiledSplat..., @makeCode('}')]
 
   unwrap: -> @name
 
@@ -5345,6 +5495,20 @@ exports.While = class While extends Base
     if @returns
       answer.push @makeCode "\n#{@tab}return #{rvar};"
     answer
+
+  processedCondition: ->
+    @processedConditionCache ?= if @invert then @condition.invert() else @condition
+
+  astType: -> 'WhileStatement'
+
+  astProperties: (o) ->
+    return
+      test: @condition.ast o, LEVEL_PAREN
+      body: @body.ast o, LEVEL_TOP
+      guard: @guard?.ast(o) ? null
+      inverted: !!@invert
+      postfix: !!@postfix
+      loop: !!@isLoop
 
 #### Op
 
@@ -5587,10 +5751,7 @@ exports.Op = class Op extends Base
   compileContinuation: (o) ->
     parts = []
     op = @operator
-    unless o.scope.parent?
-      @error "#{@operator} can only occur inside functions"
-    if o.scope.method?.bound and o.scope.method.isGenerator
-      @error 'yield cannot occur inside bound (fat arrow) functions'
+    @checkContinuation o
     if 'expression' in Object.keys(@first) and not (@first instanceof Throw)
       parts.push @first.expression.compileToFragments o, LEVEL_OP if @first.expression?
     else
@@ -5600,6 +5761,12 @@ exports.Op = class Op extends Base
       parts.push @first.compileToFragments o, LEVEL_OP
       parts.push [@makeCode ")"] if o.level >= LEVEL_PAREN
     @joinFragmentArrays parts, ''
+
+  checkContinuation: (o) ->
+    unless o.scope.parent?
+      @error "#{@operator} can only occur inside functions"
+    if o.scope.method?.bound and o.scope.method.isGenerator
+      @error 'yield cannot occur inside bound (fat arrow) functions'
 
   compileFloorDivision: (o) ->
     @floorDivisionCall(o).compileToFragments o
@@ -5630,6 +5797,8 @@ exports.Op = class Op extends Base
     super o
 
   astType: ->
+    return 'AwaitExpression' if @isAwait()
+    return 'YieldExpression' if @isYield()
     switch @operator
       when '||', '&&', '?'   then 'LogicalExpression'
       when '++', '--'        then 'UpdateExpression'
@@ -5650,11 +5819,8 @@ exports.Op = class Op extends Base
     switch
       when @isUnary()
         argument =
-          if @isYield() or @isAwait()
-            unless @first.unwrap().value is ''
-              firstAst
-            else
-              null
+          if @isYield() and @first.unwrap().value is ''
+            null
           else
             firstAst
         return {argument} if @isAwait()
@@ -5663,12 +5829,7 @@ exports.Op = class Op extends Base
           delegate: @operator is 'yield*'
         } if @isYield()
         return {
-          argument:
-            if @isYield() or @isAwait()
-              firstAst unless @first.unwrap().value is ''
-            else
-              firstAst
-          operator
+          argument, operator
           prefix: !@flip
         }
       else
@@ -5761,41 +5922,35 @@ exports.In = class In extends Base
 
 # A classic *try/catch/finally* block.
 exports.Try = class Try extends Base
-  constructor: (@attempt, @errorVariable, @recovery, @ensure) ->
+  constructor: (@attempt, @catch, @ensure, @finallyTag) ->
     super()
     @errorVariable?.unwrap().propagateLhs? yes
 
-  children: ['attempt', 'recovery', 'ensure']
+  children: ['attempt', 'catch', 'ensure']
 
   isStatement: YES
 
-  jumps: (o) -> @attempt.jumps(o) or @recovery?.jumps(o)
+  jumps: (o) -> @attempt.jumps(o) or @catch?.jumps(o)
 
   makeReturn: (opts) ->
     if opts?.mark
       @attempt?.makeReturn opts
-      @recovery?.makeReturn opts
+      @catch?.makeReturn opts
       return
-    @attempt  = @attempt .makeReturn opts if @attempt
-    @recovery = @recovery.makeReturn opts if @recovery
+    @attempt = @attempt.makeReturn opts if @attempt
+    @catch   = @catch  .makeReturn opts if @catch
     this
 
   # Compilation is more or less as you would expect -- the *finally* clause
   # is optional, the *catch* is not.
   compileNode: (o) ->
+    originalIndent = o.indent
     o.indent  += TAB
     tryPart   = @attempt.compileToFragments o, LEVEL_TOP
 
-    catchPart = if @recovery
-      generatedErrorVariableName = o.scope.freeVariable 'error', reserve: no
-      placeholder = new IdentifierLiteral generatedErrorVariableName
-      if @errorVariable
-        message = isUnassignable @errorVariable.unwrapAll().value
-        @errorVariable.error message if message
-        @recovery.unshift new Assign @errorVariable, placeholder
-      [].concat @makeCode(" catch ("), placeholder.compileToFragments(o), @makeCode(") {\n"),
-        @recovery.compileToFragments(o, LEVEL_TOP), @makeCode("\n#{@tab}}")
-    else unless @ensure
+    catchPart = if @catch
+      @catch.compileToFragments merge(o, indent: originalIndent), LEVEL_TOP
+    else unless @ensure or @catch
       generatedErrorVariableName = o.scope.freeVariable 'error', reserve: no
       [@makeCode(" catch (#{generatedErrorVariableName}) {}")]
     else
@@ -5812,6 +5967,7 @@ exports.Try = class Try extends Base
 
   astProperties: (o) ->
     {compiling} = o
+    # TODO: needs to be updated to use @catch
     if (@recovery or not @ensure) and compiling
       placeholder = new IdentifierLiteral(o.scope.freeVariable 'error', reserve: no).withEmptyLocationData()
       @recovery.unshift @recovery.withLocationData new Assign @errorVariable, placeholder if @errorVariable
@@ -5821,21 +5977,65 @@ exports.Try = class Try extends Base
         alreadyDeclared = o.scope.find name.value
         name.isDeclaration = not alreadyDeclared
 
-    block: @attempt.ast o, LEVEL_TOP
-    handler:
-      if compiling
-        (@recovery or @).withAstLocationData {
-          type: 'CatchClause'
-          param: placeholder.compileToBabylon o
-          body: (@recovery or @withLocationData new Block).compileToBabylon o, LEVEL_TOP
-        } if placeholder
-      else if @recovery
-        @recovery.withAstLocationData {
-          type: 'CatchClause'
-          param: @errorVariable?.ast(o) ? null
-          body: @recovery.ast o, LEVEL_TOP
-        }
-    finalizer: @ensure?.ast o, LEVEL_TOP
+    return
+      block: @attempt.ast o, LEVEL_TOP
+      handler: @catch?.ast(o) ? null
+      # handler:
+      #   if compiling
+      #     (@recovery or @).withAstLocationData {
+      #       type: 'CatchClause'
+      #       param: placeholder.compileToBabylon o
+      #       body: (@recovery or @withLocationData new Block).compileToBabylon o, LEVEL_TOP
+      #     } if placeholder
+      #   else if @recovery
+      #     @recovery.withAstLocationData {
+      #       type: 'CatchClause'
+      #       param: @errorVariable?.ast(o) ? null
+      #       body: @recovery.ast o, LEVEL_TOP
+      #     }
+      finalizer:
+        if @ensure?
+          Object.assign @ensure.ast(o, LEVEL_TOP),
+            # Include `finally` keyword in location data.
+            mergeAstLocationData(
+              jisonLocationDataToAstLocationData(@finallyTag.locationData),
+              @ensure.astLocationData()
+            )
+        else
+          null
+
+exports.Catch = class Catch extends Base
+  constructor: (@recovery, @errorVariable) ->
+    super()
+    @errorVariable?.unwrap().propagateLhs? yes
+
+  children: ['recovery', 'errorVariable']
+
+  isStatement: YES
+
+  jumps: (o) -> @recovery.jumps(o)
+
+  makeReturn: (res) ->
+    @recovery = @recovery.makeReturn res
+    this
+
+  compileNode: (o) ->
+    o.indent  += TAB
+    generatedErrorVariableName = o.scope.freeVariable 'error', reserve: no
+    placeholder = new IdentifierLiteral generatedErrorVariableName
+    if @errorVariable
+      message = isUnassignable @errorVariable.unwrapAll().value
+      @errorVariable.error message if message
+      @recovery.unshift new Assign @errorVariable, placeholder
+    [].concat @makeCode(" catch ("), placeholder.compileToFragments(o), @makeCode(") {\n"),
+      @recovery.compileToFragments(o, LEVEL_TOP), @makeCode("\n#{@tab}}")
+
+  astType: -> 'CatchClause'
+
+  astProperties: (o) ->
+    return
+      param: @errorVariable?.ast(o) ? null
+      body: @recovery.ast o, LEVEL_TOP
 
 #### Throw
 
@@ -6124,7 +6324,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
 
   isNestedTag: (element) ->
     call = element.unwrapAll?()
-    @csx and call instanceof Call and call.csx
+    @csx and call instanceof CSXElement
 
   astFull: (o) ->
     return @CSXContentToAst o if @csx
@@ -6609,48 +6809,58 @@ exports.Switch = class Switch extends Base
 
   astType: -> 'SwitchStatement'
 
+  casesAst: (o) ->
+    cases = []
+    lastCaseIndex = @cases.length - 1
+
+    for kase, caseIndex in @cases
+      {conditions: tests, block: consequent} = kase
+      tests = flatten [tests]
+      lastTestIndex = tests.length - 1
+      consequent.expressions.push new StatementLiteral 'break' if do =>
+        return no unless o.compiling
+        return no if caseIndex is lastCaseIndex and not @otherwise?
+        lastExpr = @lastNode consequent.expressions
+        return no if lastExpr instanceof Return
+        return no if lastExpr instanceof Throw
+        return no if lastExpr instanceof Literal and lastExpr.jumps() and lastExpr.value isnt 'debugger'
+        yes
+      for test, testIndex in tests
+        testConsequent =
+          if testIndex is lastTestIndex
+            consequent
+          else
+            null
+
+        caseLocationData = test.locationData
+        caseLocationData = mergeLocationData caseLocationData, testConsequent.expressions[testConsequent.expressions.length - 1].locationData if testConsequent?.expressions.length
+        caseLocationData = mergeLocationData caseLocationData, kase.locationData, justLeading: yes if testIndex is 0
+        caseLocationData = mergeLocationData caseLocationData, kase.locationData, justEnding:  yes if testIndex is lastTestIndex
+
+        cases.push new SwitchCase(test, testConsequent, trailing: testIndex is lastTestIndex).withLocationDataFrom locationData: caseLocationData
+
+    if @otherwise?.expressions.length
+      cases.push new SwitchCase(null, @otherwise, invert: not @subject?).withLocationDataFrom @otherwise
+
+    kase.ast(o) for kase in cases
+
   astProperties: (o) ->
     {compiling} = o
-    lastCaseIndex = @cases.length - 1
-    discriminant: (@subject ? if compiling then new BooleanLiteral 'false' else null)?.ast o, LEVEL_PAREN
-    cases: [
-      ...flatten(
-        for kase, caseIndex in @cases
-          {conditions: tests, block: consequent, leadingToken, trailingToken} = kase
-          tests = flatten [tests]
-          lastTestIndex = tests.length - 1
-          for test, testIndex in tests
-            consequentAst = do =>
-              consequent.expressions.push new StatementLiteral 'break' if do =>
-                return no unless compiling
-                return no if caseIndex is lastCaseIndex and not @otherwise
-                lastExpr = @lastNode consequent.expressions
-                return no if lastExpr instanceof Return
-                return no if lastExpr instanceof Throw
-                return no if lastExpr instanceof Literal and lastExpr.jumps() and lastExpr.value isnt 'debugger'
-                yes
-              return [] unless testIndex is lastTestIndex
-              consequent.ast(o, LEVEL_TOP).body
+    return
+      discriminant: (@subject ? if compiling then new BooleanLiteral 'false' else null)?.ast(o, LEVEL_PAREN) ? null
+      cases: @casesAst o
 
-            caseLocationData = test.astLocationData()
-            caseLocationData = mergeAstLocationData caseLocationData, consequentAst[consequentAst.length - 1] if consequentAst.length
-            caseLocationData = mergeAstLocationData caseLocationData, locationDataToAst(kase.locationData), justLeading: yes if testIndex is 0
-            caseLocationData = mergeAstLocationData caseLocationData, locationDataToAst(kase.locationData), justEnding:  yes if testIndex is lastTestIndex
-            Object.assign {
-              type: 'SwitchCase'
-              test: (if @subject or not compiling then test else test.invert()).ast o, LEVEL_PAREN
-              consequent: consequentAst
-              trailing: testIndex is lastTestIndex
-            }, caseLocationData
-      )
-      ...(
-        if @otherwise?.expressions.length then [
-          @otherwise.withAstLocationData
-            type: 'SwitchCase'
-            test: null
-            consequent: @otherwise.ast(o, LEVEL_TOP).body
-        ] else [])
-    ]
+class SwitchCase extends Base
+  constructor: (@test, @block, {@trailing, @invert} = {}) ->
+    super()
+
+  children: ['test', 'block']
+
+  astProperties: (o) ->
+    return
+      test: (if o.compiling and @invert then @test?.invert() else @test)?.ast(o, LEVEL_PAREN) ? null
+      consequent: @block?.ast(o, LEVEL_TOP).body ? []
+      trailing: !!@trailing
 
 exports.SwitchWhen = class SwitchWhen extends Base
   constructor: (@conditions, @block) ->
@@ -6670,7 +6880,7 @@ exports.If = class If extends Base
     super()
     @elseBody  = null
     @isChain   = false
-    {@soak, @type, statement: @postfix} = options
+    {@soak, @postfix, @type} = options
     moveComments @condition, @ if @condition.comments
 
   children: ['condition', 'body', 'elseBody']
@@ -6685,11 +6895,12 @@ exports.If = class If extends Base
   addElse: (elseBody) ->
     if @isChain
       @elseBodyNode().addElse elseBody
-      @mergeLocationDataFrom @elseBodyNode()
+      @locationData = mergeLocationData @locationData, @elseBodyNode().locationData
     else
       @isChain  = elseBody instanceof If
       @elseBody = @ensureBlock elseBody
-      @mergeLocationDataFrom @elseBody if @elseBody.locationData and @locationData
+      @elseBody.updateLocationDataIfMissing elseBody.locationData
+      @locationData = mergeLocationData @locationData, @elseBody.locationData if @locationData? and @elseBody.locationData?
     this
 
   # The **If** only compiles into a statement if either of its bodies needs
@@ -6761,54 +6972,51 @@ exports.If = class If extends Base
   unfoldSoak: ->
     @soak and this
 
+  processedCondition: ->
+    @processedConditionCache ?= if @type is 'unless' then @condition.invert() else @condition
+
+  isStatementAst: (o) ->
+    o.level is LEVEL_TOP
+
   astType: (o) ->
-    if @isStatement o
+    if @isStatementAst o
       'IfStatement'
     else
       'ConditionalExpression'
 
   astProperties: (o) ->
-    if @isStatement o
-      @statementToAst o
-    else
-      @expressionToAst o
-
-  astFields: (o) ->
-    return {} if o.compiling
-    {
-      @postfix
-      inverted: @type is 'unless'
-    }
-
-  statementToAst: (o) ->
     {compiling} = o
+
+    isStatement = @isStatementAst o
+    # if isStatement
     exeq = del o, 'isExistentialEquals'
     if exeq
       return new If(@processedCondition().invert(), @elseBodyNode(), type: 'if').ast o
 
-    {
-      test: @useCondition(o).ast o, LEVEL_PAREN
-      consequent: @ensureBlock(@body).ast o, LEVEL_TOP
-      alternate: do =>
-        return unless @elseBody
-        compiled = @elseBody.ast o, LEVEL_TOP
-        if compiled.type is 'BlockStatement' and compiled.body.length is 1 and compiled.body[0].type is 'IfStatement'
-          compiled.body[0]
+    properties =
+      test: @useCondition(o).ast o, if isStatement then LEVEL_PAREN else LEVEL_COND
+      consequent:
+        if isStatement
+          @body.ast o, LEVEL_TOP
         else
-          compiled
-      ...@astFields o
-    }
+          @bodyNode().ast o, if compiling then LEVEL_LIST else LEVEL_TOP
+      alternate:
+        if @isChain
+          @elseBody.unwrap().ast o, if isStatement then LEVEL_TOP else LEVEL_COND
+        else if @elseBody?
+          @elseBody?.ast(o, LEVEL_TOP) ? null
+        else if not isStatement and compiling
+          new UndefinedLiteral().ast o
+        else
+          null
 
-  expressionToAst: (o) -> {
-    test: @useCondition(o).ast o, LEVEL_COND
-    consequent: @bodyNode().ast o, if o.compiling then LEVEL_LIST else LEVEL_TOP
-    alternate:
-      if @elseBodyNode()
-        @elseBodyNode().ast o, if o.compiling then LEVEL_LIST else LEVEL_TOP
-      else if o.compiling
-        new UndefinedLiteral().ast o
-    ...@astFields o
-  }
+    Object.assign properties, {
+      postfix: !!@postfix
+      inverted: @type is 'unless'
+    } unless compiling
+
+    properties
+
 
 # Constants
 # ---------
@@ -7065,74 +7273,111 @@ makeDelimitedLiteral = (body, options = {}) ->
 lesser  = (a, b) -> if a < b then a else b
 greater = (a, b) -> if a > b then a else b
 
-lesserStartLoc = (a, b) ->
-  return yes if a.first_line < b.first_line
-  return no unless a.first_line is b.first_line
-  a.first_column < b.first_column
-
-lesserEndLoc = (a, b) ->
-  return yes if a.last_line < b.last_line
-  return no unless a.last_line is b.last_line
-  a.last_column < b.last_column
-
-lesserAstLoc = (a, b) ->
-  return yes if a.line < b.line
+isAstLocGreater = (a, b) ->
+  return yes if a.line > b.line
   return no unless a.line is b.line
-  a.column < b.column
+  a.column > b.column
+
+isLocationDataStartGreater = (a, b) ->
+  return yes if a.first_line > b.first_line
+  return no unless a.first_line is b.first_line
+  a.first_column > b.first_column
+
+isLocationDataEndGreater = (a, b) ->
+  return yes if a.last_line > b.last_line
+  return no unless a.last_line is b.last_line
+  a.last_column > b.last_column
 
 # Take two nodes’ location data and return a new `locationData` object that
 # encompasses the location data of both nodes. So the new `first_line` value
 # will be the earlier of the two nodes’ `first_line` values, the new
 # `last_column` the later of the two nodes’ `last_column` values, etc.
-mergeLocationData = (locationDataA, locationDataB) ->
+# 
+# If you only want to extend the first node’s location data with the start or
+# end location data of the second node, pass the `justLeading` or `justEnding`
+# options. So e.g. if `first`’s range is [4, 5] and `second`’s range is [1, 10],
+# you’d get:
+# ```
+# mergeLocationData(first, second).range                   # [1, 10]
+# mergeLocationData(first, second, justLeading: yes).range # [1, 5]
+# mergeLocationData(first, second, justEnding:  yes).range # [4, 10]
+# ```
+exports.mergeLocationData = mergeLocationData = (locationDataA, locationDataB, {justLeading, justEnding} = {}) ->
   return Object.assign(
-    if lesserStartLoc locationDataA, locationDataB
+    if justEnding
       first_line:   locationDataA.first_line
       first_column: locationDataA.first_column
     else
-      first_line:   locationDataB.first_line
-      first_column: locationDataB.first_column
+      if isLocationDataStartGreater locationDataA, locationDataB
+        first_line:   locationDataB.first_line
+        first_column: locationDataB.first_column
+      else
+        first_line:   locationDataA.first_line
+        first_column: locationDataA.first_column
   ,
-    if lesserEndLoc locationDataA, locationDataB
-      last_line:   locationDataB.last_line
-      last_column: locationDataB.last_column
+    if justLeading
+      last_line:             locationDataA.last_line
+      last_column:           locationDataA.last_column
+      last_line_exclusive:   locationDataA.last_line_exclusive
+      last_column_exclusive: locationDataA.last_column_exclusive
     else
-      last_line:   locationDataA.last_line
-      last_column: locationDataA.last_column
+      if isLocationDataEndGreater locationDataA, locationDataB
+        last_line:             locationDataA.last_line
+        last_column:           locationDataA.last_column
+        last_line_exclusive:   locationDataA.last_line_exclusive
+        last_column_exclusive: locationDataA.last_column_exclusive
+      else
+        last_line:             locationDataB.last_line
+        last_column:           locationDataB.last_column
+        last_line_exclusive:   locationDataB.last_line_exclusive
+        last_column_exclusive: locationDataB.last_column_exclusive
   ,
     range: [
-      lesser  locationDataA.range[0], locationDataB.range[0]
-      greater locationDataA.range[1], locationDataB.range[1]
+      if justEnding
+        locationDataA.range[0]
+      else
+        lesser locationDataA.range[0], locationDataB.range[0]
+    ,
+      if justLeading
+        locationDataA.range[1]
+      else
+        greater locationDataA.range[1], locationDataB.range[1]
     ]
   )
 
 # Take two AST nodes, or two AST nodes’ location data objects, and return a new
 # location data object that encompasses the location data of both nodes. So the
 # new `start` value will be the earlier of the two nodes’ `start` values, the
-# new `end` value will be the later of the two nodes��� `end` values, etc.
-mergeAstLocationData = (nodeA, nodeB, {justLeading, justEnding} = {}) ->
+# new `end` value will be the later of the two nodes’ `end` values, etc.
+# 
+# If you only want to extend the first node’s location data with the start or
+# end location data of the second node, pass the `justLeading` or `justEnding`
+# options. So e.g. if `first`’s range is [4, 5] and `second`’s range is [1, 10],
+# you’d get:
+# ```
+# mergeAstLocationData(first, second).range                   # [1, 10]
+# mergeAstLocationData(first, second, justLeading: yes).range # [1, 5]
+# mergeAstLocationData(first, second, justEnding:  yes).range # [4, 10]
+# ```
+exports.mergeAstLocationData = mergeAstLocationData = (nodeA, nodeB, {justLeading, justEnding} = {}) ->
   return
     loc:
       start:
         if justEnding
           nodeA.loc.start
         else
-          if lesserAstLoc nodeA.loc.start, nodeB.loc.start
-            line:   nodeA.loc.start.line
-            column: nodeA.loc.start.column
+          if isAstLocGreater nodeA.loc.start, nodeB.loc.start
+            nodeB.loc.start
           else
-            line:   nodeB.loc.start.line
-            column: nodeB.loc.start.column
+            nodeA.loc.start
       end:
         if justLeading
           nodeA.loc.end
         else
-          if lesserAstLoc nodeA.loc.end, nodeB.loc.end
-            line:   nodeB.loc.end.line
-            column: nodeB.loc.end.column
+          if isAstLocGreater nodeA.loc.end, nodeB.loc.end
+            nodeA.loc.end
           else
-            line:   nodeA.loc.end.line
-            column: nodeA.loc.end.column
+            nodeB.loc.end
     range: [
       if justEnding
         nodeA.range[0]
@@ -7162,15 +7407,15 @@ getNumberValue = (node) ->
   if number.operator is '-' then val * -1 else val
 
 # Convert Jison-style node class location data to Babel-style location data
-locationDataToAst = ({first_line, first_column, last_line, last_column, range}) ->
+jisonLocationDataToAstLocationData = ({first_line, first_column, last_line_exclusive, last_column_exclusive, range}) ->
   return
     loc:
       start:
         line:   first_line + 1
         column: first_column
       end:
-        line:   last_line + 1
-        column: last_column + 1
+        line:   last_line_exclusive + 1
+        column: last_column_exclusive
     range: [
       range[0]
       range[1]

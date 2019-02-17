@@ -44,17 +44,13 @@ o = (patternString, action, options) ->
     # that nodes may have, such as comments or location data. Location data
     # is added to the first parameter passed in, and the parameter is returned.
     # If the parameter is not a node, it will just be passed through unaffected.
-    getAddDataToNodeFunctionString = (first, last) ->
-      "yy.addDataToNode(yy, @#{first}, #{if last then "@#{last}" else 'null'}, true)"
+    getAddDataToNodeFunctionString = (first, last, forceUpdateLocation = yes) ->
+      "yy.addDataToNode(yy, @#{first}, #{if first[0] is '$' then '$$' else '$'}#{first}, #{if last then "@#{last}, #{if last[0] is '$' then '$$' else '$'}#{last}" else 'null, null'}, #{if forceUpdateLocation then 'true' else 'false'})"
 
     returnsLoc = /^LOC/.test action
     action = action.replace /LOC\(([0-9]*)\)/g, getAddDataToNodeFunctionString('$1')
     action = action.replace /LOC\(([0-9]*),\s*([0-9]*)\)/g, getAddDataToNodeFunctionString('$1', '$2')
-    performActionFunctionString =
-      if returnsLoc
-        "$$ = #{action};"
-      else
-        "$$ = #{getAddDataToNodeFunctionString(1, patternCount)}(#{action});"
+    performActionFunctionString = "$$ = #{getAddDataToNodeFunctionString(1, patternCount, not returnsLoc)}(#{action});"
   else
     performActionFunctionString = '$$ = $1;'
 
@@ -78,8 +74,8 @@ grammar =
   # The **Root** is the top-level node in the syntax tree. Since we parse bottom-up,
   # all parsing must end here.
   Root: [
-    o '',                                       -> new Block
-    o 'Body'
+    o '',                                       -> new Root new Block
+    o 'Body',                                   -> new Root $1
   ]
 
   # Any list of statements and expressions, separated by line breaks or semicolons.
@@ -291,13 +287,13 @@ grammar =
   ]
 
   YieldReturn: [
-    o 'YIELD RETURN Expression',                -> new YieldReturn $3
-    o 'YIELD RETURN',                           -> new YieldReturn
+    o 'YIELD RETURN Expression',                -> new YieldReturn $3,   returnKeyword: LOC(2)(new Literal $2)
+    o 'YIELD RETURN',                           -> new YieldReturn null, returnKeyword: LOC(2)(new Literal $2)
   ]
 
   AwaitReturn: [
-    o 'AWAIT RETURN Expression',                -> new AwaitReturn $3
-    o 'AWAIT RETURN',                           -> new AwaitReturn
+    o 'AWAIT RETURN Expression',                -> new AwaitReturn $3,   returnKeyword: LOC(2)(new Literal $2)
+    o 'AWAIT RETURN',                           -> new AwaitReturn null, returnKeyword: LOC(2)(new Literal $2)
   ]
 
   # The **Code** node is the function literal. It's defined by an indented block
@@ -341,7 +337,7 @@ grammar =
   Param: [
     o 'ParamVar',                               -> new Param $1
     o 'ParamVar ...',                           -> new Param $1, null, on
-    o '... ParamVar',                           -> new Param $2, null, postfix: false
+    o '... ParamVar',                           -> new Param $2, null, postfix: no
     o 'ParamVar = Expression',                  -> new Param $1, $3
     o 'ParamVar = TERMINATOR Expression',       -> new Param $1, $4
     o 'ParamVar = INDENT Expression OUTDENT',   -> new Param $1, $4
@@ -549,24 +545,24 @@ grammar =
 
   # Inclusive and exclusive range dots.
   RangeDots: [
-    o '..',                                     -> 'inclusive'
-    o '...',                                    -> 'exclusive'
+    o '..',                                     -> exclusive: no
+    o '...',                                    -> exclusive: yes
   ]
 
   # The CoffeeScript range literal.
   Range: [
-    o '[ Expression RangeDots Expression ]',      -> new Range $2, $4, $3
-    o '[ ExpressionLine RangeDots Expression ]',  -> new Range $2, $4, $3
+    o '[ Expression RangeDots Expression ]',      -> new Range $2, $4, if $3.exclusive then 'exclusive' else 'inclusive'
+    o '[ ExpressionLine RangeDots Expression ]',  -> new Range $2, $4, if $3.exclusive then 'exclusive' else 'inclusive'
   ]
 
   # Array slice literals.
   Slice: [
-    o 'Expression RangeDots Expression',        -> new Range $1, $3, $2
-    o 'Expression RangeDots',                   -> new Range $1, null, $2
-    o 'ExpressionLine RangeDots Expression',    -> new Range $1, $3, $2
-    o 'ExpressionLine RangeDots',               -> new Range $1, null, $2
-    o 'RangeDots Expression',                   -> new Range null, $2, $1
-    o 'RangeDots',                              -> new Range null, null, $1
+    o 'Expression RangeDots Expression',        -> new Range $1, $3, if $2.exclusive then 'exclusive' else 'inclusive'
+    o 'Expression RangeDots',                   -> new Range $1, null, if $2.exclusive then 'exclusive' else 'inclusive'
+    o 'ExpressionLine RangeDots Expression',    -> new Range $1, $3, if $2.exclusive then 'exclusive' else 'inclusive'
+    o 'ExpressionLine RangeDots',               -> new Range $1, null, if $2.exclusive then 'exclusive' else 'inclusive'
+    o 'RangeDots Expression',                   -> new Range null, $2, if $1.exclusive then 'exclusive' else 'inclusive'
+    o 'RangeDots',                              -> new Range null, null, if $1.exclusive then 'exclusive' else 'inclusive'
   ]
 
   # The **ArgList** is the list of objects passed into a function call
@@ -629,16 +625,16 @@ grammar =
   # The variants of *try/catch/finally* exception handling blocks.
   Try: [
     o 'TRY Block',                              -> new Try $2
-    o 'TRY Block Catch',                        -> new Try $2, $3[0], $3[1]
-    o 'TRY Block FINALLY Block',                -> new Try $2, null, null, $4
-    o 'TRY Block Catch FINALLY Block',          -> new Try $2, $3[0], $3[1], $5
+    o 'TRY Block Catch',                        -> new Try $2, $3
+    o 'TRY Block FINALLY Block',                -> new Try $2, null, $4, LOC(3)(new Literal $3)
+    o 'TRY Block Catch FINALLY Block',          -> new Try $2, $3, $5, LOC(4)(new Literal $4)
   ]
 
   # A catch clause names its error and runs a block of code.
   Catch: [
-    o 'CATCH Identifier Block',                 -> [$2, $3]
-    o 'CATCH Object Block',                     -> [LOC(2)(new Value($2)), $3]
-    o 'CATCH Block',                            -> [null, $2]
+    o 'CATCH Identifier Block',                 -> new Catch $3, $2
+    o 'CATCH Object Block',                     -> new Catch $3, LOC(2)(new Value($2))
+    o 'CATCH Block',                            -> new Catch $2
   ]
 
   # Throw an exception object.
@@ -678,8 +674,8 @@ grammar =
   While: [
     o 'WhileSource Block',                      -> $1.addBody $2
     o 'WhileLineSource Block',                  -> $1.addBody $2
-    o 'Statement  WhileSource',                 -> (extend $2, postfix: yes).addBody LOC(1) Block.wrap([$1])
-    o 'Expression WhileSource',                 -> (extend $2, postfix: yes).addBody LOC(1) Block.wrap([$1])
+    o 'Statement  WhileSource',                 -> (Object.assign $2, postfix: yes).addBody LOC(1) Block.wrap([$1])
+    o 'Expression WhileSource',                 -> (Object.assign $2, postfix: yes).addBody LOC(1) Block.wrap([$1])
     o 'Loop',                                   -> $1
   ]
 
@@ -816,8 +812,8 @@ grammar =
   If: [
     o 'IfBlock'
     o 'IfBlock ELSE Block',                     -> $1.addElse $3
-    o 'Statement  POST_IF Expression',          -> new If $3, LOC(1)(Block.wrap [$1]), type: $2, statement: true
-    o 'Expression POST_IF Expression',          -> new If $3, LOC(1)(Block.wrap [$1]), type: $2, statement: true
+    o 'Statement  POST_IF Expression',          -> new If $3, LOC(1)(Block.wrap [$1]), type: $2, postfix: true
+    o 'Expression POST_IF Expression',          -> new If $3, LOC(1)(Block.wrap [$1]), type: $2, postfix: true
   ]
 
   IfBlockLine: [
@@ -828,8 +824,8 @@ grammar =
   IfLine: [
     o 'IfBlockLine'
     o 'IfBlockLine ELSE Block',               -> $1.addElse $3
-    o 'Statement  POST_IF ExpressionLine',    -> new If $3, LOC(1)(Block.wrap [$1]), type: $2, statement: true
-    o 'Expression POST_IF ExpressionLine',    -> new If $3, LOC(1)(Block.wrap [$1]), type: $2, statement: true
+    o 'Statement  POST_IF ExpressionLine',    -> new If $3, LOC(1)(Block.wrap [$1]), type: $2, postfix: true
+    o 'Expression POST_IF ExpressionLine',    -> new If $3, LOC(1)(Block.wrap [$1]), type: $2, postfix: true
   ]
 
   # Arithmetic and logical operators, working on one or more operands.
