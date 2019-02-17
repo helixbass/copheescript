@@ -799,8 +799,8 @@ exports.Block = class Block extends Base
     this
 
   compile: (o, lvl) ->
+    return @prettier o if o.usePrettier and not o.scope
     return new Root(this).withLocationDataFrom(this).compile o, lvl unless o.scope
-
     super o, lvl
 
   # Compile all expressions within the **Block** body. If we need to return
@@ -854,10 +854,6 @@ exports.Block = class Block extends Base
     formatted = prettier.__debug.formatAST(ast, merge opts, originalText: code).formatted
     return formatted unless returnWithAst
     {ast, formatted}
-
-  compile: (o, lvl) ->
-    return @prettier o if o.usePrettier and not o.scope
-    super o, lvl
 
   compileToBabylon: (o, level) ->
     return @withBabylonComments o, @compileRootToBabylon o unless o.scope
@@ -5146,7 +5142,7 @@ exports.Code = class Code extends Base
       new Splat name, lhs: yes, postfix: splat.postfix
       .withLocationDataFrom name
     else if value?
-      new Assign name, value, null, param: yes
+      new Assign name, value, param: yes
       .withLocationDataFrom locationData: mergeLocationData name.locationData, value.locationData
     else
       name

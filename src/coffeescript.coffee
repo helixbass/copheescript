@@ -229,6 +229,7 @@ exports.tokens = withPrettyErrors (code, options) ->
 exports.nodes = withPrettyErrors (source, options) ->
   source = lexer.tokenize(source, options).tokens if typeof source is 'string'
   parser.parse(source).body
+
 exports.babylon = compileToBabylon = withPrettyErrors (source, options) ->
   {tokens, comments} = lexer.tokenize source, options
   nodes = parser.parse tokens

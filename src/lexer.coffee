@@ -992,6 +992,7 @@ exports.Lexer = class Lexer
               token[2].last_column = quote.length - 1
             else
               token[2].last_column += quote.length
+            token[2].last_column_exclusive += quote.length
             token[2].range = [
               token[2].range[0] - quote.length
               token[2].range[1] + quote.length
