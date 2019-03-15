@@ -1316,6 +1316,7 @@ exports.Block = class Block extends Base
     body = []
     for expression in @expressions
       expression.topLevel = @isRootBlock
+      expressionAst = expression.ast o
       # return @extractDirectives ast.body, o if node instanceof Block or ast.type is 'BlockStatement'
       # return ast if node.isStatement(o) or node instanceof Class
       # ast = @extractDirectives ast, o
@@ -1323,13 +1324,15 @@ exports.Block = class Block extends Base
       # return @asExpressionStatement ast unless Array.isArray ast
       # @asExpressionStatement item for item in ast
       # If an expression is a statement, it can be added to the body as is.
-      if expression.isStatementAst o
-        body.push expression.ast o
+      if expressionAst?.type is 'Directive'
+        @directives.push expressionAst
+      else if expression.isStatementAst o
+        body.push expressionAst
       # Otherwise, we need to wrap it in an `ExpressionStatement` AST node.
       else
         body.push Object.assign
             type: 'ExpressionStatement'
-            expression: expression.ast o
+            expression: expressionAst
           ,
             expression.astLocationData()
 
