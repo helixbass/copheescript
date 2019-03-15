@@ -2334,7 +2334,13 @@ exports.CSXElement = class CSXElement extends Base
       else
         @elementAstProperties o
     ,
-      children: []
+      children:
+        if @content and not @content.base.isEmpty?()
+          @content.base.csx = yes
+          compact flatten [
+            @content.ast o#, LEVEL_LIST
+          ]
+        else []
     )
 
   astLocationData: ->
