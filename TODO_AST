@@ -13,6 +13,16 @@
     ### comment ###
     a: 1
 - use ClassProperty for static class fields eg @a: 2?
+- is returns wrong/missing here?
+  try
+    yes
+  finally
+    'nothing' # <- Prettier was parenthesizing, implying no returns: true
+
+  """multiline #{"nested #{
+    ok true
+    '"interpolations"' # <- Prettier was parenthesizing, implying no returns: true
+  }"} work"""
 
 - should update to OptionalCallExpression/OptionalMemberExpression? Is that where babel 7 landed?
 - sourceType
@@ -20,3 +30,4 @@
 - make assertErrorFormat() check AST by default
 - chained Ops eg a < b < c
 - distinguish Infinity from 2e308
+- literate?
