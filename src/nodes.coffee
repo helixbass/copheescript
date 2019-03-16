@@ -201,7 +201,7 @@ exports.Base = class Base
       if (unwrapped = expr?.unwrap?()) instanceof PassthroughLiteral and unwrapped.generated
         index++
         continue
-      break unless expr instanceof Value and expr.isString()
+      break unless expr instanceof Value and expr.isString() and expr.unwrap().quote.length is 1
       if expr.hoisted
         index++
       else
@@ -7363,7 +7363,7 @@ exports.mergeLocationData = mergeLocationData = (locationDataA, locationDataB, {
 # new `start` value will be the earlier of the two nodes’ `start` values, the
 # new `end` value will be the later of the two nodes’ `end` values, etc.
 # 
-# If you only want to extend the first node’s location data with the start or
+# If you only want to extend the first node���s location data with the start or
 # end location data of the second node, pass the `justLeading` or `justEnding`
 # options. So e.g. if `first`’s range is [4, 5] and `second`’s range is [1, 10],
 # you’d get:
