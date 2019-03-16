@@ -201,7 +201,7 @@ exports.Base = class Base
       if (unwrapped = expr?.unwrap?()) instanceof PassthroughLiteral and unwrapped.generated
         index++
         continue
-      break unless expr instanceof Value and expr.isString() and expr.unwrap().quote.length is 1
+      break unless expr instanceof Value and expr.isString() and not expr.unwrap().shouldGenerateTemplateLiteralAst()
       if expr.hoisted
         index++
       else
@@ -1506,9 +1506,12 @@ exports.StringLiteral = class StringLiteral extends Literal
   isEmpty: ->
     not @unquote().length
 
+  shouldGenerateTemplateLiteralAst: ->
+    @quote.length is 3# and @originalValue.indexOf('\n') > -1
+
   astFull: (o) ->
     return @CSXTextToAst o if @csx
-    if not o.compiling and @quote.length is 3 and @originalValue.indexOf('\n') > -1
+    if not o.compiling and @shouldGenerateTemplateLiteralAst()
       return StringWithInterpolations.fromStringLiteral(@).ast o
     super o
 
