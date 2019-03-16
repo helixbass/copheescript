@@ -5178,6 +5178,7 @@ exports.Code = class Code extends Base
         return yes if @name instanceof Access and (@name.name instanceof NumberLiteral or @name.name instanceof StringLiteral)
         no
       static: @isStatic
+      bound: !!@bound
     unless o.compiling
       fields.staticClassName = @isStatic.className if @isStatic?.className
       fields.operator = @operatorToken?.value ? '='
