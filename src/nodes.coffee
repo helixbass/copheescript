@@ -198,6 +198,9 @@ exports.Base = class Base
     lastIndex = expressions.length - 1
     while expr = expressions[index]
       break if index is lastIndex and notFinalExpression
+      if (unwrapped = expr?.unwrap?()) instanceof PassthroughLiteral and unwrapped.generated
+        index++
+        continue
       break unless expr instanceof Value and expr.isString()
       if expr.hoisted
         index++
