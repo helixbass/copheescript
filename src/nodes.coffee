@@ -6026,7 +6026,8 @@ exports.Catch = class Catch extends Base
   jumps: (o) -> @recovery.jumps(o)
 
   makeReturn: (res) ->
-    @recovery = @recovery.makeReturn res
+    ret = @recovery.makeReturn res
+    @recovery = ret unless res?.mark
     this
 
   compileNode: (o) ->
