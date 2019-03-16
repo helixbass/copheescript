@@ -992,6 +992,7 @@ exports.Lexer = class Lexer
               token[2].last_column = quote.length - 1
             else
               token[2].last_column += quote.length
+              token[2].last_column -= 1 if token[1].length is 2
             token[2].last_column_exclusive += quote.length
             token[2].range = [
               token[2].range[0] - quote.length
@@ -1090,7 +1091,7 @@ exports.Lexer = class Lexer
     [locationData.last_line, locationData.last_column, endOffset] =
       @getLineAndColumnFromChunk offsetInChunk + lastCharacter
     [locationData.last_line_exclusive, locationData.last_column_exclusive] =
-      @getLineAndColumnFromChunk offsetInChunk + lastCharacter + 1
+      @getLineAndColumnFromChunk offsetInChunk + lastCharacter + (if length > 0 then 1 else 0)
     locationData.range[1] = if length > 0 then endOffset + 1 else endOffset
 
     locationData

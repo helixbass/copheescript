@@ -1483,24 +1483,25 @@ exports.StringLiteral = class StringLiteral extends Literal
     unquoted
 
   withoutQuotesInLocationData: ->
-    # TODO: make this non-mutating (return new StringLiteral)?
     endsWithNewline = @originalValue[-1..] is '\n'
-    @locationData = merge {}, @locationData
-    @locationData.first_column += @quote.length
+    locationData = merge {}, @locationData
+    locationData.first_column += @quote.length
     if endsWithNewline
-      @locationData.last_line -= 1
-      @locationData.last_column =
-        if @locationData.last_line is @locationData.first_line
-          @locationData.first_column + @originalValue.length - '\n'.length
+      locationData.last_line -= 1
+      locationData.last_column =
+        if locationData.last_line is locationData.first_line
+          locationData.first_column + @originalValue.length - '\n'.length
         else
           @originalValue.length - '\n'.length - @originalValue.lastIndexOf('\n')
     else
-      @locationData.last_column -= @quote.length
-    @locationData.range = [
-      @locationData.range[0] + @quote.length
-      @locationData.range[1] - @quote.length
+      locationData.last_column -= @quote.length
+    locationData.range = [
+      locationData.range[0] + @quote.length
+      locationData.range[1] - @quote.length
     ]
-    @
+    copy = new StringLiteral @originalValue, {@quote, @initialChunk, @finalChunk, @indent, @double, @heregex}
+    copy.locationData = locationData
+    copy
 
   isEmpty: ->
     not @unquote().length
