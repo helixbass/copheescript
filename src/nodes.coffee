@@ -727,7 +727,22 @@ exports.Root = class Root extends Base
     @body.isRootBlock = yes
     return
       program: Object.assign @body.ast(o), @astLocationData()
-      comments: []
+      comments: @commentsToAst()
+
+  commentsToAst: ->
+    return [] unless @allComments?.length
+
+    for {here, content, locationData, heregex, indent} in @allComments when not heregex
+      {
+        type:
+          if here
+            'CommentBlock'
+          else
+            'CommentLine'
+        value: content
+        jisonLocationDataToAstLocationData(locationData)...
+        indent
+      }
 
 #### Block
 
@@ -1284,21 +1299,6 @@ exports.Block = class Block extends Base
   #     program, comments
   #   }, programLocationData
 
-  commentsToAst: ->
-    return [] unless @allComments?.length
-
-    for {here, content, locationData, heregex, indent} in @allComments when not heregex
-      {
-        type:
-          if here
-            'CommentBlock'
-          else
-            'CommentLine'
-        value: content
-        jisonLocationDataToAstLocationData(locationData)...
-        indent
-      }
-
   astType: ->
     if @isRootBlock
       'Program'
@@ -1314,7 +1314,7 @@ exports.Block = class Block extends Base
     @sniffDirectives @expressions, replace: yes, notFinalExpression: checkForDirectives if @isRootBlock or checkForDirectives
 
     body = []
-    for expression in @expressions
+    for expression in @expressions when not ((unwrapped = expression?.unwrap()) instanceof PassthroughLiteral and unwrapped.generated)
       expression.topLevel = @isRootBlock
       expressionAst = expression.ast o
       # return @extractDirectives ast.body, o if node instanceof Block or ast.type is 'BlockStatement'
