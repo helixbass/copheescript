@@ -31,3 +31,4 @@
 - chained Ops eg a < b < c
 - distinguish Infinity from 2e308
 - literate?
+- new.target should generate MetaProperty
