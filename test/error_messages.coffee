@@ -1955,3 +1955,13 @@ test "`new.target` cannot be assigned", ->
       new.target = b
                  ^
   '''
+
+test 'leading logical followed by :: should parse as continuation', ->
+  assertErrorFormat '''
+    a
+      and ::b
+  ''','''
+    [stdin]:2:7: error: unexpected ::
+      and ::b
+          ^^
+  '''
