@@ -147,6 +147,13 @@ test "AST as expected for InfinityLiteral node", ->
     type: 'Identifier'
     name: 'Infinity'
 
+  testExpression '2e308',
+    type: 'NumericLiteral'
+    value: Infinity
+    extra:
+      raw: '2e308'
+      rawValue: Infinity
+
 test "AST as expected for NaNLiteral node", ->
   testExpression 'NaN',
     type: 'Identifier'
@@ -2590,4 +2597,37 @@ test "AST as expected for If node", ->
         alternate: ID 'd'
         postfix: no
         inverted: no
+      ]
+
+test "AST as expected for MetaProperty node", ->
+  testExpression '''
+    -> new.target
+  ''',
+    type: 'FunctionExpression'
+    body:
+      type: 'BlockStatement'
+      body: [
+        type: 'ExpressionStatement'
+        expression:
+          type: 'MetaProperty'
+          meta: ID 'new'
+          property: ID 'target'
+      ]
+
+  testExpression '''
+    -> new.target.name
+  ''',
+    type: 'FunctionExpression'
+    body:
+      type: 'BlockStatement'
+      body: [
+        type: 'ExpressionStatement'
+        expression:
+          type: 'MemberExpression'
+          object:
+            type: 'MetaProperty'
+            meta: ID 'new'
+            property: ID 'target'
+          property: ID 'name'
+          computed: no
       ]

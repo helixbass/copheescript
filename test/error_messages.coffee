@@ -1929,7 +1929,7 @@ test "#3933: prevent implicit calls when cotrol flow is missing `THEN`", ->
   '''
 
 test "`new.target` outside of a function", ->
-  assertErrorFormat '''
+  assertErrorFormatAst '''
     new.target
   ''', '''
     [stdin]:1:1: error: new.target can only occur inside functions
@@ -1938,10 +1938,20 @@ test "`new.target` outside of a function", ->
   '''
 
 test "`new.target` is only allowed meta property", ->
-  assertErrorFormat '''
+  assertErrorFormatAst '''
     -> new.something
   ''', '''
     [stdin]:1:4: error: the only valid meta property for new is new.target
     -> new.something
        ^^^^^^^^^^^^^
+  '''
+
+test "`new.target` cannot be assigned", ->
+  assertErrorFormatAst '''
+    ->
+      new.target = b
+  ''', '''
+    [stdin]:2:14: error: unexpected =
+      new.target = b
+                 ^
   '''
