@@ -32,3 +32,4 @@
 - distinguish Infinity from 2e308
 - literate?
 - new.target should generate MetaProperty
+- TemplateElement.value.cooked?
