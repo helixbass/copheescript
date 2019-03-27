@@ -495,6 +495,10 @@ test "#4657: destructured array parameters", ->
   arrayEq result.a, [1, 2, 3]
   eq result.b, 4
 
+test "#5128: default parameters of function in binary operation", ->
+  foo = yes or (a, b = {}) -> null
+  eq foo, yes
+
 # TODO: add tests for newly supported shouldCache() params with default eg ([..., last] = 1) ->, (..., [..., last] = 1) ->
 
 test "allow linebreak/indentation before default param value", ->

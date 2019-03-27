@@ -10,7 +10,7 @@ formatWithPrettier = (js, {returnAll} = {}) ->
     tokens: yes
     sourceType: 'module'
     allowImportExportEverywhere: yes
-    plugins: ['jsx']
+    plugins: ['jsx', 'objectRestSpread', 'dynamicImport']
   joined =
     (for {value, type} in tokens # when type isnt 'CommentLine'
       if type is 'CommentBlock'

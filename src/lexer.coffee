@@ -765,6 +765,9 @@ exports.Lexer = class Lexer
         @error message, origin[2] if message
       return value.length if skipToken
 
+    if value is '(' and prev?[0] is 'IMPORT'
+      prev[0] = 'DYNAMIC_IMPORT'
+
     if value is '{' and @seenImport
       @importSpecifierList = yes
     else if @importSpecifierList and value is '}'
@@ -930,20 +933,6 @@ exports.Lexer = class Lexer
     unless str[...closingDelimiter.length] is closingDelimiter
       @error "missing #{closingDelimiter}", length: delimiter.length
 
-    [firstToken, ..., lastToken] = tokens
-    # firstToken[2].first_column -= delimiter.length
-    # firstToken[2].range[0]     -= delimiter.length
-    # lastToken[2].range[1]      += closingDelimiter.length
-    # if lastToken[1].substr(-1) is '\n'
-    #   lastToken[2].last_line += 1
-    #   lastToken[2].last_column = closingDelimiter.length - 1
-    # else
-    #   lastToken[2].last_column += closingDelimiter.length
-    # lastToken[2].last_column_exclusive += closingDelimiter.length
-    # if lastToken[1].length is 0
-    #   lastToken[2].last_column -= 1
-    #   lastToken[2].range[1]    -= 1
-
     {tokens, index: offsetInChunk + closingDelimiter.length}
 
   # Merge the array `tokens` of the fake token types `'TOKENS'` and `'NEOSTRING'`
@@ -1021,14 +1010,6 @@ exports.Lexer = class Lexer
       ]
       # lparen[2] = lparen.origin[2]
       rparen = @token 'STRING_END', ')', offset: endOffset - (quote ? '').length, length: quote?.length ? 0, generated: not quote?.length
-      # rparen[2] =
-      #   first_line:            lastToken[2].last_line
-      #   first_column:          lastToken[2].last_column
-      #   last_line:             lastToken[2].last_line
-      #   last_column:           lastToken[2].last_column
-      #   last_line_exclusive:   lastToken[2].last_line_exclusive
-      #   last_column_exclusive: lastToken[2].last_column_exclusive
-      #   range:                 lastToken[2].range
 
   # Pairs up a closing token, ensuring that all listed pairs of tokens are
   # correctly balanced throughout the course of the token stream.
@@ -1428,7 +1409,7 @@ RELATION = ['IN', 'OF', 'INSTANCEOF']
 # Tokens which could legitimately be invoked or indexed. An opening
 # parentheses or bracket following these tokens will be recorded as the start
 # of a function invocation or indexing operation.
-CALLABLE  = ['IDENTIFIER', 'PROPERTY', ')', ']', '?', '@', 'THIS', 'SUPER']
+CALLABLE  = ['IDENTIFIER', 'PROPERTY', ')', ']', '?', '@', 'THIS', 'SUPER', 'DYNAMIC_IMPORT']
 INDEXABLE = CALLABLE.concat [
   'NUMBER', 'INFINITY', 'NAN', 'STRING', 'STRING_END', 'REGEX', 'REGEX_END'
   'BOOL', 'NULL', 'UNDEFINED', '}', '::'

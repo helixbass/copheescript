@@ -108,6 +108,11 @@ NUMBER = (value) -> {
   value
 }
 
+STRING = (value) -> {
+  type: 'StringLiteral'
+  value
+}
+
 # Check each node type in the same order as they appear in `nodes.coffee`.
 # For nodes that have equivalents in Babel’s AST spec, we’re checking that
 # the type and properties match. When relevant, also check that values of
@@ -2215,23 +2220,108 @@ test "AST as expected for Parens node", ->
     type: 'NumericLiteral'
     value: 1
 
-# test "AST as expected for StringWithInterpolations node", ->
-#   testExpression '"#{o}/"',
-#     type: 'StringWithInterpolations'
-#     quote: '"'
-#     body:
-#       type: 'Block'
-#       expressions: [
-#         originalValue: ''
-#       ,
-#         type: 'Interpolation'
-#         expression:
-#           type: 'Value'
-#           base:
-#             value: 'o'
-#       ,
-#         originalValue: '/'
-#       ]
+test "AST as expected for StringWithInterpolations node", ->
+  testExpression '"a#{b}c"',
+    type: 'TemplateLiteral'
+    expressions: [
+      ID 'b'
+    ]
+    quasis: [
+      type: 'TemplateElement'
+      value:
+        raw: 'a'
+      tail: no
+    ,
+      type: 'TemplateElement'
+      value:
+        raw: 'c'
+      tail: yes
+    ]
+    quote: '"'
+
+  testExpression '"""a#{b}c"""',
+    type: 'TemplateLiteral'
+    expressions: [
+      ID 'b'
+    ]
+    quasis: [
+      type: 'TemplateElement'
+      value:
+        raw: 'a'
+      tail: no
+    ,
+      type: 'TemplateElement'
+      value:
+        raw: 'c'
+      tail: yes
+    ]
+    quote: '"""'
+
+  testExpression '"#{b}"',
+    type: 'TemplateLiteral'
+    expressions: [
+      ID 'b'
+    ]
+    quasis: [
+      type: 'TemplateElement'
+      value:
+        raw: ''
+      tail: no
+    ,
+      type: 'TemplateElement'
+      value:
+        raw: ''
+      tail: yes
+    ]
+    quote: '"'
+
+  testExpression '''
+    " a
+      #{b}
+      c
+    "
+  ''',
+    type: 'TemplateLiteral'
+    expressions: [
+      ID 'b'
+    ]
+    quasis: [
+      type: 'TemplateElement'
+      value:
+        raw: ' a\n  '
+      tail: no
+    ,
+      type: 'TemplateElement'
+      value:
+        raw: '\n  c\n'
+      tail: yes
+    ]
+    quote: '"'
+
+  testExpression '''
+    """
+      a
+        b#{
+        c
+      }d
+    """
+  ''',
+    type: 'TemplateLiteral'
+    expressions: [
+      ID 'c'
+    ]
+    quasis: [
+      type: 'TemplateElement'
+      value:
+        raw: '\n  a\n    b'
+      tail: no
+    ,
+      type: 'TemplateElement'
+      value:
+        raw: 'd\n'
+      tail: yes
+    ]
+    quote: '"""'
 
 test "AST as expected for For node", ->
   testStatement 'for x, i in arr when x? then return',
@@ -2779,3 +2869,12 @@ test "AST as expected for MetaProperty node", ->
           property: ID 'name'
           computed: no
       ]
+
+test "AST as expected for dynamic import", ->
+  testExpression '''
+    import('a')
+  ''',
+    type: 'CallExpression'
+    callee:
+      type: 'Import'
+    arguments: [STRING 'a']
