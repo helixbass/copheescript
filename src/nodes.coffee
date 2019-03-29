@@ -1443,6 +1443,7 @@ exports.NaNLiteral = class NaNLiteral extends NumberLiteral
 exports.StringLiteral = class StringLiteral extends Literal
   constructor: (@originalValue, {@quote, @initialChunk, @finalChunk, @indent, @double, @heregex} = {}) ->
     super ''
+    @quote = null if @quote is '///'
     @fromSourceString = @quote?
     @quote ?= '"'
     heredoc = @quote.length is 3
@@ -2056,12 +2057,14 @@ exports.Value = class Value extends Base
   astProperties: (o) ->
     [..., property] = @properties
     property.name.csx = yes if @isCSXTag()
-    return
+    computed = property instanceof Index or property.name?.unwrap() not instanceof PropertyName
+    return {
       object: @object().ast o, LEVEL_ACCESS
-      property: property.ast o
-      computed: property instanceof Index or property.name?.unwrap() not instanceof PropertyName
+      property: property.ast o, (LEVEL_PAREN if computed)
+      computed
       optional: !!property.soak
       shorthand: !!property.shorthand
+    }
 
   astLocationData: ->
     return super() unless @isCSXTag()

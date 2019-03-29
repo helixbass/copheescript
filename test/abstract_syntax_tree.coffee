@@ -623,11 +623,52 @@ test "AST as expected for Call node", ->
 #                   type: 'Access'
 #     ]
 
-# test "AST as expected for RegexWithInterpolations node", ->
-#   testExpression '///^#{flavor}script$///',
-#     type: 'RegexWithInterpolations'
+test "AST as expected for RegexWithInterpolations node", ->
+  testExpression '///^#{flavor}script$///',
+    type: 'InterpolatedRegExpLiteral'
+    interpolatedPattern:
+      type: 'TemplateLiteral'
+      expressions: [
+        ID 'flavor'
+      ]
+      quasis: [
+        type: 'TemplateElement'
+        value:
+          raw: '^'
+        tail: no
+      ,
+        type: 'TemplateElement'
+        value:
+          raw: 'script$'
+        tail: yes
+      ]
+      quote: '///'
+    flags: ''
 
-#   # TODO: Shouldn't there be more info we can check for?
+  testExpression '''
+    ///
+      a
+      #{b}///ig
+  ''',
+    type: 'InterpolatedRegExpLiteral'
+    interpolatedPattern:
+      type: 'TemplateLiteral'
+      expressions: [
+        ID 'b'
+      ]
+      quasis: [
+        type: 'TemplateElement'
+        value:
+          raw: '\n  a\n  '
+        tail: no
+      ,
+        type: 'TemplateElement'
+        value:
+          raw: ''
+        tail: yes
+      ]
+      quote: '///'
+    flags: 'ig'
 
 # test "AST as expected for TaggedTemplateCall node", ->
 #   testExpression 'func"tagged"',
@@ -793,6 +834,17 @@ test "AST as expected for Index node", ->
     property:
       type: 'NumericLiteral'
       value: 3
+    computed: yes
+    optional: no
+    shorthand: no
+
+  testExpression 'a[if b then c]',
+    type: 'MemberExpression'
+    object: ID 'a'
+    property:
+      type: 'ConditionalExpression'
+      test: ID 'b'
+      consequent: ID 'c'
     computed: yes
     optional: no
     shorthand: no
