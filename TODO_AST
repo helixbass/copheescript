@@ -31,5 +31,5 @@
 - chained Ops eg a < b < c
 - distinguish Infinity from 2e308
 - literate?
-- new.target should generate MetaProperty
 - TemplateElement.value.cooked?
+- add tests for unicode code point escapes etc for interpolated heregex (like there are some for non-interpolated regex/heregex)
