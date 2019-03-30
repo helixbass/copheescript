@@ -670,12 +670,80 @@ test "AST as expected for RegexWithInterpolations node", ->
       quote: '///'
     flags: 'ig'
 
-# test "AST as expected for TaggedTemplateCall node", ->
-#   testExpression 'func"tagged"',
-#     type: 'TaggedTemplateCall'
-#     args: [
-#       type: 'StringWithInterpolations'
-#     ]
+test "AST as expected for TaggedTemplateCall node", ->
+  testExpression 'func"tagged"',
+    type: 'TaggedTemplateExpression'
+    tag: ID 'func'
+    quasi:
+      type: 'TemplateLiteral'
+      expressions: []
+      quasis: [
+        type: 'TemplateElement'
+        value:
+          raw: 'tagged'
+        tail: yes
+      ]
+
+  testExpression 'a"b#{c}"',
+    type: 'TaggedTemplateExpression'
+    tag: ID 'a'
+    quasi:
+      type: 'TemplateLiteral'
+      expressions: [
+        ID 'c'
+      ]
+      quasis: [
+        type: 'TemplateElement'
+        value:
+          raw: 'b'
+        tail: no
+      ,
+        type: 'TemplateElement'
+        value:
+          raw: ''
+        tail: yes
+      ]
+
+  testExpression '''
+    a"""
+      b#{c}
+    """
+  ''',
+    type: 'TaggedTemplateExpression'
+    tag: ID 'a'
+    quasi:
+      type: 'TemplateLiteral'
+      expressions: [
+        ID 'c'
+      ]
+      quasis: [
+        type: 'TemplateElement'
+        value:
+          raw: '\n  b'
+        tail: no
+      ,
+        type: 'TemplateElement'
+        value:
+          raw: '\n'
+        tail: yes
+      ]
+
+  testExpression """
+    a'''
+      b
+    '''
+  """,
+    type: 'TaggedTemplateExpression'
+    tag: ID 'a'
+    quasi:
+      type: 'TemplateLiteral'
+      expressions: []
+      quasis: [
+        type: 'TemplateElement'
+        value:
+          raw: '\n  b\n'
+        tail: yes
+      ]
 
 # test "AST as expected for Extends node", ->
 #   testExpression 'class child extends parent',
@@ -2930,3 +2998,79 @@ test "AST as expected for dynamic import", ->
     callee:
       type: 'Import'
     arguments: [STRING 'a']
+
+test "AST as expected for RegexLiteral node", ->
+  testExpression '/a/ig',
+    type: 'RegExpLiteral'
+    pattern: 'a'
+    originalPattern: 'a'
+    flags: 'ig'
+    delimiter: '/'
+    value: undefined
+    extra:
+      raw: "/a/ig"
+      originalRaw: "/a/ig"
+      rawValue: undefined
+
+  testExpression '''
+    ///
+      a
+    ///i
+  ''',
+    type: 'RegExpLiteral'
+    pattern: 'a'
+    originalPattern: '\n  a\n'
+    flags: 'i'
+    delimiter: '///'
+    value: undefined
+    extra:
+      raw: "/a/i"
+      originalRaw: "///\n  a\n///i"
+      rawValue: undefined
+
+  testExpression '/a\\w\\u1111\\u{11111}/',
+    type: 'RegExpLiteral'
+    pattern: 'a\\w\\u1111\\ud804\\udd11'
+    originalPattern: 'a\\w\\u1111\\u{11111}'
+    flags: ''
+    delimiter: '/'
+    value: undefined
+    extra:
+      raw: "/a\\w\\u1111\\ud804\\udd11/"
+      originalRaw: "/a\\w\\u1111\\u{11111}/"
+      rawValue: undefined
+
+  testExpression '''
+    ///
+      a
+      \\w\\u1111\\u{11111}
+    ///
+  ''',
+    type: 'RegExpLiteral'
+    pattern: 'a\\w\\u1111\\ud804\\udd11'
+    originalPattern: '\n  a\n  \\w\\u1111\\u{11111}\n'
+    flags: ''
+    delimiter: '///'
+    value: undefined
+    extra:
+      raw: "/a\\w\\u1111\\ud804\\udd11/"
+      originalRaw: "///\n  a\n  \\w\\u1111\\u{11111}\n///"
+      rawValue: undefined
+
+  testExpression '''
+    ///
+      /
+      (.+)
+      /
+    ///
+  ''',
+    type: 'RegExpLiteral'
+    pattern: '\\/(.+)\\/'
+    originalPattern: '\n  /\n  (.+)\n  /\n'
+    flags: ''
+    delimiter: '///'
+    value: undefined
+    extra:
+      raw: "/\\/(.+)\\//"
+      originalRaw: "///\n  /\n  (.+)\n  /\n///"
+      rawValue: undefined
