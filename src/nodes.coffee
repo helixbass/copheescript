@@ -6443,7 +6443,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
       wrapped.jsxAttribute = yes
       return wrapped.compileNode o
 
-    elements = @extractElements o
+    elements = @extractElements o, isJsx: @jsx
 
     fragments = []
     fragments.push @makeCode '`' unless @jsx
