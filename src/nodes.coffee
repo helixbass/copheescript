@@ -798,14 +798,14 @@ exports.Block = class Block extends Base
     len = @expressions.length
     [..., lastExp] = @expressions
     lastExp = lastExp?.unwrap() or no
-    # We also need to check that we’re not returning a CSX tag if there’s an
+    # We also need to check that we’re not returning a JSX tag if there’s an
     # adjacent one at the same level; JSX doesn’t allow that.
     if lastExp and lastExp instanceof Parens and lastExp.body.expressions.length > 1
       {body:{expressions}} = lastExp
       [..., penult, last] = expressions
       penult = penult.unwrap()
       last = last.unwrap()
-      if penult instanceof CSXElement and last instanceof CSXElement
+      if penult instanceof JSXElement and last instanceof JSXElement
         expressions[expressions.length - 1].error 'Adjacent JSX elements must be wrapped in an enclosing tag'
     if opts?.mark
       return @expressions[len - 1]?.makeReturn opts
@@ -1482,13 +1482,13 @@ exports.StringLiteral = class StringLiteral extends Literal
     }, opts
 
   compileNode: (o) ->
-    return [@makeCode @unquote(yes, yes)] if @csx
+    return [@makeCode @unquote(yes, yes)] if @jsx
     super o
 
-  unquote: (doubleQuote = no, csx = no) ->
+  unquote: (doubleQuote = no, jsx = no) ->
     unquoted = @value[1...-1]
     unquoted = unquoted.replace /\\"/g, '"'  if doubleQuote
-    unquoted = unquoted.replace /\\n/g, '\n' if csx
+    unquoted = unquoted.replace /\\n/g, '\n' if jsx
     unquoted
 
   # `StringLiteral`s can represent either entire literal strings
@@ -1526,7 +1526,6 @@ exports.StringLiteral = class StringLiteral extends Literal
     @quote.length is 3# and @originalValue.indexOf('\n') > -1
 
   astFull: (o) ->
-    return @CSXTextToAst o if @csx
     if not o.compiling and @shouldGenerateTemplateLiteralAst()
       return StringWithInterpolations.fromStringLiteral(@).ast o
     super o
@@ -1544,24 +1543,6 @@ exports.StringLiteral = class StringLiteral extends Literal
             @value
           else
             @delimit @originalValue, justEscapeDelimiter: yes
-
-  CSXTextToAst: (o) ->
-    if o.compiling
-      unquoted = @unquote yes, yes
-    Object.assign
-      type: 'JSXText'
-      value:
-        if o.compiling
-          unquoted
-        else
-          @originalValue
-      extra:
-        raw:
-          if o.compiling
-            unquoted
-          else
-            @originalValue
-    , @astLocationData()
 
 exports.RegexLiteral = class RegexLiteral extends Literal
   constructor: (value, {@delimiter = '/'} = {}) ->
@@ -1640,7 +1621,7 @@ exports.IdentifierLiteral = class IdentifierLiteral extends Literal
     iterator @
 
   astType: ->
-    if @csx
+    if @jsx
       'JSXIdentifier'
     else
       'Identifier'
@@ -1650,27 +1631,11 @@ exports.IdentifierLiteral = class IdentifierLiteral extends Literal
       name: @value
       declaration: !!@isDeclaration
 
-exports.CSXTag = class CSXTag extends IdentifierLiteral
-  constructor: (value, {
-    @tagNameLocationData
-    @closingTagOpeningBracketLocationData
-    @closingTagSlashLocationData
-    @closingTagNameLocationData
-    @closingTagClosingBracketLocationData
-  }) ->
-    super value
-
-  astType: -> 'JSXIdentifier'
-
-  astProperties: ->
-    return
-      name: @value
-
 exports.PropertyName = class PropertyName extends Literal
   isAssignable: YES
 
   astType: ->
-    if @csx
+    if @jsx
       'JSXIdentifier'
     else
       'Identifier'
@@ -1921,7 +1886,7 @@ exports.Value = class Value extends Base
                       @isUndefined() or @isNull() or @isBoolean()
 
   isStatement : (o)    -> not @properties.length and @base.isStatement o
-  isCSXTag    : -> @base instanceof CSXTag
+  isJSXTag    : -> @base instanceof JSXTag
   assigns     : (name) -> not @properties.length and @base.assigns name
   jumps       : (o)    -> not @properties.length and @base.jumps o
 
@@ -2053,7 +2018,7 @@ exports.Value = class Value extends Base
     super o
 
   astType: ->
-    if @isCSXTag()
+    if @isJSXTag()
       'JSXMemberExpression'
     else
       'MemberExpression'
@@ -2063,7 +2028,7 @@ exports.Value = class Value extends Base
   # a child `Value` node assigned to the `object` property.
   astProperties: (o) ->
     [..., property] = @properties
-    property.name.csx = yes if @isCSXTag()
+    property.name.jsx = yes if @isJSXTag()
     computed = property instanceof Index or property.name?.unwrap() not instanceof PropertyName
     return {
       object: @object().ast o, LEVEL_ACCESS
@@ -2074,7 +2039,7 @@ exports.Value = class Value extends Base
     }
 
   astLocationData: ->
-    return super() unless @isCSXTag()
+    return super() unless @isJSXTag()
     # don't include leading < of JSX tag in location data
     mergeAstLocationData(
       jisonLocationDataToAstLocationData(@base.tagNameLocationData),
@@ -2173,16 +2138,30 @@ exports.LineComment = class LineComment extends Base
     fragment.isComment = fragment.isLineComment = yes
     fragment
 
-#### CSX
+#### JSX
 
-exports.CSXIdentifier = class CSXIdentifier extends IdentifierLiteral
+exports.JSXIdentifier = class JSXIdentifier extends IdentifierLiteral
   astType: -> 'JSXIdentifier'
 
-exports.CSXExpressionContainer = class CSXExpressionContainer extends Base
-  constructor: (@expression) ->
+exports.JSXTag = class JSXTag extends JSXIdentifier
+  constructor: (value, {
+    @tagNameLocationData
+    @closingTagOpeningBracketLocationData
+    @closingTagSlashLocationData
+    @closingTagNameLocationData
+    @closingTagClosingBracketLocationData
+  }) ->
+    super value
+
+  astProperties: ->
+    return
+      name: @value
+
+exports.JSXExpressionContainer = class JSXExpressionContainer extends Base
+  constructor: (@expression, {locationData} = {}) ->
     super()
-    @expression.csxAttribute = yes
-    @locationData = @expression.locationData
+    @expression.jsxAttribute = yes
+    @locationData = locationData ? @expression.locationData
 
   children: ['expression']
 
@@ -2195,7 +2174,22 @@ exports.CSXExpressionContainer = class CSXExpressionContainer extends Base
     return
       expression: @expression.ast o
 
-exports.CSXAttribute = class CSXAttribute extends Base
+exports.JSXEmptyExpression = class JSXEmptyExpression extends Base
+
+exports.JSXText = class JSXText extends Base
+  constructor: (stringLiteral) ->
+    super()
+    @value = stringLiteral.unquote yes, yes
+    @locationData = stringLiteral.locationData
+
+  astProperties: ->
+    return {
+      @value
+      extra:
+        raw: @value
+    }
+
+exports.JSXAttribute = class JSXAttribute extends Base
   constructor: ({@name, value}) ->
     super()
     @value =
@@ -2204,7 +2198,7 @@ exports.CSXAttribute = class CSXAttribute extends Base
         if value instanceof StringLiteral
           value
         else
-          new CSXExpressionContainer value
+          new JSXExpressionContainer value
       else
         null
     @value?.comments = value.comments
@@ -2224,7 +2218,7 @@ exports.CSXAttribute = class CSXAttribute extends Base
       name: @name.ast o
       value: @value?.ast(o) ? null
 
-exports.CSXAttributes = class CSXAttributes extends Base
+exports.JSXAttributes = class JSXAttributes extends Base
   constructor: (arr) ->
     super()
     @attributes = []
@@ -2233,21 +2227,21 @@ exports.CSXAttributes = class CSXAttributes extends Base
       {base} = object
       if base instanceof IdentifierLiteral
         # attribute with no value eg disabled
-        attribute = new CSXAttribute name: new CSXIdentifier(base.value).withLocationDataAndCommentsFrom base
+        attribute = new JSXAttribute name: new JSXIdentifier(base.value).withLocationDataAndCommentsFrom base
         attribute.locationData = base.locationData
         @attributes.push attribute
       else if not base.generated
         # object spread attribute eg {...props}
         attribute = base.properties[0]
-        attribute.csx = yes
+        attribute.jsx = yes
         attribute.locationData = base.locationData
         @attributes.push attribute
       else
         # Obj containing attributes with values eg a="b" c={d}
         for property in base.properties
           {variable, value} = property
-          attribute = new CSXAttribute {
-            name: new CSXIdentifier(variable.base.value).withLocationDataAndCommentsFrom variable.base
+          attribute = new JSXAttribute {
+            name: new JSXIdentifier(variable.base.value).withLocationDataAndCommentsFrom variable.base
             value
           }
           attribute.locationData = property.locationData
@@ -2262,7 +2256,7 @@ exports.CSXAttributes = class CSXAttributes extends Base
     properties = attribute?.properties or []
     if not (attribute instanceof Obj or attribute instanceof IdentifierLiteral) or (attribute instanceof Obj and not attribute.generated and (properties.length > 1 or not (properties[0] instanceof Splat)))
       object.error """
-        Unexpected token. Allowed CSX attributes are: id="val", src={source}, {props...} or attribute.
+        Unexpected token. Allowed JSX attributes are: id="val", src={source}, {props...} or attribute.
       """
 
   compileNode: (o) ->
@@ -2275,15 +2269,15 @@ exports.CSXAttributes = class CSXAttributes extends Base
   ast: (o) ->
     attribute.ast(o) for attribute in @attributes
 
-# Node for a CSX element
-exports.CSXElement = class CSXElement extends Base
+# Node for a JSX element
+exports.JSXElement = class JSXElement extends Base
   constructor: ({@tagName, @attributes, @content}) ->
     super()
 
   children: ['tagName', 'attributes', 'content']
 
   compileNode: (o) ->
-    @content?.base.csx = yes
+    @content?.base.jsx = yes
     fragments = [@makeCode('<')]
     fragments.push (tag = @tagName.compileToFragments(o, LEVEL_ACCESS))...
     fragments.push @attributes.compileToFragments(o)...
@@ -2371,6 +2365,73 @@ exports.CSXElement = class CSXElement extends Base
 
     {openingFragment, closingFragment}
 
+  contentAst: (o) ->
+    return [] unless @content and not @content.base.isEmpty?()
+
+    content = @content.unwrapAll()
+    children =
+      if content instanceof StringLiteral
+        [new JSXText content]
+      else # StringWithInterpolations
+        for element in @content.unwrapAll().extractElements o, includeInterpolationWrappers: yes
+          if element instanceof StringLiteral
+            new JSXText element
+          else # Interpolation
+            {expression} = element
+            unless expression?
+              new JSXEmptyExpression().withLocationDataFrom element
+            else
+              unwrapped = expression.unwrapAll()
+              if unwrapped instanceof JSXElement
+                unwrapped
+              else
+                new JSXExpressionContainer unwrapped, locationData: element.locationData
+
+    child.ast(o) for child in children when not (child instanceof JSXText and child.value.length is 0)
+
+  # CSXContentToAst: (o) ->
+  #   elements = @extractElements o
+
+  #   for element in elements
+  #     element.csx = yes
+  #     compiled = astAsBlock element, o
+  #     hasComment = do ->
+  #       hasComment = no
+  #       element.traverseChildren no, ({comments, csxAttribute}) ->
+  #         return no if csxAttribute
+  #         if comments
+  #           hasComment = yes
+  #           no
+  #       hasComment
+  #     if element instanceof StringLiteral
+  #       compiled unless element.isEmpty()
+  #     else if compiled.type in ['JSXElement', 'JSXFragment'] and not hasComment
+  #       compiled
+  #     else
+  #       element.withAstLocationData
+  #         type: 'JSXExpressionContainer'
+  #         expression: do ->
+  #           compiled.type ?= 'JSXEmptyExpression'
+  #           compiled
+
+  # CSXTextToAst: (o) ->
+  #   if o.compiling
+  #     unquoted = @unquote yes, yes
+  #   Object.assign
+  #     type: 'JSXText'
+  #     value:
+  #       if o.compiling
+  #         unquoted
+  #       else
+  #         @originalValue
+  #     extra:
+  #       raw:
+  #         if o.compiling
+  #           unquoted
+  #         else
+  #           @originalValue
+  #   , @astLocationData()
+
   astProperties: (o) ->
     Object.assign(
       if @isFragment()
@@ -2378,13 +2439,7 @@ exports.CSXElement = class CSXElement extends Base
       else
         @elementAstProperties o
     ,
-      children:
-        if @content and not @content.base.isEmpty?()
-          @content.base.csx = yes
-          compact flatten [
-            @content.ast o#, LEVEL_LIST
-          ]
-        else []
+      children: @contentAst o
     )
 
   astLocationData: ->
@@ -2405,10 +2460,10 @@ exports.Call = class Call extends Base
     if @variable instanceof Value and @variable.isNotCallable()
       @variable.error "literal is not a function"
 
-    if @variable.base instanceof CSXTag
-      return new CSXElement(
+    if @variable.base instanceof JSXTag
+      return new JSXElement(
         tagName: @variable
-        attributes: new CSXAttributes @args[0].base
+        attributes: new JSXAttributes @args[0].base
         content: @args[1]
       )
 
@@ -3069,7 +3124,7 @@ exports.Obj = class Obj extends Base
     no
 
   _compileToBabylon: (o) ->
-    return @CSXAttributesToAst o if @csx
+    return @JSXAttributesToAst o if @jsx
     @reorderProperties() if @hasSplat() and @lhs
     @propagateLhs()
 
@@ -3090,8 +3145,8 @@ exports.Obj = class Obj extends Base
       prevLast.withLocationData prop, force: yes
 
   compileNode: (o) ->
-    # CSX attributes <div id="val" attr={aaa} {props...} />
-    return @compileCSXAttributes o if @csx
+    # JSX attributes <div id="val" attr={aaa} {props...} />
+    return @compileJSXAttributes o if @jsx
 
     @reorderProperties() if @hasSplat() and @lhs
     props = @properties
@@ -3244,17 +3299,17 @@ exports.Obj = class Obj extends Base
       else if property instanceof Splat
         property.lhs = yes
 
-  CSXAttributesToAst: (o) ->
+  JSXAttributesToAst: (o) ->
     propertiesAst =
       for property in @properties
-        property.csx = yes
+        property.jsx = yes
         property.ast o#, LEVEL_TOP
     return propertiesAst unless @properties.length is 1 and @properties[0] instanceof Splat
     # Include surrounding `{` and `}` of spread prop `{...b}` in location data.
     Object.assign propertiesAst[0], @astLocationData()
 
   astFull: (o) ->
-    return @CSXAttributesToAst o if @csx
+    return @JSXAttributesToAst o if @jsx
     super o
 
   astType: ->
@@ -4177,7 +4232,7 @@ exports.Assign = class Assign extends Base
     unfoldSoak o, this, 'variable'
 
   _compileToBabylon: (o) ->
-    return @CSXAttributeToAst o if @csx
+    return @JSXAttributeToAst o if @jsx
     if @variable instanceof Value
       if @variable.isArray() or @variable.isObject()
         unless @variable.isAssignable()
@@ -4694,9 +4749,9 @@ exports.Assign = class Assign extends Base
     # destructured variables.
     @variable.base.propagateLhs yes
 
-  getCSXAttributeValueAst: (o) ->
+  getJSXAttributeValueAst: (o) ->
     value = @value.base
-    value.csxAttribute = yes
+    value.jsxAttribute = yes
     ast = astAsBlock value, o
     return ast if value instanceof StringLiteral
     Object.assign
@@ -4704,7 +4759,7 @@ exports.Assign = class Assign extends Base
       expression: ast
     , value.astLocationData()
 
-  CSXAttributeToAst: (o) ->
+  JSXAttributeToAst: (o) ->
     Object.assign
       type: 'JSXAttribute'
       name:
@@ -4712,11 +4767,11 @@ exports.Assign = class Assign extends Base
           type: 'JSXIdentifier'
           name: @variable.base.value
         , @variable.base.astLocationData()
-      value: @getCSXAttributeValueAst o
+      value: @getJSXAttributeValueAst o
     , @astLocationData()
 
   astFull: (o) ->
-    return @CSXAttributeToAst o if @csx
+    return @JSXAttributeToAst o if @jsx
     @addScopeVariables o, checkAssignability: no if not @context or @context is '**='
     super o
 
@@ -5395,13 +5450,13 @@ exports.Splat = class Splat extends Base
 
   compileNode: (o) ->
     compiledSplat = [@makeCode('...'), @name.compileToFragments(o, LEVEL_OP)...]
-    return compiledSplat unless @csx
+    return compiledSplat unless @jsx
     return [@makeCode('{'), compiledSplat..., @makeCode('}')]
 
   unwrap: -> @name
 
   astType: ->
-    if @csx
+    if @jsx
       'JSXSpreadAttribute'
     else if @lhs
       'RestElement'
@@ -6268,7 +6323,7 @@ exports.Parens = class Parens extends Base
     # by comment-based type annotations from JavaScript labels.
     shouldWrapComment = expr.comments?.some(
       (comment) -> comment.here and not comment.unshift and not comment.newLine)
-    if expr instanceof Value and expr.isAtomic() and not @csxAttribute and not shouldWrapComment
+    if expr instanceof Value and expr.isAtomic() and not @jsxAttribute and not shouldWrapComment
       expr.front = @front
       return expr.compileToFragments o
     fragments = expr.compileToFragments o, LEVEL_PAREN
@@ -6276,7 +6331,7 @@ exports.Parens = class Parens extends Base
         expr instanceof Op and not expr.isInOperator() or expr.unwrap() instanceof Call or
         (expr instanceof For and expr.returns)
       ) and (o.level < LEVEL_COND or fragments.length <= 3)
-    return @wrapInCommentBoundingBraces fragments if @csxAttribute
+    return @wrapInCommentBoundingBraces fragments if @jsxAttribute
     if bare then fragments else @wrapInParentheses fragments
 
   astFull: (o) -> @body.unwrap().ast o, LEVEL_PAREN
@@ -6302,7 +6357,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
 
   shouldCache: -> @body.shouldCache()
 
-  extractElements: (o) ->
+  extractElements: (o, {includeInterpolationWrappers} = {}) ->
     # Assumes that `expr` is `Block`
     expr = @body.unwrap()
 
@@ -6322,7 +6377,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
             comment.unshift = yes
             comment.newLine = yes
           attachCommentsToNode salvagedComments, node
-        if isEmpty and not @csx
+        if isEmpty and not @jsx
           commentPlaceholder = new StringLiteral('').withLocationDataFrom node
           commentPlaceholder.comments = unwrapped.comments
           (commentPlaceholder.comments ?= []).push node.comments... if node.comments
@@ -6331,10 +6386,10 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
           empty = new Interpolation().withLocationDataFrom node
           empty.comments = node.comments
           elements.push empty
-        else if node.expression
-          (node.expression.comments ?= []).push node.comments... if node.comments
-          node.expression.locationData = node.locationData
-          elements.push node.expression
+        else if node.expression or includeInterpolationWrappers
+          (node.expression?.comments ?= []).push node.comments... if node.comments
+          node.expression?.locationData = node.locationData
+          elements.push if includeInterpolationWrappers then node else node.expression
         else if not o.compiling
           elements.push node
         return no
@@ -6353,8 +6408,8 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
     elements
 
   prepareElementValue: (element) ->
-    element.value = element.unquote yes, @csx
-    unless @csx
+    element.value = element.unquote yes, @jsx
+    unless @jsx
       # Backticks and `${` inside template literals must be escaped.
       element.value = element.value.replace /(\\*)(`|\$\{)/g, (match, backslashes, toBeEscaped) ->
         if backslashes.length % 2 is 0
@@ -6365,21 +6420,21 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
   compileNode: (o) ->
     @comments ?= @startQuote?.comments
 
-    if @csxAttribute
+    if @jsxAttribute
       wrapped = new Parens new StringWithInterpolations @body
-      wrapped.csxAttribute = yes
+      wrapped.jsxAttribute = yes
       return wrapped.compileNode o
 
     elements = @extractElements o
 
     fragments = []
-    fragments.push @makeCode '`' unless @csx
+    fragments.push @makeCode '`' unless @jsx
     for element in elements
       if element instanceof StringLiteral
         @prepareElementValue(element)
         fragments.push element.compileToFragments(o)...
       else
-        fragments.push @makeCode '$' unless @csx
+        fragments.push @makeCode '$' unless @jsx
         code = element.compileToFragments(o, LEVEL_PAREN)
         if not @isNestedTag(element) or code.some(do ->
           insideCommentBoundary = 0
@@ -6391,16 +6446,12 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
         )
           code = @wrapInCommentBoundingBraces code
         fragments.push code...
-    fragments.push @makeCode '`' unless @csx
+    fragments.push @makeCode '`' unless @jsx
     fragments
 
   isNestedTag: (element) ->
     call = element.unwrapAll?()
-    @csx and call instanceof CSXElement
-
-  astFull: (o) ->
-    return @CSXContentToAst o if @csx
-    super o
+    @jsx and call instanceof JSXElement
 
   astType: -> 'TemplateLiteral'
 
@@ -6454,31 +6505,6 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
 
     {expressions, quasis, @quote}
 
-  CSXContentToAst: (o) ->
-    elements = @extractElements o
-
-    for element in elements
-      element.csx = yes
-      compiled = astAsBlock element, o
-      hasComment = do ->
-        hasComment = no
-        element.traverseChildren no, ({comments, csxAttribute}) ->
-          return no if csxAttribute
-          if comments
-            hasComment = yes
-            no
-        hasComment
-      if element instanceof StringLiteral
-        compiled unless element.isEmpty()
-      else if compiled.type in ['JSXElement', 'JSXFragment'] and not hasComment
-        compiled
-      else
-        element.withAstLocationData
-          type: 'JSXExpressionContainer'
-          expression: do ->
-            compiled.type ?= 'JSXEmptyExpression'
-            compiled
-
 exports.TemplateElement = class TemplateElement extends Base
   constructor: (@value, {@tail} = {}) ->
     super()
@@ -6500,7 +6526,7 @@ exports.Interpolation = class Interpolation extends Base
     super o
 
   astType: ->
-    if @csx
+    if @jsx
       'JSXEmptyExpression'
     else
       'EmptyInterpolation'
