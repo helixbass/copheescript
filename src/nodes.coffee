@@ -2373,7 +2373,7 @@ exports.JSXElement = class JSXElement extends Base
       if content instanceof StringLiteral
         [new JSXText content]
       else # StringWithInterpolations
-        for element in @content.unwrapAll().extractElements o, includeInterpolationWrappers: yes
+        for element in @content.unwrapAll().extractElements o, includeInterpolationWrappers: yes, isJsx: yes
           if element instanceof StringLiteral
             new JSXText element
           else # Interpolation
@@ -6357,7 +6357,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
 
   shouldCache: -> @body.shouldCache()
 
-  extractElements: (o, {includeInterpolationWrappers} = {}) ->
+  extractElements: (o, {includeInterpolationWrappers, isJsx} = {}) ->
     # Assumes that `expr` is `Block`
     expr = @body.unwrap()
 
@@ -6377,7 +6377,7 @@ exports.StringWithInterpolations = class StringWithInterpolations extends Base
             comment.unshift = yes
             comment.newLine = yes
           attachCommentsToNode salvagedComments, node
-        if isEmpty and not @jsx
+        if isEmpty and not isJsx
           commentPlaceholder = new StringLiteral('').withLocationDataFrom node
           commentPlaceholder.comments = unwrapped.comments
           (commentPlaceholder.comments ?= []).push node.comments... if node.comments
