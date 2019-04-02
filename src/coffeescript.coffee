@@ -17,7 +17,8 @@ packageJson   = require '../../package.json'
 # babylonToEspree = require '../../node_modules/babel-eslint/babylon-to-espree'
 babelTraverse = require('babel-traverse').default
 babylonTokenTypes = require('babylon').tokTypes
-prettier = require 'prettier'
+# prettier = require 'prettier'
+prettier = null
 
 # The current CoffeeScript version number.
 exports.VERSION = packageJson.version

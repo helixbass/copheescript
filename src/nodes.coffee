@@ -7,7 +7,8 @@ Error.stackTraceLimit = Infinity
 
 {Scope} = require './scope'
 {isUnassignable, JS_FORBIDDEN} = require './lexer'
-prettier = require 'prettier'
+# prettier = require 'prettier'
+prettier = null
 babylon = require 'babylon'
 
 # Import the helpers we plan to use.
