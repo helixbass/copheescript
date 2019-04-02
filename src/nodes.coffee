@@ -866,7 +866,7 @@ exports.Block = class Block extends Base
   prettier: (o) ->
     code = del o, 'code'
     returnWithAst = del o, 'returnWithAst'
-    { opts } = prettier.__debug.parse ''
+    { opts } = prettier.__debug.parse '', parser: 'babylon'
     ast = @compileToBabylon merge o, forPrettier: yes
     prettier.__debug.attachComments code, ast, opts
     formatted = prettier.__debug.formatAST(ast, merge opts, originalText: code).formatted

@@ -139,7 +139,7 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
       {formatted, ast} = nodes.prettier merge options, {code, returnWithAst: yes}
       return formatted unless generateSourceMap
 
-      {ast: prettierAst} = prettier.__debug.parseAndAttachComments formatted
+      {ast: prettierAst} = prettier.__debug.parseAndAttachComments formatted, parser: 'babylon'
       # dump {ast, prettierAst}
       traverseBabylonAsts ast.program.body, prettierAst.program.body, (node, prettierNode) ->
         return unless node?.loc

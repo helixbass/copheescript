@@ -1,7 +1,7 @@
 prettier = require 'prettier'
 babylon = require 'babylon'
 formatWithPrettier = (js, {returnAll} = {}) ->
-  formatted = prettier.format "FORCE_NON_DIRECTIVE; #{js}"
+  formatted = prettier.format "FORCE_NON_DIRECTIVE; #{js}", parser: 'babylon'
   # {parsed: {ast}, opts} = prettier.__debug.parse "FORCE_NON_DIRECTIVE; #{js}"
   # opts.originalText = js
   # {formatted} = prettier.__debug.formatAST ast, opts
