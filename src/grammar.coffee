@@ -685,13 +685,22 @@ grammar =
     o 'UNTIL ExpressionLine WHEN Expression',   -> new While $2, invert: true, guard: $4
   ]
 
+  PostfixWhileSource: [
+    o 'POST_WHILE Expression',                       -> new While $2
+    o 'POST_WHILE Expression WHEN Expression',       -> new While $2, guard: $4
+    o 'POST_WHILE ExpressionLine WHEN Expression',   -> new While $2, guard: $4
+    o 'POST_UNTIL Expression',                       -> new While $2, invert: true
+    o 'POST_UNTIL Expression WHEN Expression',       -> new While $2, invert: true, guard: $4
+    o 'POST_UNTIL ExpressionLine WHEN Expression',   -> new While $2, invert: true, guard: $4
+  ]
+
   # The while loop can either be normal, with a block of expressions to execute,
   # or postfix, with a single expression. There is no do..while.
   While: [
     o 'WhileSource Block',                      -> $1.addBody $2
     o 'WhileLineSource Block',                  -> $1.addBody $2
-    o 'Statement  WhileSource',                 -> (Object.assign $2, postfix: yes).addBody LOC(1) Block.wrap([$1])
-    o 'Expression WhileSource',                 -> (Object.assign $2, postfix: yes).addBody LOC(1) Block.wrap([$1])
+    o 'Statement  PostfixWhileSource',          -> (Object.assign $2, postfix: yes).addBody LOC(1) Block.wrap([$1])
+    o 'Expression PostfixWhileSource',          -> (Object.assign $2, postfix: yes).addBody LOC(1) Block.wrap([$1])
     o 'Loop',                                   -> $1
   ]
 
@@ -704,16 +713,22 @@ grammar =
   # Comprehensions can either be normal, with a block of expressions to execute,
   # or postfix, with a single expression.
   For: [
-    o 'Statement    ForBody',  -> $2.postfix = yes; $2.addBody $1
-    o 'Expression   ForBody',  -> $2.postfix = yes; $2.addBody $1
-    o 'ForBody      Block',    -> $1.addBody $2
-    o 'ForLineBody  Block',    -> $1.addBody $2
+    o 'Statement    PostfixForBody',  -> $2.postfix = yes; $2.addBody $1
+    o 'Expression   PostfixForBody',  -> $2.postfix = yes; $2.addBody $1
+    o 'ForBody      Block',           -> $1.addBody $2
+    o 'ForLineBody  Block',           -> $1.addBody $2
   ]
 
   ForBody: [
     o 'FOR Range',                -> new For [], source: (LOC(2) new Value($2))
     o 'FOR Range BY Expression',  -> new For [], source: (LOC(2) new Value($2)), step: $4
     o 'ForStart ForSource',       -> $1.addSource $2
+  ]
+
+  PostfixForBody: [
+    o 'POST_FOR Range',                -> new For [], source: (LOC(2) new Value($2))
+    o 'POST_FOR Range BY Expression',  -> new For [], source: (LOC(2) new Value($2)), step: $4
+    o 'PostfixForStart ForSource',     -> $1.addSource $2
   ]
 
   ForLineBody: [
@@ -727,6 +742,16 @@ grammar =
         [name, index] = $3
         new For [], {name, index, await: yes, awaitTag: (LOC(2) new Literal($2))}
     o 'FOR OWN ForVariables',    ->
+        [name, index] = $3
+        new For [], {name, index, own: yes, ownTag: (LOC(2) new Literal($2))}
+  ]
+
+  PostfixForStart: [
+    o 'POST_FOR ForVariables',        -> new For [], name: $2[0], index: $2[1]
+    o 'POST_FOR AWAIT ForVariables',  ->
+        [name, index] = $3
+        new For [], {name, index, await: yes, awaitTag: (LOC(2) new Literal($2))}
+    o 'POST_FOR OWN ForVariables',    ->
         [name, index] = $3
         new For [], {name, index, own: yes, ownTag: (LOC(2) new Literal($2))}
   ]
@@ -938,7 +963,7 @@ operators = [
   ['right',     '=', ':', 'COMPOUND_ASSIGN', 'RETURN', 'THROW', 'EXTENDS']
   ['right',     'FORIN', 'FOROF', 'FORFROM', 'BY', 'WHEN']
   ['right',     'IF', 'ELSE', 'FOR', 'WHILE', 'UNTIL', 'LOOP', 'SUPER', 'CLASS', 'IMPORT', 'EXPORT', 'DYNAMIC_IMPORT']
-  ['left',      'POST_IF']
+  ['left',      'POST_IF', 'POST_FOR', 'POST_WHILE', 'POST_UNTIL']
 ]
 
 # Wrapping Up

@@ -47,6 +47,7 @@ exports.Rewriter = class Rewriter
     if process?.env?.DEBUG_TOKEN_STREAM
       console.log 'Initial token stream:' if process.env.DEBUG_REWRITTEN_TOKEN_STREAM
       console.log (t[0] + '/' + t[1] + (if t.comments then '*' else '') for t in @tokens).join ' '
+    # dump @tokens
     @removeLeadingNewlines()
     @closeOpenCalls()
     @closeOpenIndexes()
@@ -61,6 +62,7 @@ exports.Rewriter = class Rewriter
     if process?.env?.DEBUG_REWRITTEN_TOKEN_STREAM
       console.log 'Rewritten token stream:' if process.env.DEBUG_TOKEN_STREAM
       console.log (t[0] + '/' + t[1] + (if t.comments then '*' else '') for t in @tokens).join ' '
+    dump @tokens
     @tokens
 
   # Rewrite the token stream, looking one token ahead and behind.
@@ -371,7 +373,7 @@ exports.Rewriter = class Rewriter
           # return a: 1, b: 2 unless true
           else if inImplicitObject() and sameLine and
                   tag isnt 'TERMINATOR' and prevTag isnt ':' and
-                  not (tag in ['POST_IF', 'FOR', 'WHILE', 'UNTIL'] and startsLine and implicitObjectContinues(i + 1))
+                  not (tag in ['POST_IF', 'POST_FOR', 'POST_WHILE', 'POST_UNTIL'] and startsLine and implicitObjectContinues(i + 1))
             endImplicitObject()
           # Close implicit objects when at end of line, line didn't end with a comma
           # and the implicit object didn't start the line or the next line doesn’t look like
@@ -651,7 +653,7 @@ exports.Rewriter = class Rewriter
         original[0] = 'POST_' + original[0]
 
     @scanTokens (token, i) ->
-      return 1 unless token[0] is 'IF'
+      return 1 unless token[0] in ['IF', 'WHILE', 'UNTIL', 'FOR']
       original = token
       @detectEnd i + 1, condition, action
       return 1
@@ -725,6 +727,7 @@ IMPLICIT_CALL    = [
   'IDENTIFIER', 'JSX_TAG', 'PROPERTY', 'NUMBER', 'INFINITY', 'NAN'
   'STRING', 'STRING_START', 'REGEX', 'REGEX_START', 'JS'
   'NEW', 'PARAM_START', 'CLASS', 'IF', 'TRY', 'SWITCH', 'THIS'
+  'WHILE', 'FOR'
   'UNDEFINED', 'NULL', 'BOOL'
   'UNARY', 'DO', 'DO_IIFE', 'YIELD', 'AWAIT', 'UNARY_MATH', 'SUPER', 'THROW'
   '@', '->', '=>', '[', '(', '{', '--', '++'
@@ -733,7 +736,7 @@ IMPLICIT_CALL    = [
 IMPLICIT_UNSPACED_CALL = ['+', '-']
 
 # Tokens that always mark the end of an implicit call for single-liners.
-IMPLICIT_END     = ['POST_IF', 'FOR', 'WHILE', 'UNTIL', 'WHEN', 'BY',
+IMPLICIT_END     = ['POST_IF', 'POST_FOR', 'POST_WHILE', 'POST_UNTIL', 'WHEN', 'BY',
   'LOOP', 'TERMINATOR']
 
 # Single-line flavors of block expressions that have unclosed endings.
@@ -748,7 +751,7 @@ LINEBREAKS       = ['TERMINATOR', 'INDENT', 'OUTDENT']
 CALL_CLOSERS     = ['.', '?.', '::', '?::']
 
 # Tokens that prevent a subsequent indent from ending implicit calls/objects
-CONTROL_IN_IMPLICIT = ['IF', 'TRY', 'FINALLY', 'CATCH', 'CLASS', 'SWITCH']
+CONTROL_IN_IMPLICIT = ['IF', 'TRY', 'FINALLY', 'CATCH', 'CLASS', 'SWITCH', 'WHILE', 'UNTIL', 'FOR']
 
 # Tokens that are swallowed up by the parser, never leading to code generation.
 # You can spot these in `grammar.coffee` because the `o` function second
@@ -762,3 +765,4 @@ DISCARDED = ['(', ')', '[', ']', '{', '}', '.', '..', '...', ',', '=', '++', '--
   'INTERPOLATION_START', 'INTERPOLATION_END', 'LEADING_WHEN', 'OUTDENT', 'PARAM_END',
   'REGEX_START', 'REGEX_END', 'RETURN', 'STRING_END', 'THROW', 'UNARY', 'YIELD'
 ].concat IMPLICIT_UNSPACED_CALL.concat IMPLICIT_END.concat CALL_CLOSERS.concat CONTROL_IN_IMPLICIT
+dump = (obj) -> console.log require('util').inspect obj, no, null
