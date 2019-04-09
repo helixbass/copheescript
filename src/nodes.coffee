@@ -3375,8 +3375,8 @@ exports.ObjectProperty = class ObjectProperty extends Base
     #     @key.ast o
 
     return
-      key: @key.ast o
-      value: @value?.ast(o) ? @key.ast o
+      key: @key.ast o, LEVEL_LIST
+      value: @value?.ast(o, LEVEL_LIST) ? @key.ast o, LEVEL_LIST
       shorthand: !!@shorthand
       computed: !!isComputedPropertyName
       method: no
@@ -3504,9 +3504,9 @@ exports.Class = class Class extends Base
 
   constructor: (@variable, @parent, @body) ->
     super()
-    unless @body
+    unless @body?
       @body = new Block
-      @generatedBody = yes
+      @hasGeneratedBody = yes
 
   compileNode: (o) ->
     @name          = @determineName()
@@ -3571,7 +3571,7 @@ exports.Class = class Class extends Base
     name.isDeclaration = not alreadyDeclared
 
   fixBodyLocationData: ->
-    return unless @generatedBody
+    return unless @hasGeneratedBody
 
     @body.withEmptyTrailingLocationDataFrom @
 
@@ -3781,17 +3781,18 @@ exports.Class = class Class extends Base
 
     null
 
-  isStatementAst: (o) -> yes
-
   astFull: (o) ->
     @declareName o
     @fixBodyLocationData()
     @name = @determineName()
     @body.isClassBody = yes
+    @body.locationData = zeroWidthLocationDataFromEndLocation @locationData if @hasGeneratedBody
     @walkBody o
     @sniffDirectives @body.expressions, replace: yes
     @ctor?.noReturn = true
     super o
+
+  isStatementAst: -> yes
 
   astType: (o) ->
     if o.level is LEVEL_TOP
@@ -3800,9 +3801,10 @@ exports.Class = class Class extends Base
       'ClassExpression'
 
   astProperties: (o) ->
-    id: @variable?.ast(o) ? null
-    superClass: @parent?.ast(o, LEVEL_PAREN) ? null
-    body: @body.ast o, LEVEL_TOP
+    return
+      id: @variable?.ast(o) ? null
+      superClass: @parent?.ast(o, LEVEL_PAREN) ? null
+      body: @body.ast o, LEVEL_TOP
 
 exports.ClassProperty = class ClassProperty extends Base
   constructor: ({@name, @isStatic, @value, @operatorToken}) ->
@@ -4967,7 +4969,7 @@ exports.Code = class Code extends Base
       async: @isAsync
       params: @compileParamsToBabylon {params, haveSplatParam, o}
       body: @body.compileWithDeclarationsToBabylon o
-      ...@methodAstFields o
+      ...@methodAstProperties o
     }
 
   expandThisParams: (o) ->
@@ -5295,7 +5297,7 @@ exports.Code = class Code extends Base
     else
       name
 
-  methodAstFields: (o) ->
+  methodAstProperties: (o) ->
     return {} unless @isMethod
 
     [methodScope, o.scope] = [o.scope, o.scope.parent]
@@ -5303,11 +5305,7 @@ exports.Code = class Code extends Base
     o.scope = methodScope
 
     fields =
-      kind:
-        if @ctor
-          'constructor'
-        else
-          'method'
+      static: @isStatic
       key: compiledName
       computed: do =>
         return no if not o.compiling and @name instanceof Index and @name.index instanceof StringWithInterpolations
@@ -5316,7 +5314,11 @@ exports.Code = class Code extends Base
         return no unless o.compiling
         return yes if @name instanceof Access and (@name.name instanceof NumberLiteral or @name.name instanceof StringLiteral)
         no
-      static: @isStatic
+      kind:
+        if @ctor
+          'constructor'
+        else
+          'method'
       bound: !!@bound
     unless o.compiling
       fields.staticClassName = @isStatic.className if @isStatic?.className
@@ -5324,7 +5326,7 @@ exports.Code = class Code extends Base
     fields
 
   astProperties: (o) ->
-    return {
+    return Object.assign
       params: @paramForAst(param).ast(o) for param in @params
       body: {
         ...@body.ast merge(o, checkForDirectives: yes), LEVEL_TOP
@@ -5335,8 +5337,14 @@ exports.Code = class Code extends Base
       # We never generate named functions, so specify `id` as `null`, which
       # matches the Babel AST for anonymous function expressions/arrow functions
       id: null
-      ...@methodAstFields o
-    }
+    ,
+      if @isMethod then @methodAstProperties o else {}
+
+  astLocationData: ->
+    functionLocationData = super()
+    return functionLocationData unless @isMethod
+
+    mergeAstLocationData @name.astLocationData(), functionLocationData
 
 #### Param
 
@@ -7562,3 +7570,14 @@ jisonLocationDataToAstLocationData = ({first_line, first_column, last_line_exclu
     ]
     start: range[0]
     end:   range[1]
+
+# Generate a zero-width location data that corresponds to the end of another node’s location.
+zeroWidthLocationDataFromEndLocation = ({range: [, endRange], last_line_exclusive, last_column_exclusive}) -> {
+  first_line: last_line_exclusive
+  first_column: last_column_exclusive
+  last_line: last_line_exclusive
+  last_column: last_column_exclusive
+  last_line_exclusive
+  last_column_exclusive
+  range: [endRange, endRange]
+}
