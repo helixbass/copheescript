@@ -34,3 +34,4 @@
 - TemplateElement.value.cooked?
 - add tests for unicode code point escapes etc for interpolated heregex (like there are some for non-interpolated regex/heregex)
 - StringLiteral escaping (eg "\u2017" un-escapes the unicode escape for value/extra.rawValue)
+- ClassProperty variance field?
