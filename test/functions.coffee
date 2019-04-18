@@ -522,3 +522,10 @@ test "allow linebreak/indentation before default param value", ->
   ) -> q
   eq a, obj.f()
   eq b, obj.p
+
+test "#5121: array end bracket after function glyph", ->
+  a = [->]
+  eq a.length, 1
+
+  b = [c: ->]
+  eq b.length, 1
