@@ -3,5 +3,5 @@
 # causes this test to load is adapted from
 # https://github.com/tc39/proposal-regexp-dotall-flag#proposed-solution.
 
-test "dotall flag", ->
+test 'dotall flag', ->
   doesNotThrow -> /a.b/s.test 'a\nb'

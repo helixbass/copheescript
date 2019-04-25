@@ -1,6 +1,5 @@
 if vm = require? 'vm'
-
-  test "CoffeeScript.eval runs in the global context by default", ->
+  test 'CoffeeScript.eval runs in the global context by default', ->
     global.punctuation = '!'
     code = '''
     global.fhqwhgads = "global superpower#{global.punctuation}"
@@ -9,7 +8,7 @@ if vm = require? 'vm'
     eq result, 'global superpower!'
     eq fhqwhgads, 'global superpower!'
 
-  test "CoffeeScript.eval can run in, and modify, a Script context sandbox", ->
+  test 'CoffeeScript.eval can run in, and modify, a Script context sandbox', ->
     createContext = vm.Script.createContext ? vm.createContext
     sandbox = createContext()
     sandbox.foo = 'bar'
@@ -20,8 +19,8 @@ if vm = require? 'vm'
     eq result, 'not bar!'
     eq sandbox.foo, 'not bar!'
 
-  test "CoffeeScript.eval can run in, but cannot modify, an ordinary object sandbox", ->
-    sandbox = {foo: 'bar'}
+  test 'CoffeeScript.eval can run in, but cannot modify, an ordinary object sandbox', ->
+    sandbox = foo: 'bar'
     code = '''
     global.foo = 'not bar!'
     '''

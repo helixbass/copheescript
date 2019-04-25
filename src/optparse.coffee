@@ -12,7 +12,6 @@
 # The `coffee` command uses an instance of **OptionParser** to parse its
 # command-line arguments in `src/command.coffee`.
 exports.OptionParser = class OptionParser
-
   # Initialize with a list of valid options, in the form:
   #
   #     [short-flag, long-flag, description]
@@ -63,22 +62,22 @@ exports.OptionParser = class OptionParser
     lines = []
     lines.unshift "#{@banner}\n" if @banner
     for rule in @rules.ruleList
-      spaces  = 15 - rule.longFlag.length
-      spaces  = if spaces > 0 then repeat ' ', spaces else ''
+      spaces = 15 - rule.longFlag.length
+      spaces = if spaces > 0 then repeat ' ', spaces else ''
       letPart = if rule.shortFlag then rule.shortFlag + ', ' else '    '
       lines.push '  ' + letPart + rule.longFlag + spaces + rule.description
-    "\n#{ lines.join('\n') }\n"
+    "\n#{lines.join '\n'}\n"
 
 # Helpers
 # -------
 
 # Regex matchers for option flags on the command line and their rules.
-LONG_FLAG  = /^(--\w[\w\-]*)/
+LONG_FLAG = /^(--\w[\w\-]*)/
 SHORT_FLAG = /^(-\w)$/
 MULTI_FLAG = /^-(\w{2,})/
 # Matches the long flag part of a rule for an option with an argument. Not
 # applied to anything in process.argv.
-OPTIONAL   = /\[(\w+(\*?))\]/
+OPTIONAL = /\[(\w+(\*?))\]/
 
 # Build and return the list of option rules. If the optional *short-flag* is
 # unspecified, leave it out by padding with `null`.
@@ -100,17 +99,15 @@ buildRules = (ruleDeclarations) ->
 # Build a rule from a `-o` short flag, a `--output [DIR]` long flag, and the
 # description of what the option does.
 buildRule = (shortFlag, longFlag, description) ->
-  match     = longFlag.match(OPTIONAL)
+  match = longFlag.match OPTIONAL
   shortFlag = shortFlag?.match(SHORT_FLAG)[1]
-  longFlag  = longFlag.match(LONG_FLAG)[1]
-  {
-    name:         longFlag.replace /^--/, ''
-    shortFlag:    shortFlag
-    longFlag:     longFlag
-    description:  description
-    hasArgument:  !!(match and match[1])
-    isList:       !!(match and match[2])
-  }
+  longFlag = longFlag.match(LONG_FLAG)[1]
+  name: longFlag.replace /^--/, ''
+  shortFlag: shortFlag
+  longFlag: longFlag
+  description: description
+  hasArgument: !!(match and match[1])
+  isList: !!(match and match[2])
 
 normalizeArguments = (args, flagDict) ->
   rules = []
@@ -121,20 +118,23 @@ normalizeArguments = (args, flagDict) ->
     # next command-line argument as its argument, create copy of the option’s
     # rule with an `argument` field.
     if needsArgOpt?
-      withArg = Object.assign {}, needsArgOpt.rule, {argument: arg}
+      withArg = Object.assign {}, needsArgOpt.rule, argument: arg
       rules.push withArg
       needsArgOpt = null
       continue
 
-    multiFlags = arg.match(MULTI_FLAG)?[1]
-      .split('')
+    multiFlags =
+      arg
+      .match(MULTI_FLAG)?[1]
+      .split ''
       .map (flagName) -> "-#{flagName}"
     if multiFlags?
-      multiOpts = multiFlags.map (flag) ->
-        rule = flagDict[flag]
-        unless rule?
-          throw new Error "unrecognized option #{flag} in multi-flag #{arg}"
-        {rule, flag}
+      multiOpts =
+        multiFlags.map (flag) ->
+          rule = flagDict[flag]
+          unless rule?
+            throw new Error "unrecognized option #{flag} in multi-flag #{arg}"
+          {rule, flag}
       # Only the last flag in a multi-flag may have an argument.
       [innerOpts..., lastOpt] = multiOpts
       for {rule, flag} in innerOpts
@@ -146,12 +146,12 @@ normalizeArguments = (args, flagDict) ->
         needsArgOpt = lastOpt
       else
         rules.push lastOpt.rule
-    else if ([LONG_FLAG, SHORT_FLAG].some (pat) -> arg.match(pat)?)
+    else if [LONG_FLAG, SHORT_FLAG].some((pat) -> arg.match(pat)?)
       singleRule = flagDict[arg]
       unless singleRule?
         throw new Error "unrecognized option #{arg}"
       if singleRule.hasArgument
-        needsArgOpt = {rule: singleRule, flag: arg}
+        needsArgOpt = rule: singleRule, flag: arg
       else
         rules.push singleRule
     else

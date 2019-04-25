@@ -10,11 +10,11 @@ createAsyncIterable = (syncIterable) ->
   for elem in syncIterable
     yield await winLater elem, 50
 
-test "async iteration", ->
-  foo = (x for await x from createAsyncIterable [1,2,3])
+test 'async iteration', ->
+  foo = (x for await x from createAsyncIterable [1, 2, 3])
   arrayEq foo, [1, 2, 3]
 
-test "async generator functions", ->
+test 'async generator functions', ->
   foo = (val) ->
     yield await winLater val + 1, 50
 
@@ -27,6 +27,6 @@ test "async generator functions", ->
   try
     b = do -> await bar(41).next()
     b.catch (err) ->
-      eq "40", err.message
+      eq '40', err.message
   catch err
     ok no

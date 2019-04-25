@@ -13,11 +13,11 @@
 # TODO: make sure postfix forms and expression coercion are properly tested
 
 # shared identity function
-id = (_) -> if arguments.length is 1 then _ else Array::slice.call(arguments)
+id = (_) -> if arguments.length is 1 then _ else Array::slice.call arguments
 
 # Conditionals
 
-test "basic conditionals", ->
+test 'basic conditionals', ->
   if false
     ok false
   else if false
@@ -46,152 +46,156 @@ test "basic conditionals", ->
   else
     ok true
 
-test "single-line conditional", ->
+test 'single-line conditional', ->
   if false then ok false else ok true
   unless false then ok true else ok false
 
-test "nested conditionals", ->
+test 'nested conditionals', ->
   nonce = {}
-  eq nonce, (if true
-    unless false
-      if false then false else
-        if true
-          nonce)
+  eq nonce,
+    if true
+      unless false
+        if false
+          false
+        else
+          if true
+            nonce
 
-test "nested single-line conditionals", ->
+test 'nested single-line conditionals', ->
   nonce = {}
 
-  a = if false then undefined else b = if 0 then undefined else nonce
+  a = if false then undefined else (b = if 0 then undefined else nonce)
   eq nonce, a
   eq nonce, b
 
-  c = if false then undefined else (if 0 then undefined else nonce)
+  c = if false then undefined else if 0 then undefined else nonce
   eq nonce, c
 
-  d = if true then id(if false then undefined else nonce)
+  d = if true then id (if false then undefined else nonce)
   eq nonce, d
 
-test "empty conditional bodies", ->
-  eq undefined, (if false
-  else if false
-  else)
+test 'empty conditional bodies', ->
+  eq undefined,
+    if false
+    else if false
+    else
 
-test "conditional bodies containing only comments", ->
-  eq undefined, (if true
-    ###
-    block comment
-    ###
-  else
-    # comment
-  )
+test 'conditional bodies containing only comments', ->
+  eq undefined,
+    if true
+      ###
+      block comment
+      ###
+    else
+      # comment
 
-  eq undefined, (if false
-    # comment
-  else if true
-    ###
-    block comment
-    ###
-  else)
+  eq undefined,
+    if false
+      # comment
+    else if true
+      ###
+      block comment
+      ###
+    else
 
-test "return value of if-else is from the proper body", ->
+test 'return value of if-else is from the proper body', ->
   nonce = {}
   eq nonce, if false then undefined else nonce
 
-test "return value of unless-else is from the proper body", ->
+test 'return value of unless-else is from the proper body', ->
   nonce = {}
   eq nonce, unless true then undefined else nonce
 
-test "assign inside the condition of a conditional statement", ->
+test 'assign inside the condition of a conditional statement', ->
   nonce = {}
   if a = nonce then 1
   eq nonce, a
   1 if b = nonce
   eq nonce, b
 
-
 # Interactions With Functions
 
-test "single-line function definition with single-line conditional", ->
+test 'single-line function definition with single-line conditional', ->
   fn = -> if 1 < 0.5 then 1 else -1
   ok fn() is -1
 
-test "function resturns conditional value with no `else`", ->
+test 'function resturns conditional value with no `else`', ->
   fn = ->
-    return if false then true
+    return (if false then true)
   eq undefined, fn()
 
-test "function returns a conditional value", ->
+test 'function returns a conditional value', ->
   a = {}
   fnA = ->
-    return if false then undefined else a
+    return (if false then undefined else a)
   eq a, fnA()
 
   b = {}
   fnB = ->
-    return unless false then b else undefined
+    return (unless false then b else undefined)
   eq b, fnB()
 
-test "passing a conditional value to a function", ->
+test 'passing a conditional value to a function', ->
   nonce = {}
   eq nonce, id if false then undefined else nonce
 
-test "unmatched `then` should catch implicit calls", ->
+test 'unmatched `then` should catch implicit calls', ->
   a = 0
   trueFn = -> true
   if trueFn undefined then a++
   eq 1, a
 
-
 # if-to-ternary
 
-test "if-to-ternary with instanceof requires parentheses", ->
+test 'if-to-ternary with instanceof requires parentheses', ->
   nonce = {}
-  eq nonce, (if {} instanceof Object
-    nonce
-  else
-    undefined)
+  eq nonce,
+    if {} instanceof Object
+      nonce
+    else
+      undefined
 
-test "if-to-ternary as part of a larger operation requires parentheses", ->
-  ok 2, 1 + if false then 0 else 1
-
+test 'if-to-ternary as part of a larger operation requires parentheses', ->
+  ok 2, 1 + (if false then 0 else 1)
 
 # Odd Formatting
 
-test "if-else indented within an assignment", ->
+test 'if-else indented within an assignment', ->
   nonce = {}
-  result =
-    if false
-      undefined
-    else
-      nonce
+  result = if false
+    undefined
+  else
+    nonce
   eq nonce, result
 
-test "suppressed indentation via assignment", ->
+test 'suppressed indentation via assignment', ->
   nonce = {}
-  result =
-    if      false then undefined
-    else if no    then undefined
-    else if 0     then undefined
-    else if 1 < 0 then undefined
-    else               id(
-         if false then undefined
-         else          nonce
-    )
+  result = if false
+    undefined
+  else if no
+    undefined
+  else if 0
+    undefined
+  else if 1 < 0
+    undefined
+  else
+    id if false then undefined else nonce
   eq nonce, result
 
-test "tight formatting with leading `then`", ->
+test 'tight formatting with leading `then`', ->
   nonce = {}
   eq nonce,
-  if true
-  then nonce
-  else undefined
+    if true
+      nonce
+    else
+      undefined
 
-test "#738: inline function defintion", ->
+test '#738: inline function defintion', ->
   nonce = {}
   fn = if true then -> nonce
   eq nonce, fn()
 
-test "#748: trailing reserved identifiers", ->
+test '#748: trailing reserved identifiers', ->
   nonce = {}
   obj = delete: true
   result = if obj.delete
@@ -199,38 +203,37 @@ test "#748: trailing reserved identifiers", ->
   eq nonce, result
 
 test 'if-else within an assignment, condition parenthesized', ->
-  result = if (1 is 1) then 'correct'
+  result = if 1 is 1 then 'correct'
   eq result, 'correct'
 
-  result = if ('whatever' ? no) then 'correct'
+  result = if 'whatever' ? no then 'correct'
   eq result, 'correct'
 
   f = -> 'wrong'
-  result = if (f?()) then 'correct' else 'wrong'
+  result = if f?() then 'correct' else 'wrong'
   eq result, 'correct'
 
 # Postfix
 
-test "#3056: multiple postfix conditionals", ->
+test '#3056: multiple postfix conditionals', ->
   temp = 'initial'
   temp = 'ignored' unless true if false
   eq temp, 'initial'
 
 # Loops
 
-test "basic `while` loops", ->
-
+test 'basic `while` loops', ->
   i = 5
   list = while i -= 1
     i * 2
-  ok list.join(' ') is "8 6 4 2"
+  ok list.join(' ') is '8 6 4 2'
 
   i = 5
   list = (i * 3 while i -= 1)
-  ok list.join(' ') is "12 9 6 3"
+  ok list.join(' ') is '12 9 6 3'
 
   i = 5
-  func   = (num) -> i -= num
+  func = (num) -> i -= num
   assert = -> ok i < 5 > 0
   results = while func 1
     assert()
@@ -238,18 +241,14 @@ test "basic `while` loops", ->
   ok results.join(' ') is '4 3 2 1'
 
   i = 10
-  results = while i -= 1 when i % 2 is 0
+  results = while i -= 1 when (i % 2) is 0
     i * 2
   ok results.join(' ') is '16 12 8 4'
 
+test 'Issue 759: `if` within `while` condition', ->
+  2 while (if 1 then 0)
 
-test "Issue 759: `if` within `while` condition", ->
-
-  2 while if 1 then 0
-
-
-test "assignment inside the condition of a `while` loop", ->
-
+test 'assignment inside the condition of a `while` loop', ->
   nonce = {}
   count = 1
   a = nonce while count--
@@ -259,27 +258,21 @@ test "assignment inside the condition of a `while` loop", ->
     b = nonce
   eq nonce, b
 
-
-test "While over break.", ->
-
+test 'While over break.', ->
   i = 0
   result = while i < 10
     i++
     break
   arrayEq result, []
 
-
-test "While over continue.", ->
-
+test 'While over continue.', ->
   i = 0
   result = while i < 10
     i++
     continue
   arrayEq result, []
 
-
-test "Basic `until`", ->
-
+test 'Basic `until`', ->
   value = false
   i = 0
   results = until value
@@ -287,9 +280,7 @@ test "Basic `until`", ->
     i++
   ok i is 6
 
-
-test "Basic `loop`", ->
-
+test 'Basic `loop`', ->
   i = 5
   list = []
   loop
@@ -298,15 +289,14 @@ test "Basic `loop`", ->
     list.push i * 2
   ok list.join(' ') is '8 6 4 2'
 
-
-test "break at the top level", ->
-  for i in [1,2,3]
+test 'break at the top level', ->
+  for i in [1, 2, 3]
     result = i
     if i == 2
       break
   eq 2, result
 
-test "break *not* at the top level", ->
+test 'break *not* at the top level', ->
   someFunc = ->
     i = 0
     while ++i < 3
@@ -317,8 +307,7 @@ test "break *not* at the top level", ->
 
 # Switch
 
-test "basic `switch`", ->
-
+test 'basic `switch`', ->
   num = 10
   result = switch num
     when 5 then false
@@ -328,14 +317,12 @@ test "basic `switch`", ->
       false
     when 10 then true
 
-
     # Mid-switch comment with whitespace
     # and multi line
     when 11 then false
     else false
 
   ok result
-
 
   func = (num) ->
     switch num
@@ -344,17 +331,15 @@ test "basic `switch`", ->
       when 1, 3, 5
         false
 
-  ok func(2)
-  ok func(6)
-  ok !func(3)
+  ok func 2
+  ok func 6
+  ok !func 3
   eq func(8), undefined
 
-
 test "Ensure that trailing switch elses don't get rewritten.", ->
-
   result = false
-  switch "word"
-    when "one thing"
+  switch 'word'
+    when 'one thing'
       doSomething()
     else
       result = true unless false
@@ -362,62 +347,52 @@ test "Ensure that trailing switch elses don't get rewritten.", ->
   ok result
 
   result = false
-  switch "word"
-    when "one thing"
+  switch 'word'
+    when 'one thing'
       doSomething()
-    when "other thing"
+    when 'other thing'
       doSomething()
     else
       result = true unless false
 
   ok result
 
-
-test "Should be able to handle switches sans-condition.", ->
-
+test 'Should be able to handle switches sans-condition.', ->
   result = switch
-    when null                     then 0
-    when !1                       then 1
-    when '' not of {''}           then 2
-    when [] not instanceof Array  then 3
-    when true is false            then 4
-    when 'x' < 'y' > 'z'          then 5
-    when 'a' in ['b', 'c']        then 6
-    when 'd' in (['e', 'f'])      then 7
+    when null then 0
+    when !1 then 1
+    when '' not of {''} then 2
+    when [] not instanceof Array then 3
+    when true is false then 4
+    when 'x' < 'y' > 'z' then 5
+    when 'a' in ['b', 'c'] then 6
+    when 'd' in ['e', 'f'] then 7
     else ok
 
   eq result, ok
 
-
-test "Should be able to use `@properties` within the switch clause.", ->
-
-  obj = {
+test 'Should be able to use `@properties` within the switch clause.', ->
+  obj =
     num: 101
     func: ->
       switch @num
         when 101 then '101!'
         else 'other'
-  }
 
   ok obj.func() is '101!'
 
-
-test "Should be able to use `@properties` within the switch cases.", ->
-
-  obj = {
+test 'Should be able to use `@properties` within the switch cases.', ->
+  obj =
     num: 101
     func: (yesOrNo) ->
       result = switch yesOrNo
         when yes then @num
         else 'other'
       result
-  }
 
   ok obj.func(yes) is 101
 
-
-test "Switch with break as the return value of a loop.", ->
-
+test 'Switch with break as the return value of a loop.', ->
   i = 10
   results = while i > 0
     i--
@@ -427,9 +402,7 @@ test "Switch with break as the return value of a loop.", ->
 
   eq results.join(', '), '9, 7, 5, 3, 1'
 
-
 test "Issue #997. Switch doesn't fallthrough.", ->
-
   val = 1
   switch true
     when true
@@ -442,29 +415,30 @@ test "Issue #997. Switch doesn't fallthrough.", ->
 
 # Throw
 
-test "Throw should be usable as an expression.", ->
+test 'Throw should be usable as an expression.', ->
   try
     false or throw 'up'
     throw new Error 'failed'
   catch e
     ok e is 'up'
 
-
-test "#2555, strange function if bodies", ->
+test '#2555, strange function if bodies', ->
   success = -> ok true
   failure = -> ok false
 
   success() if do ->
     yes
 
-  failure() if try
-    false
+  failure() if (
+    try
+      false
+  )
 
-test "#1057: `catch` or `finally` in single-line functions", ->
+test '#1057: `catch` or `finally` in single-line functions', ->
   ok do -> try throw 'up' catch then yes
   ok do -> try yes finally 'nothing'
 
-test "#2367: super in for-loop", ->
+test '#2367: super in for-loop', ->
   class Foo
     sum: 0
     add: (val) -> @sum += val
@@ -474,19 +448,19 @@ test "#2367: super in for-loop", ->
       super val for val in vals
       @sum
 
-  eq 10, (new Bar).add 2, 3, 5
+  eq 10, new Bar().add 2, 3, 5
 
-test "#4267: lots of for-loops in the same scope", ->
+test '#4267: lots of for-loops in the same scope', ->
   # This used to include the invalid JavaScript `var do = 0`.
   code = """
     do ->
-      #{Array(200).join('for [0..0] then\n  ')}
+      #{Array(200).join 'for [0..0] then\n  '}
       true
   """
-  ok CoffeeScript.eval(code)
+  ok CoffeeScript.eval code
 
 # Test for issue #2342: Lexer: Inline `else` binds to wrong `if`/`switch`
-test "#2343: if / then / if / then / else", ->
+test '#2343: if / then / if / then / else', ->
   a = b = yes
   c = e = g = no
   d = 1
@@ -509,41 +483,49 @@ test "#2343: if / then / if / then / else", ->
               i
 
   t = ->
-    if a then if b
-      if c then d
-      else if e
-        f
-      else if g
-        h
-      else
-        i
+    if a
+      if b
+        if c
+          d
+        else if e
+          f
+        else if g
+          h
+        else
+          i
 
   u = ->
-    if a then if b
-      if c then d else if e
-        f
-      else if g
-        h
-      else i
+    if a
+      if b
+        if c
+          d
+        else if e
+          f
+        else if g
+          h
+        else
+          i
 
   v = ->
-    if a then if b
-      if c then d else if e then f
-      else if g then h
-      else i
+    if a
+      if b
+        if c then d else if e then f else if g then h else i
 
   w = ->
-    if a then if b
-      if c then d
-      else if e
+    if a
+      if b
+        if c
+          d
+        else if e
           f
         else
-          if g then h
-          else i
+          if g then h else i
 
-  x = -> if a then if b then if c then d else if e then f else if g then h else i
+  x = ->
+    if a then if b then if c then d else if e then f else if g then h else i
 
-  y = -> if a then if b then (if c then d else (if e then f else (if g then h else i)))
+  y = ->
+    if a then if b then (if c then d else if e then f else if g then h else i)
 
   eq 4, s()
   eq 4, t()
@@ -571,7 +553,7 @@ test "#2343: if / then / if / then / else", ->
   eq undefined, x()
   eq undefined, y()
 
-test "#2343: if / then / if / then / else / else", ->
+test '#2343: if / then / if / then / else / else', ->
   a = b = yes
   c = e = g = no
   d = 1
@@ -603,7 +585,8 @@ test "#2343: if / then / if / then / else / else", ->
   t = ->
     if a
       if b
-        if c then d
+        if c
+          d
         else if e
           f
         else if g
@@ -618,35 +601,53 @@ test "#2343: if / then / if / then / else / else", ->
   u = ->
     if a
       if b
-        if c then d else if e
+        if c
+          d
+        else if e
           f
         else if g
           h
-        else i
-      else j
-    else k
+        else
+          i
+      else
+        j
+    else
+      k
 
   v = ->
     if a
       if b
-        if c then d else if e then f
-        else if g then h
-        else i
-      else j else k
+        if c then d else if e then f else if g then h else i
+      else
+        j
+    else
+      k
 
   w = ->
-    if a then if b
-        if c then d
+    if a
+      if b
+        if c
+          d
         else if e
-            f
-          else
-            if g then h
-            else i
-    else j else k
+          f
+        else
+          if g then h else i
+      else
+        j
+    else
+      k
 
-  x = -> if a then if b then if c then d else if e then f else if g then h else i else j else k
+  x = ->
+    if a
+      if b then if c then d else if e then f else if g then h else i else j
+    else
+      k
 
-  y = -> if a then (if b then (if c then d else (if e then f else (if g then h else i))) else j) else k
+  y = ->
+    if a
+      if b then (if c then d else if e then f else if g then h else i) else j
+    else
+      k
 
   eq 4, s()
   eq 4, t()
@@ -683,8 +684,7 @@ test "#2343: if / then / if / then / else / else", ->
   eq 6, x()
   eq 6, y()
 
-
-test "#2343: switch / when / then / if / then / else", ->
+test '#2343: switch / when / then / if / then / else', ->
   a = b = yes
   c = e = g = no
   d = 1
@@ -707,42 +707,48 @@ test "#2343: switch / when / then / if / then / else", ->
               else
                 i
 
-
   t = ->
     switch
-      when a then if b
-        if c then d
-        else if e
-          f
-        else if g
-          h
-        else
-          i
+      when a
+        if b
+          if c
+            d
+          else if e
+            f
+          else if g
+            h
+          else
+            i
 
   u = ->
     switch
-      when a then if b then if c then d
-      else if e then f
-      else if g then h else i
+      when a then if b then if c then d else if e then f else if g then h else i
 
   v = ->
     switch
-      when a then if b then if c then d else if e then f
-      else if g then h else i
+      when a then if b then if c then d else if e then f else if g then h else i
 
   w = ->
     switch
-      when a then if b then if c then d else if e then f
-      else if g
-        h
-      else i
+      when a
+        if b
+          if c
+            d
+          else if e
+            f
+          else if g
+            h
+          else
+            i
 
   x = ->
     switch
-     when a then if b then if c then d else if e then f else if g then h else i
+      when a then if b then if c then d else if e then f else if g then h else i
 
-  y = -> switch
-    when a then if b then (if c then d else (if e then f else (if g then h else i)))
+  y = ->
+    switch
+      when a
+        if b then (if c then d else if e then f else if g then h else i)
 
   eq 4, s()
   eq 4, t()
@@ -770,7 +776,7 @@ test "#2343: switch / when / then / if / then / else", ->
   eq undefined, x()
   eq undefined, y()
 
-test "#2343: switch / when / then / if / then / else / else", ->
+test '#2343: switch / when / then / if / then / else / else', ->
   a = b = yes
   c = e = g = no
   d = 1
@@ -797,56 +803,61 @@ test "#2343: switch / when / then / if / then / else / else", ->
     switch
       when a
         if b
-          if c then d
-          else if e
-            f
-          else if g
-            h
-          else i
-      else 0
-
-  u = ->
-    switch
-      when a
-        if b then if c
+          if c
             d
           else if e
             f
           else if g
             h
-          else i
+          else
+            i
+      else 0
+
+  u = ->
+    switch
+      when a
+        if b
+          if c
+            d
+          else if e
+            f
+          else if g
+            h
+          else
+            i
       else 0
 
   v = ->
     switch
       when a
-        if b then if c then d
-        else if e
-          f
-        else if g
-          h
-        else i
+        if b
+          if c
+            d
+          else if e
+            f
+          else if g
+            h
+          else
+            i
       else 0
 
   w = ->
     switch
       when a
-        if b then if c then d
-        else if e then f
-        else if g then h
-        else i
+        if b then if c then d else if e then f else if g then h else i
       else 0
 
   x = ->
     switch
-     when a
-       if b then if c then d else if e then f else if g then h else i
-     else 0
+      when a
+        if b then if c then d else if e then f else if g then h else i
+      else 0
 
-  y = -> switch
-    when a
-      if b then (if c then d else (if e then f else (if g then h else i)))
-    else 0
+  y = ->
+    switch
+      when a
+        if b then (if c then d else if e then f else if g then h else i)
+      else 0
 
   eq 4, s()
   eq 4, t()
@@ -884,7 +895,7 @@ test "#2343: switch / when / then / if / then / else / else", ->
   eq 0, x()
   eq 0, y()
 
-test "#2343: switch / when / then / if / then / else / else / else", ->
+test '#2343: switch / when / then / if / then / else / else / else', ->
   a = b = yes
   c = e = g = no
   d = 1
@@ -914,12 +925,14 @@ test "#2343: switch / when / then / if / then / else / else / else", ->
     switch
       when a
         if b
-          if c then d
+          if c
+            d
           else if e
             f
           else if g
             h
-          else i
+          else
+            i
         else
           j
       else 0
@@ -934,43 +947,48 @@ test "#2343: switch / when / then / if / then / else / else / else", ->
             f
           else if g
             h
-          else i
-        else j
+          else
+            i
+        else
+          j
       else 0
 
   v = ->
     switch
       when a
         if b
-          if c then d
+          if c
+            d
           else if e
             f
-          else if g then h
-          else i
-        else j
+          else if g
+            h
+          else
+            i
+        else
+          j
       else 0
 
   w = ->
     switch
       when a
         if b
-          if c then d
-          else if e then f
-          else if g then h
-          else i
-        else j
+          if c then d else if e then f else if g then h else i
+        else
+          j
       else 0
 
   x = ->
     switch
-     when a
-       if b then if c then d else if e then f else if g then h else i else j
-     else 0
+      when a
+        if b then if c then d else if e then f else if g then h else i else j
+      else 0
 
-  y = -> switch
-    when a
-      if b then (if c then d else (if e then f else (if g then h else i))) else j
-    else 0
+  y = ->
+    switch
+      when a
+        if b then (if c then d else if e then f else if g then h else i) else j
+      else 0
 
   eq 4, s()
   eq 4, t()
@@ -1009,7 +1027,7 @@ test "#2343: switch / when / then / if / then / else / else / else", ->
   eq 0, y()
 
 # Test for issue #3921: Inline function without parentheses used in condition fails to compile
-test "#3921: `if` & `unless`", ->
+test '#3921: `if` & `unless`', ->
   a = {}
   eq a, if do -> no then undefined else a
   a1 = undefined
@@ -1044,7 +1062,7 @@ test "#3921: `if` & `unless`", ->
     statm2 = 'correct'
   eq answer, statm2
 
-test "#3921: `post if`", ->
+test '#3921: `post if`', ->
   a = {}
   eq a, a unless do -> no
   a1 = a if do -> yes
@@ -1067,7 +1085,7 @@ test "#3921: `post if`", ->
   statm2 = 'correct' unless do -> not 'wrong'
   eq answer, statm2
 
-test "Issue 3921: `while` & `until`", ->
+test 'Issue 3921: `while` & `until`', ->
   i = 5
   assert = (a) -> ok 5 > a > 0
   result1 = while do (num = 1) -> i -= num
@@ -1081,157 +1099,130 @@ test "Issue 3921: `while` & `until`", ->
     j
   ok result2.join(' ') is '4 3 2 1'
 
-test "#3921: `switch`", ->
+test '#3921: `switch`', ->
   i = 1
   a = switch do (m = 2) -> i * m
-    when 5 then "five"
-    when 4 then "four"
-    when 3 then "three"
-    when 2 then "two"
-    when 1 then "one"
-    else "none"
-  eq "two", a
+    when 5 then 'five'
+    when 4 then 'four'
+    when 3 then 'three'
+    when 2 then 'two'
+    when 1 then 'one'
+    else 'none'
+  eq 'two', a
 
   j = 12
   b = switch do (m = 3) -> j / m
-    when 5 then "five"
-    when 4 then "four"
-    when 3 then "three"
-    when 2 then "two"
-    when 1 then "one"
-    else "none"
-  eq "four", b
+    when 5 then 'five'
+    when 4 then 'four'
+    when 3 then 'three'
+    when 2 then 'two'
+    when 1 then 'one'
+    else 'none'
+  eq 'four', b
 
   k = 20
   c = switch do (m = 4) -> k / m
-    when 5 then "five"
-    when 4 then "four"
-    when 3 then "three"
-    when 2 then "two"
-    when 1 then "one"
-    else "none"
-  eq "five", c
+    when 5 then 'five'
+    when 4 then 'four'
+    when 3 then 'three'
+    when 2 then 'two'
+    when 1 then 'one'
+    else 'none'
+  eq 'five', c
 
 # Issue #3909: backslash to break line in `for` loops throw syntax error
-test "#3909: backslash `for own ... of`", ->
-
-  obj = {a: 1, b: 2, c: 3}
+test '#3909: backslash `for own ... of`', ->
+  obj = a: 1, b: 2, c: 3
   arr = ['a', 'b', 'c']
 
-  x1 \
-    = ( key for own key of obj )
+  x1 = (key for own key of obj)
   arrayEq x1, arr
 
-  x2 = \
-    ( key for own key of obj )
+  x2 = (key for own key of obj)
   arrayEq x2, arr
 
-  x3 = ( \
-    key for own key of obj )
+  x3 = (key for own key of obj)
   arrayEq x3, arr
 
-  x4 = ( key \
-    for own key of obj )
+  x4 = (key for own key of obj)
   arrayEq x4, arr
 
-  x5 = ( key for own key of \
-    obj )
+  x5 = (key for own key of obj)
   arrayEq x5, arr
 
-  x6 = ( key for own key of obj \
-    )
+  x6 = (key for own key of obj)
   arrayEq x6, arr
 
-  x7 = ( key for \
-    own key of obj )
+  x7 = (key for own key of obj)
   arrayEq x7, arr
 
-  x8 = ( key for own \
-    key of obj )
+  x8 = (key for own key of obj)
   arrayEq x8, arr
 
-  x9 = ( key for own key \
-    of obj )
+  x9 = (key for own key of obj)
   arrayEq x9, arr
 
-
-test "#3909: backslash `for ... of`", ->
-  obj = {a: 1, b: 2, c: 3}
+test '#3909: backslash `for ... of`', ->
+  obj = a: 1, b: 2, c: 3
   arr = ['a', 'b', 'c']
 
-  x1 \
-    = ( key for key of obj )
+  x1 = (key for key of obj)
   arrayEq x1, arr
 
-  x2 = \
-    ( key for key of obj )
+  x2 = (key for key of obj)
   arrayEq x2, arr
 
-  x3 = ( \
-    key for key of obj )
+  x3 = (key for key of obj)
   arrayEq x3, arr
 
-  x4 = ( key \
-    for key of obj )
+  x4 = (key for key of obj)
   arrayEq x4, arr
 
-  x5 = ( key for key of \
-    obj )
+  x5 = (key for key of obj)
   arrayEq x5, arr
 
-  x6 = ( key for key of obj \
-    )
+  x6 = (key for key of obj)
   arrayEq x6, arr
 
-  x7 = ( key for \
-    key of obj )
+  x7 = (key for key of obj)
   arrayEq x7, arr
 
-  x8 = ( key for key \
-    of obj )
+  x8 = (key for key of obj)
   arrayEq x8, arr
 
-
-test "#3909: backslash `for ... in`", ->
+test '#3909: backslash `for ... in`', ->
   arr = ['a', 'b', 'c']
 
-  x1 \
-    = ( key for key in arr )
+  x1 = (key for key in arr)
   arrayEq x1, arr
 
-  x2 = \
-    ( key for key in arr )
+  x2 = (key for key in arr)
   arrayEq x2, arr
 
-  x3 = ( \
-    key for key in arr )
+  x3 = (key for key in arr)
   arrayEq x3, arr
 
-  x4 = ( key \
-    for key in arr )
+  x4 = (key for key in arr)
   arrayEq x4, arr
 
-  x5 = ( key for key in \
-    arr )
+  x5 = (key for key in arr)
   arrayEq x5, arr
 
-  x6 = ( key for key in arr \
-    )
+  x6 = (key for key in arr)
   arrayEq x6, arr
 
-  x7 = ( key for \
-    key in arr )
+  x7 = (key for key in arr)
   arrayEq x7, arr
 
-  x8 = ( key for key \
-    in arr )
+  x8 = (key for key in arr)
   arrayEq x8, arr
 
-test "#4871: `else if` no longer output together ", ->
-   eqJS '''
+test '#4871: `else if` no longer output together ', ->
+  eqJS(
+    '''
    if a then b else if c then d else if e then f else g
    ''',
-   '''
+    '''
    if (a) {
      b;
    } else if (c) {
@@ -1241,71 +1232,54 @@ test "#4871: `else if` no longer output together ", ->
    } else {
      g;
    }
-   '''
+   ''',
+  )
 
-   eqJS '''
+  eqJS(
+    '''
    if no
      1
    else if yes
      2
    ''',
-   '''
+    '''
    if (false) {
      1;
    } else if (true) {
      2;
    }
-   '''
+   ''',
+  )
 
-test "#4898: Lexer: backslash line continuation is inconsistent", ->
-  if ( \
-      false \
-      or \
-      true \
-    )
+test '#4898: Lexer: backslash line continuation is inconsistent', ->
+  if false or true
     a = 42
 
   eq a, 42
 
-  if ( \
-      false \
-      or \
-      true \
-  )
+  if false or true
     b = 42
 
   eq b, 42
 
-  if ( \
-            false \
-         or \
-   true \
-  )
+  if false or true
     c = 42
 
   eq c, 42
 
-  if \
-   false \
-        or \
-   true
+  if false or true
     d = 42
 
   eq d, 42
 
-  if \
-              false or \
-  true
+  if false or true
     e = 42
 
   eq e, 42
 
-  if \
-       false or \
-    true \
-       then \
-   f = 42 \
-   else
-     f = 24
+  if false or true
+    f = 42
+  else
+    f = 24
 
   eq f, 42

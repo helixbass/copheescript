@@ -3,35 +3,42 @@
 # contains the main entry functions for tokenizing, parsing, and compiling
 # source CoffeeScript into JavaScript.
 
-{Lexer}       = require './lexer'
-{parser}      = require './parser'
-helpers       = require './helpers'
-SourceMap     = require './sourcemap'
+{Lexer} = require './lexer'
+{parser} = require './parser'
+helpers = require './helpers'
+SourceMap = require './sourcemap'
 # Require `package.json`, which is two levels above this file, as this file is
 # evaluated from `lib/coffeescript`.
-packageJson   = require '../../package.json'
+packageJson = require '../../package.json'
 
 # The current CoffeeScript version number.
 exports.VERSION = packageJson.version
 
-exports.FILE_EXTENSIONS = FILE_EXTENSIONS = ['.coffee', '.litcoffee', '.coffee.md']
+exports.FILE_EXTENSIONS = FILE_EXTENSIONS = [
+  '.coffee',
+  '.litcoffee',
+  '.coffee.md',
+]
 
 # Expose helpers for testing.
 exports.helpers = helpers
 
 # Function that allows for btoa in both nodejs and the browser.
-base64encode = (src) -> switch
-  when typeof Buffer is 'function'
-    Buffer.from(src).toString('base64')
-  when typeof btoa is 'function'
-    # The contents of a `<script>` block are encoded via UTF-16, so if any extended
-    # characters are used in the block, btoa will fail as it maxes out at UTF-8.
-    # See https://developer.mozilla.org/en-US/docs/Web/API/WindowBase64/Base64_encoding_and_decoding#The_Unicode_Problem
-    # for the gory details, and for the solution implemented here.
-    btoa encodeURIComponent(src).replace /%([0-9A-F]{2})/g, (match, p1) ->
-      String.fromCharCode '0x' + p1
-  else
-    throw new Error('Unable to base64 encode inline sourcemap.')
+base64encode = (src) ->
+  switch
+    when typeof Buffer is 'function'
+      Buffer.from(src).toString 'base64'
+    when typeof btoa is 'function'
+      # The contents of a `<script>` block are encoded via UTF-16, so if any extended
+      # characters are used in the block, btoa will fail as it maxes out at UTF-8.
+      # See https://developer.mozilla.org/en-US/docs/Web/API/WindowBase64/Base64_encoding_and_decoding#The_Unicode_Problem
+      # for the gory details, and for the solution implemented here.
+      btoa(
+        encodeURIComponent(src).replace /%([0-9A-F]{2})/g, (match, p1) ->
+          String.fromCharCode '0x' + p1
+      )
+    else
+      throw new Error 'Unable to base64 encode inline sourcemap.'
 
 # Function wrapper to add source file information to SyntaxErrors thrown by the
 # lexer/parser/compiler.
@@ -60,7 +67,6 @@ sourceMaps = {}
 # Error.prepareStackTrace below to correctly adjust the stack trace for the
 # corresponding file (the source map will be generated on demand).
 exports.registerCompiled = registerCompiled = (filename, source, sourcemap) ->
-
   sources[filename] ?= []
   sources[filename].push source
 
@@ -84,20 +90,20 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
   # Always generate a source map if no filename is passed in, since without a
   # a filename we have no way to retrieve this source later in the event that
   # we need to recompile it to get a source map for `prepareStackTrace`.
-  generateSourceMap = options.sourceMap or options.inlineMap or not options.filename?
+  generateSourceMap =
+    options.sourceMap or options.inlineMap or not options.filename?
   filename = options.filename or '<anonymous>'
 
   checkShebangLine filename, code
 
-  map = new SourceMap if generateSourceMap
+  map = new SourceMap() if generateSourceMap
 
   tokens = lexer.tokenize code, options
 
   # Pass a list of referenced variables, so that generated variables won’t get
   # the same name.
-  options.referencedVars = (
+  options.referencedVars =
     token[1] for token in tokens when token[0] is 'IDENTIFIER'
-  )
 
   # Check for import or export; if found, force bare mode.
   unless options.bare? and options.bare is yes
@@ -116,7 +122,8 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
     sourceCodeNumberOfLines = (code.match(/\r?\n/g) or '').length + 1
     sourceCodeLastLine = /.*$/.exec(code)[0] # `.*` matches all but line break characters.
     ast = nodes.ast options
-    ast.end = ast.range[1] = ast.program.end = ast.program.range[1] = code.length
+    ast.end = ast.range[1] = ast.program.end = ast.program.range[1] =
+      code.length
     ast.loc.end.line = ast.program.loc.end.line = sourceCodeNumberOfLines
     ast.loc.end.column = ast.program.loc.end.column = sourceCodeLastLine.length
     return ast
@@ -127,20 +134,25 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
   currentLine += 1 if options.header
   currentLine += 1 if options.shiftLine
   currentColumn = 0
-  js = ""
+  js = ''
   for fragment in fragments
     # Update the sourcemap with data from each fragment.
     if generateSourceMap
       # Do not include empty, whitespace, or semicolon-only fragments.
       if fragment.locationData and not /^[;\s]*$/.test fragment.code
         map.add(
-          [fragment.locationData.first_line, fragment.locationData.first_column]
-          [currentLine, currentColumn]
-          {noReplace: true})
-      newLines = helpers.count fragment.code, "\n"
+          [
+            fragment.locationData.first_line,
+            fragment.locationData.first_column,
+          ],
+          [currentLine, currentColumn],
+          noReplace: true
+        )
+      newLines = helpers.count fragment.code, '\n'
       currentLine += newLines
       if newLines
-        currentColumn = fragment.code.length - (fragment.code.lastIndexOf("\n") + 1)
+        currentColumn =
+          fragment.code.length - (fragment.code.lastIndexOf('\n') + 1)
       else
         currentColumn += fragment.code.length
 
@@ -158,7 +170,9 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
     if typeof options.transpile isnt 'object'
       # This only happens if run via the Node API and `transpile` is set to
       # something other than an object.
-      throw new Error 'The transpile option must be given an object with options to pass to Babel'
+      throw new Error(
+        'The transpile option must be given an object with options to pass to Babel',
+      )
 
     # Get the reference to Babel that we have been passed if this compiler
     # is run via the CLI or Node API.
@@ -187,9 +201,9 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
 
   if options.sourceMap
     {
-      js
-      sourceMap: map
-      v3SourceMap: JSON.stringify v3SourceMap, null, 2
+      js,
+      sourceMap: map,
+      v3SourceMap: JSON.stringify(v3SourceMap, null, 2),
     }
   else
     js
@@ -214,7 +228,7 @@ exports.run = exports.eval = exports.register = ->
   throw new Error 'require index.coffee, not this file'
 
 # Instantiate a Lexer for our use here.
-lexer = new Lexer
+lexer = new Lexer()
 
 # The real Lexer produces a generic stream of tokens. This object provides a
 # thin wrapper around it, compatible with the Jison API. We can then pass it
@@ -254,7 +268,15 @@ parser.yy.parseError = (message, {token}) ->
       'end of input'
     when errorTag in ['INDENT', 'OUTDENT']
       'indentation'
-    when errorTag in ['IDENTIFIER', 'NUMBER', 'INFINITY', 'STRING', 'STRING_START', 'REGEX', 'REGEX_START']
+    when errorTag in [
+      'IDENTIFIER',
+      'NUMBER',
+      'INFINITY',
+      'STRING',
+      'STRING_START',
+      'REGEX',
+      'REGEX_START',
+    ]
       errorTag.replace(/_START$/, '').toLowerCase()
     else
       helpers.nameWhitespaceCharacter errorText
@@ -272,7 +294,7 @@ formatSourcePosition = (frame, getSourceMapping) ->
   fileLocation = ''
 
   if frame.isNative()
-    fileLocation = "native"
+    fileLocation = 'native'
   else
     if frame.isEval()
       filename = frame.getScriptNameOrSourceURL()
@@ -280,18 +302,17 @@ formatSourcePosition = (frame, getSourceMapping) ->
     else
       filename = frame.getFileName()
 
-    filename or= "<anonymous>"
+    filename or= '<anonymous>'
 
     line = frame.getLineNumber()
     column = frame.getColumnNumber()
 
     # Check for a sourceMap position
     source = getSourceMapping filename, line, column
-    fileLocation =
-      if source
-        "#{filename}:#{source[0]}:#{source[1]}"
-      else
-        "#{filename}:#{line}:#{column}"
+    fileLocation = if source
+      "#{filename}:#{source[0]}:#{source[1]}"
+    else
+      "#{filename}:#{line}:#{column}"
 
   functionName = frame.getFunctionName()
   isConstructor = frame.isConstructor()
@@ -305,7 +326,11 @@ formatSourcePosition = (frame, getSourceMapping) ->
       tp = as = ''
       if typeName and functionName.indexOf typeName
         tp = "#{typeName}."
-      if methodName and functionName.indexOf(".#{methodName}") isnt functionName.length - methodName.length - 1
+      if (
+        methodName and
+        functionName.indexOf(".#{methodName}") isnt
+          functionName.length - methodName.length - 1
+      )
         as = " [as #{methodName}]"
 
       "#{tp}#{functionName}#{as} (#{fileLocation})"
@@ -321,7 +346,10 @@ formatSourcePosition = (frame, getSourceMapping) ->
 getSourceMap = (filename, line, column) ->
   # Skip files that we didn’t compile, like Node system files that appear in
   # the stack trace, as they never have source maps.
-  return null unless filename is '<anonymous>' or filename.slice(filename.lastIndexOf('.')) in FILE_EXTENSIONS
+  return null unless (
+    filename is '<anonymous>' or
+    filename.slice(filename.lastIndexOf '.') in FILE_EXTENSIONS
+  )
 
   if filename isnt '<anonymous>' and sourceMaps[filename]?
     return sourceMaps[filename][sourceMaps[filename].length - 1]
@@ -350,7 +378,7 @@ getSourceMap = (filename, line, column) ->
     answer = compile sources[filename][sources[filename].length - 1],
       filename: filename
       sourceMap: yes
-      literate: helpers.isLiterate filename
+      literate: helpers.isLiterate(filename)
     answer.sourceMap
   else
     null
@@ -373,8 +401,11 @@ Error.prepareStackTrace = (err, stack) ->
 
 checkShebangLine = (file, input) ->
   firstLine = input.split(/$/m)[0]
-  rest = firstLine?.match(/^#!\s*([^\s]+\s*)(.*)/)
-  args = rest?[2]?.split(/\s/).filter (s) -> s isnt ''
+  rest = firstLine?.match /^#!\s*([^\s]+\s*)(.*)/
+  args =
+    rest?[2]
+    ?.split /\s/
+    .filter (s) -> s isnt ''
   if args?.length > 1
     console.error '''
       The script to be run begins with a shebang line with more than one

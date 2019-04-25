@@ -5,14 +5,20 @@
 # those of `actual`. Use `looseArray` helper function to skip array length
 # comparison.
 deepStrictIncludeExpectedProperties = (actual, expected) ->
-  eq actual.length, expected.length if expected instanceof Array and not expected.loose
+  eq actual.length, expected.length if (
+    expected instanceof Array and not expected.loose
+  )
   for key, val of expected
     if val? and typeof val is 'object'
-      fail "Property #{reset}#{key}#{red} expected, but was missing" unless actual[key]
+      fail "Property #{reset}#{key}#{red} expected, but was missing" unless (
+        actual[key]
+      )
       deepStrictIncludeExpectedProperties actual[key], val
     else
       eq actual[key], val, """
-        Property #{reset}#{key}#{red}: expected #{reset}#{actual[key]}#{red} to equal #{reset}#{val}#{red}
+        Property #{reset}#{key}#{red}: expected #{reset}#{
+        actual[key]
+      }#{red} to equal #{reset}#{val}#{red}
           Expected AST output to include:
           #{reset}#{inspect expected}#{red}
           but instead it was:
@@ -55,23 +61,16 @@ test 'Confirm functionality of `deepStrictIncludeExpectedProperties`', ->
   check = (message, test, expected) ->
     test (-> deepStrictIncludeExpectedProperties actual, expected), message
 
-  check 'Expected property does not match', throws,
-    name: '"Name"'
+  check 'Expected property does not match', throws, name: '"Name"'
 
-  check 'Array length mismatch', throws,
-    x: [1, 2]
+  check 'Array length mismatch', throws, x: [1, 2]
 
   check 'Skip array length check', doesNotThrow,
-    x: looseArray [
-      1
-      2
-    ]
+    x: looseArray([1, 2])
 
-  check 'Array length matches', doesNotThrow,
-    x: [1, 2, 3]
+  check 'Array length matches', doesNotThrow, x: [1, 2, 3]
 
-  check 'Array prop mismatch', throws,
-    x: [3, 2, 1]
+  check 'Array prop mismatch', throws, x: [3, 2, 1]
 
   check 'Partial object comparison', doesNotThrow,
     a:
@@ -88,8 +87,7 @@ test 'Confirm functionality of `deepStrictIncludeExpectedProperties`', ->
     a: {}
     x: {}
 
-  check 'Prop is missing', throws,
-    missingProp: {}
+  check 'Prop is missing', throws, missingProp: {}
 
 # Shorthand helpers for common AST patterns.
 
@@ -99,18 +97,18 @@ EMPTY_BLOCK =
   directives: []
 
 ID = (name) -> {
-  type: 'Identifier'
-  name
+  type: 'Identifier',
+  name,
 }
 
 NUMBER = (value) -> {
-  type: 'NumericLiteral'
-  value
+  type: 'NumericLiteral',
+  value,
 }
 
 STRING = (value) -> {
-  type: 'StringLiteral'
-  value
+  type: 'StringLiteral',
+  value,
 }
 
 # Check each node type in the same order as they appear in `nodes.coffee`.
@@ -118,7 +116,7 @@ STRING = (value) -> {
 # the type and properties match. When relevant, also check that values of
 # properties are as expected.
 
-test "AST as expected for Block node", ->
+test 'AST as expected for Block node', ->
   deepStrictIncludeExpectedProperties CoffeeScript.compile('a', ast: yes),
     type: 'File'
     program:
@@ -132,7 +130,7 @@ test "AST as expected for Block node", ->
       directives: []
     comments: []
 
-test "AST as expected for NumberLiteral node", ->
+test 'AST as expected for NumberLiteral node', ->
   testExpression '42',
     type: 'NumericLiteral'
     value: 42
@@ -147,7 +145,7 @@ test "AST as expected for NumberLiteral node", ->
       rawValue: 225
       raw: '0xE1'
 
-test "AST as expected for InfinityLiteral node", ->
+test 'AST as expected for InfinityLiteral node', ->
   testExpression 'Infinity',
     type: 'Identifier'
     name: 'Infinity'
@@ -159,7 +157,7 @@ test "AST as expected for InfinityLiteral node", ->
       raw: '2e308'
       rawValue: Infinity
 
-test "AST as expected for NaNLiteral node", ->
+test 'AST as expected for NaNLiteral node', ->
   testExpression 'NaN',
     type: 'Identifier'
     name: 'NaN'
@@ -195,12 +193,12 @@ test "AST as expected for NaNLiteral node", ->
 #     originalValue: code
 #     here: yes
 
-test "AST as expected for IdentifierLiteral node", ->
+test 'AST as expected for IdentifierLiteral node', ->
   testExpression 'id',
     type: 'Identifier'
     name: 'id'
 
-test "AST as expected for JSXTag node", ->
+test 'AST as expected for JSXTag node', ->
   testExpression '<CSXY />',
     type: 'JSXElement'
     openingElement:
@@ -364,7 +362,8 @@ test "AST as expected for JSXTag node", ->
       value: 'abc'
     ]
 
-  testExpression '''
+  testExpression(
+    '''
     <a>
       {b}
       <c />
@@ -412,6 +411,7 @@ test "AST as expected for JSXTag node", ->
         raw: '\n'
       value: '\n'
     ]
+  )
 
   testExpression '<>abc{}</>',
     type: 'JSXFragment'
@@ -430,7 +430,8 @@ test "AST as expected for JSXTag node", ->
         type: 'JSXEmptyExpression'
     ]
 
-  testExpression '''
+  testExpression(
+    '''
     <a>{<b />}</a>
   ''',
     type: 'JSXElement'
@@ -459,6 +460,7 @@ test "AST as expected for JSXTag node", ->
         closingElement: null
         children: []
     ]
+  )
 
 # test "AST as expected for PropertyName node", ->
 #   testExpression 'Object.assign',
@@ -468,7 +470,7 @@ test "AST as expected for JSXTag node", ->
 #         value: 'assign'
 #     ]
 
-test "AST as expected for ComputedPropertyName node", ->
+test 'AST as expected for ComputedPropertyName node', ->
   testExpression '[fn]: ->',
     type: 'ObjectExpression'
     properties: [
@@ -500,17 +502,14 @@ test "AST as expected for ComputedPropertyName node", ->
     ]
     implicit: yes
 
-test "AST as expected for StatementLiteral node", ->
-  testStatement 'break',
-    type: 'BreakStatement'
+test 'AST as expected for StatementLiteral node', ->
+  testStatement 'break', type: 'BreakStatement'
 
-  testStatement 'continue',
-    type: 'ContinueStatement'
+  testStatement 'continue', type: 'ContinueStatement'
 
-  testStatement 'debugger',
-    type: 'DebuggerStatement'
+  testStatement 'debugger', type: 'DebuggerStatement'
 
-test "AST as expected for ThisLiteral node", ->
+test 'AST as expected for ThisLiteral node', ->
   testExpression 'this',
     type: 'ThisExpression'
     shorthand: no
@@ -520,16 +519,15 @@ test "AST as expected for ThisLiteral node", ->
     shorthand: yes
   # TODO: `@prop` property access isn't covered yet in these tests.
 
-test "AST as expected for UndefinedLiteral node", ->
+test 'AST as expected for UndefinedLiteral node', ->
   testExpression 'undefined',
     type: 'Identifier'
     name: 'undefined'
 
-test "AST as expected for NullLiteral node", ->
-  testExpression 'null',
-    type: 'NullLiteral'
+test 'AST as expected for NullLiteral node', ->
+  testExpression 'null', type: 'NullLiteral'
 
-test "AST as expected for BooleanLiteral node", ->
+test 'AST as expected for BooleanLiteral node', ->
   testExpression 'true',
     type: 'BooleanLiteral'
     value: true
@@ -545,13 +543,14 @@ test "AST as expected for BooleanLiteral node", ->
     value: true
     name: 'yes'
 
-test "AST as expected for Return node", ->
+test 'AST as expected for Return node', ->
   testStatement 'return no',
     type: 'ReturnStatement'
     argument:
       type: 'BooleanLiteral'
 
-  testExpression '''
+  testExpression(
+    '''
     (a, b) ->
       return a + b
   ''',
@@ -563,6 +562,7 @@ test "AST as expected for Return node", ->
         argument:
           type: 'BinaryExpression'
       ]
+  )
 
   testExpression '-> return',
     type: 'FunctionExpression'
@@ -573,7 +573,7 @@ test "AST as expected for Return node", ->
         argument: null
       ]
 
-test "AST as expected for YieldReturn node", ->
+test 'AST as expected for YieldReturn node', ->
   testExpression '-> yield return 1',
     type: 'FunctionExpression'
     body:
@@ -588,7 +588,7 @@ test "AST as expected for YieldReturn node", ->
           delegate: no
       ]
 
-test "AST as expected for AwaitReturn node", ->
+test 'AST as expected for AwaitReturn node', ->
   testExpression '-> await return 2',
     type: 'FunctionExpression'
     body:
@@ -623,7 +623,7 @@ test "AST as expected for AwaitReturn node", ->
 
 # # Comments aren’t nodes, so they shouldn’t appear in the AST.
 
-test "AST as expected for Call node", ->
+test 'AST as expected for Call node', ->
   testExpression 'fn()',
     type: 'CallExpression'
     callee:
@@ -691,17 +691,13 @@ test "AST as expected for Call node", ->
 
   testExpression 'maybe?(1 + 1)',
     type: 'CallExpression'
-    arguments: [
-      type: 'BinaryExpression'
-    ]
+    arguments: [type: 'BinaryExpression']
     optional: yes
     implicit: no
 
   testExpression 'maybe? 1 + 1',
     type: 'CallExpression'
-    arguments: [
-      type: 'BinaryExpression'
-    ]
+    arguments: [type: 'BinaryExpression']
     optional: yes
     implicit: yes
 
@@ -740,14 +736,12 @@ test "AST as expected for Call node", ->
 #                   type: 'Access'
 #     ]
 
-test "AST as expected for RegexWithInterpolations node", ->
+test 'AST as expected for RegexWithInterpolations node', ->
   testExpression '///^#{flavor}script$///',
     type: 'InterpolatedRegExpLiteral'
     interpolatedPattern:
       type: 'TemplateLiteral'
-      expressions: [
-        ID 'flavor'
-      ]
+      expressions: [ID 'flavor']
       quasis: [
         type: 'TemplateElement'
         value:
@@ -762,7 +756,8 @@ test "AST as expected for RegexWithInterpolations node", ->
       quote: '///'
     flags: ''
 
-  testExpression '''
+  testExpression(
+    '''
     ///
       a
       #{b}///ig
@@ -770,9 +765,7 @@ test "AST as expected for RegexWithInterpolations node", ->
     type: 'InterpolatedRegExpLiteral'
     interpolatedPattern:
       type: 'TemplateLiteral'
-      expressions: [
-        ID 'b'
-      ]
+      expressions: [ID 'b']
       quasis: [
         type: 'TemplateElement'
         value:
@@ -786,8 +779,9 @@ test "AST as expected for RegexWithInterpolations node", ->
       ]
       quote: '///'
     flags: 'ig'
+  )
 
-test "AST as expected for TaggedTemplateCall node", ->
+test 'AST as expected for TaggedTemplateCall node', ->
   testExpression 'func"tagged"',
     type: 'TaggedTemplateExpression'
     tag: ID 'func'
@@ -806,9 +800,7 @@ test "AST as expected for TaggedTemplateCall node", ->
     tag: ID 'a'
     quasi:
       type: 'TemplateLiteral'
-      expressions: [
-        ID 'c'
-      ]
+      expressions: [ID 'c']
       quasis: [
         type: 'TemplateElement'
         value:
@@ -821,7 +813,8 @@ test "AST as expected for TaggedTemplateCall node", ->
         tail: yes
       ]
 
-  testExpression '''
+  testExpression(
+    '''
     a"""
       b#{c}
     """
@@ -830,9 +823,7 @@ test "AST as expected for TaggedTemplateCall node", ->
     tag: ID 'a'
     quasi:
       type: 'TemplateLiteral'
-      expressions: [
-        ID 'c'
-      ]
+      expressions: [ID 'c']
       quasis: [
         type: 'TemplateElement'
         value:
@@ -844,8 +835,10 @@ test "AST as expected for TaggedTemplateCall node", ->
           raw: '\n'
         tail: yes
       ]
+  )
 
-  testExpression """
+  testExpression(
+    """
     a'''
       b
     '''
@@ -861,8 +854,9 @@ test "AST as expected for TaggedTemplateCall node", ->
           raw: '\n  b\n'
         tail: yes
       ]
+  )
 
-test "AST as expected for Access node", ->
+test 'AST as expected for Access node', ->
   testExpression 'obj.prop',
     type: 'MemberExpression'
     object:
@@ -949,7 +943,7 @@ test "AST as expected for Access node", ->
     optional: no
     shorthand: no
 
-test "AST as expected for Index node", ->
+test 'AST as expected for Index node', ->
   testExpression 'a[b]',
     type: 'MemberExpression'
     object:
@@ -1025,7 +1019,7 @@ test "AST as expected for Index node", ->
     optional: no
     shorthand: no
 
-test "AST as expected for Range node", ->
+test 'AST as expected for Range node', ->
   testExpression '[x..y]',
     type: 'Range'
     exclusive: no
@@ -1064,7 +1058,7 @@ test "AST as expected for Range node", ->
   #     to:
   #       value: 'z'
 
-test "AST as expected for Slice node", ->
+test 'AST as expected for Slice node', ->
   testExpression 'x[..y]',
     property:
       type: 'Range'
@@ -1141,7 +1135,7 @@ test "AST as expected for Slice node", ->
         name: 'd'
       exclusive: yes
 
-test "AST as expected for Obj node", ->
+test 'AST as expected for Obj node', ->
   testExpression "{a: 1, b, [c], @d, [e()]: f, 'g': 2, ...h, i...}",
     type: 'ObjectExpression'
     properties: [
@@ -1245,7 +1239,8 @@ test "AST as expected for Obj node", ->
     ]
     implicit: yes
 
-  testExpression '''
+  testExpression(
+    '''
     a:
       if b then c
   ''',
@@ -1259,8 +1254,10 @@ test "AST as expected for Obj node", ->
         consequent: ID 'c'
     ]
     implicit: yes
+  )
 
-  testExpression '''
+  testExpression(
+    '''
     a:
       c if b
   ''',
@@ -1274,27 +1271,24 @@ test "AST as expected for Obj node", ->
         consequent: ID 'c'
     ]
     implicit: yes
+  )
 
 #   # TODO: Test destructuring.
 
 #   # console.log JSON.stringify expression, ["type", "generated", "lhs", "value", "properties", "variable"], 2
 
-test "AST as expected for Arr node", ->
+test 'AST as expected for Arr node', ->
   testExpression '[]',
     type: 'ArrayExpression'
     elements: []
 
   testExpression '[3, tables, !1]',
     type: 'ArrayExpression'
-    elements: [
-      {value: 3}
-      {name: 'tables'}
-      {operator: '!'}
-    ]
+    elements: [{value: 3}, {name: 'tables'}, {operator: '!'}]
 
 #   # TODO: Test destructuring.
 
-test "AST as expected for Class node", ->
+test 'AST as expected for Class node', ->
   testStatement 'class Klass',
     type: 'ClassDeclaration'
     id: ID 'Klass'
@@ -1330,7 +1324,8 @@ test "AST as expected for Class node", ->
         body: EMPTY_BLOCK
       ]
 
-  testExpression '''
+  testExpression(
+    '''
     a = class A
       b: ->
         c
@@ -1360,8 +1355,10 @@ test "AST as expected for Class node", ->
             ]
           operator: ':'
         ]
+  )
 
-  testStatement '''
+  testStatement(
+    '''
     class A
       @b: ->
       @c = ->
@@ -1474,6 +1471,7 @@ test "AST as expected for Class node", ->
           type: 'ThisExpression'
           shorthand: no
       ]
+  )
 
 # test "AST as expected for ExecutableClassBody node", ->
 #   code = """
@@ -1508,7 +1506,7 @@ test "AST as expected for Class node", ->
 #         ]
 #       ]
 
-test "AST as expected for ModuleDeclaration node", ->
+test 'AST as expected for ModuleDeclaration node', ->
   testStatement 'export {X}',
     type: 'ExportNamedDeclaration'
     declaration: null
@@ -1537,7 +1535,7 @@ test "AST as expected for ModuleDeclaration node", ->
       type: 'StringLiteral'
       value: '.'
 
-test "AST as expected for ImportDeclaration node", ->
+test 'AST as expected for ImportDeclaration node', ->
   testStatement 'import React, {Component} from "react"',
     type: 'ImportDeclaration'
     specifiers: [
@@ -1562,7 +1560,7 @@ test "AST as expected for ImportDeclaration node", ->
       extra:
         raw: '"react"'
 
-test "AST as expected for ExportNamedDeclaration node", ->
+test 'AST as expected for ExportNamedDeclaration node', ->
   testStatement 'export {}',
     type: 'ExportNamedDeclaration'
     declaration: null
@@ -1634,7 +1632,7 @@ test "AST as expected for ExportNamedDeclaration node", ->
         raw: '"./abc"'
     exportKind: 'value'
 
-test "AST as expected for ExportDefaultDeclaration node", ->
+test 'AST as expected for ExportDefaultDeclaration node', ->
   # testStatement 'export default class',
   #   type: 'ExportDefaultDeclaration'
   #   clause:
@@ -1648,7 +1646,7 @@ test "AST as expected for ExportDefaultDeclaration node", ->
       extra:
         raw: '"abc"'
 
-test "AST as expected for ExportAllDeclaration node", ->
+test 'AST as expected for ExportAllDeclaration node', ->
   testStatement 'export * from "module-name"',
     type: 'ExportAllDeclaration'
     source:
@@ -1658,7 +1656,7 @@ test "AST as expected for ExportAllDeclaration node", ->
         raw: '"module-name"'
     exportKind: 'value'
 
-test "AST as expected for ExportSpecifierList node", ->
+test 'AST as expected for ExportSpecifierList node', ->
   testStatement 'export {a, b, c}',
     type: 'ExportNamedDeclaration'
     declaration: null
@@ -1688,7 +1686,7 @@ test "AST as expected for ExportSpecifierList node", ->
         name: 'c'
     ]
 
-test "AST as expected for ImportDefaultSpecifier node", ->
+test 'AST as expected for ImportDefaultSpecifier node', ->
   testStatement 'import React from "react"',
     type: 'ImportDeclaration'
     specifiers: [
@@ -1702,7 +1700,7 @@ test "AST as expected for ImportDefaultSpecifier node", ->
       type: 'StringLiteral'
       value: 'react'
 
-test "AST as expected for ImportNamespaceSpecifier node", ->
+test 'AST as expected for ImportNamespaceSpecifier node', ->
   testStatement 'import * as React from "react"',
     type: 'ImportDeclaration'
     specifiers: [
@@ -1734,7 +1732,7 @@ test "AST as expected for ImportNamespaceSpecifier node", ->
       type: 'StringLiteral'
       value: 'react'
 
-test "AST as expected for Assign node", ->
+test 'AST as expected for Assign node', ->
   testExpression 'a = b',
     type: 'AssignmentExpression'
     left:
@@ -1815,16 +1813,14 @@ test "AST as expected for Assign node", ->
           name: 'a'
         value:
           type: 'ArrayPattern'
-          elements: [
-            type: 'RestElement'
-          ]
+          elements: [type: 'RestElement']
       ]
     right:
       name: 'c'
 
 # # `FuncGlyph` node isn't exported.
 
-test "AST as expected for Code node", ->
+test 'AST as expected for Code node', ->
   testExpression '=>',
     type: 'ArrowFunctionExpression'
     params: []
@@ -1833,7 +1829,8 @@ test "AST as expected for Code node", ->
     async: no
     id: null
 
-  testExpression '''
+  testExpression(
+    '''
     (a, b = 1) ->
       c
       d()
@@ -1867,6 +1864,7 @@ test "AST as expected for Code node", ->
     generator: no
     async: no
     id: null
+  )
 
   testExpression '({a}) ->',
     type: 'FunctionExpression'
@@ -1874,8 +1872,8 @@ test "AST as expected for Code node", ->
       type: 'ObjectPattern'
       properties: [
         type: 'ObjectProperty'
-        key: ID('a')
-        value: ID('a')
+        key: ID 'a'
+        value: ID 'a'
         shorthand: yes
       ]
     ]
@@ -1888,9 +1886,7 @@ test "AST as expected for Code node", ->
     type: 'FunctionExpression'
     params: [
       type: 'ArrayPattern'
-      elements: [
-        ID('a')
-      ]
+      elements: [ID 'a']
     ]
     body: EMPTY_BLOCK
     generator: no
@@ -1905,11 +1901,11 @@ test "AST as expected for Code node", ->
         type: 'ObjectPattern'
         properties: [
           type: 'ObjectProperty'
-          key: ID('a')
+          key: ID 'a'
           value:
             type: 'AssignmentPattern'
-            left: ID('a')
-            right: NUMBER(1)
+            left: ID 'a'
+            right: NUMBER 1
           shorthand: yes
         ]
       right:
@@ -1929,8 +1925,8 @@ test "AST as expected for Code node", ->
         type: 'ArrayPattern'
         elements: [
           type: 'AssignmentPattern'
-          left: ID('a')
-          right: NUMBER(1)
+          left: ID 'a'
+          right: NUMBER 1
         ]
       right:
         type: 'ArrayExpression'
@@ -2001,7 +1997,7 @@ test "AST as expected for Code node", ->
       type: 'ObjectPattern'
       properties: [
         type: 'ObjectProperty'
-        key:   ID 'a'
+        key: ID 'a'
         value: ID 'a'
         shorthand: yes
         computed: yes
@@ -2042,7 +2038,7 @@ test "AST as expected for Code node", ->
       type: 'RestElement'
       argument: null
     ,
-      ID 'a'
+      ID('a'),
     ]
     body: EMPTY_BLOCK
     generator: no
@@ -2109,7 +2105,7 @@ test "AST as expected for Code node", ->
     async: no
     id: null
 
-test "AST as expected for Splat node", ->
+test 'AST as expected for Splat node', ->
   testExpression '[a...]',
     type: 'ArrayExpression'
     elements: [
@@ -2142,7 +2138,7 @@ test "AST as expected for Splat node", ->
 
 #   # TODO: Test object splats.
 
-test "AST as expected for Expansion node", ->
+test 'AST as expected for Expansion node', ->
   # testExpression '(...) ->',
   #   type: 'Code'
   #   params: [
@@ -2160,27 +2156,25 @@ test "AST as expected for Expansion node", ->
         type: 'Identifier'
       ]
 
-test "AST as expected for Elision node", ->
+test 'AST as expected for Elision node', ->
   testExpression '[,,,a,,,b]',
     type: 'ArrayExpression'
-    elements: [
-      null, null, null
-      name: 'a'
-      null, null
-      name: 'b'
-    ]
+    elements: [null, null, null, {name: 'a'}, null, null, {name: 'b'}]
 
   testExpression '[,,,a,,,b] = "asdfqwer"',
     type: 'AssignmentExpression'
     left:
       type: 'ArrayPattern'
       elements: [
-        null, null, null
+        null,
+        null,
+        null
       ,
         type: 'Identifier'
         name: 'a'
       ,
-        null, null
+        null,
+        null
       ,
         type: 'Identifier'
         name: 'b'
@@ -2189,7 +2183,7 @@ test "AST as expected for Elision node", ->
       type: 'StringLiteral'
       value: 'asdfqwer'
 
-test "AST as expected for While node", ->
+test 'AST as expected for While node', ->
   testStatement 'loop 1',
     type: 'WhileStatement'
     test:
@@ -2234,7 +2228,8 @@ test "AST as expected for While node", ->
     postfix: no
     loop: no
 
-  testStatement '''
+  testStatement(
+    '''
     x() until y
   ''',
     type: 'WhileStatement'
@@ -2250,8 +2245,10 @@ test "AST as expected for While node", ->
     inverted: yes
     postfix: yes
     loop: no
+  )
 
-  testStatement '''
+  testStatement(
+    '''
     until x when y
       z++
   ''',
@@ -2268,8 +2265,10 @@ test "AST as expected for While node", ->
     inverted: yes
     postfix: no
     loop: no
+  )
 
-  testStatement '''
+  testStatement(
+    '''
     x while y when z
   ''',
     type: 'WhileStatement'
@@ -2284,8 +2283,10 @@ test "AST as expected for While node", ->
     inverted: no
     postfix: yes
     loop: no
+  )
 
-  testStatement '''
+  testStatement(
+    '''
     loop
       a()
       b++
@@ -2308,8 +2309,9 @@ test "AST as expected for While node", ->
     inverted: no
     postfix: no
     loop: yes
+  )
 
-test "AST as expected for Op node", ->
+test 'AST as expected for Op node', ->
   testExpression 'a <= 2',
     type: 'BinaryExpression'
     operator: '<='
@@ -2494,7 +2496,7 @@ test "AST as expected for Op node", ->
       type: 'Identifier'
       name: 'z'
 
-test "AST as expected for Try node", ->
+test 'AST as expected for Try node', ->
   testStatement 'try cappuccino',
     type: 'TryStatement'
     block:
@@ -2508,7 +2510,8 @@ test "AST as expected for Try node", ->
     handler: null
     finalizer: null
 
-  testStatement '''
+  testStatement(
+    '''
     try
       x = 1
       y()
@@ -2548,8 +2551,10 @@ test "AST as expected for Try node", ->
         expression:
           type: 'BinaryExpression'
       ]
+  )
 
-  testStatement '''
+  testStatement(
+    '''
     try
     catch
     finally
@@ -2567,8 +2572,10 @@ test "AST as expected for Try node", ->
     finalizer:
       type: 'BlockStatement'
       body: []
+  )
 
-  testStatement '''
+  testStatement(
+    '''
     try
     catch {e}
       f
@@ -2583,20 +2590,19 @@ test "AST as expected for Try node", ->
         type: 'ObjectPattern'
       body:
         type: 'BlockStatement'
-        body: [
-          type: 'ExpressionStatement'
-        ]
+        body: [type: 'ExpressionStatement']
     finalizer: null
+  )
 
-test "AST as expected for Throw node", ->
+test 'AST as expected for Throw node', ->
   testStatement 'throw new BallError "catch"',
     type: 'ThrowStatement'
     argument:
       type: 'NewExpression'
 
-test "AST as expected for Existence node", ->
+test 'AST as expected for Existence node', ->
   testExpression 'Ghosts?',
-    type: 'UnaryExpression',
+    type: 'UnaryExpression'
     argument:
       name: 'Ghosts'
     operator: '?'
@@ -2604,30 +2610,28 @@ test "AST as expected for Existence node", ->
 
 #   # NOTE: Soaking is covered in `Call` and `Access` nodes.
 
-test "AST as expected for Parens node", ->
+test 'AST as expected for Parens node', ->
   testExpression '(hmmmmm)',
     type: 'Identifier'
     name: 'hmmmmm'
 
-#   testExpression '(a + b) / c',
-#     type: 'Op'
-#     operator: '/'
-#     first:
-#       type: 'Parens'
-#       body:
-#         type: 'Op'
-#         operator: '+'
+  #   testExpression '(a + b) / c',
+  #     type: 'Op'
+  #     operator: '/'
+  #     first:
+  #       type: 'Parens'
+  #       body:
+  #         type: 'Op'
+  #         operator: '+'
 
   testExpression '(((1)))',
     type: 'NumericLiteral'
     value: 1
 
-test "AST as expected for StringWithInterpolations node", ->
+test 'AST as expected for StringWithInterpolations node', ->
   testExpression '"a#{b}c"',
     type: 'TemplateLiteral'
-    expressions: [
-      ID 'b'
-    ]
+    expressions: [ID 'b']
     quasis: [
       type: 'TemplateElement'
       value:
@@ -2643,9 +2647,7 @@ test "AST as expected for StringWithInterpolations node", ->
 
   testExpression '"""a#{b}c"""',
     type: 'TemplateLiteral'
-    expressions: [
-      ID 'b'
-    ]
+    expressions: [ID 'b']
     quasis: [
       type: 'TemplateElement'
       value:
@@ -2661,9 +2663,7 @@ test "AST as expected for StringWithInterpolations node", ->
 
   testExpression '"#{b}"',
     type: 'TemplateLiteral'
-    expressions: [
-      ID 'b'
-    ]
+    expressions: [ID 'b']
     quasis: [
       type: 'TemplateElement'
       value:
@@ -2677,16 +2677,15 @@ test "AST as expected for StringWithInterpolations node", ->
     ]
     quote: '"'
 
-  testExpression '''
+  testExpression(
+    '''
     " a
       #{b}
       c
     "
   ''',
     type: 'TemplateLiteral'
-    expressions: [
-      ID 'b'
-    ]
+    expressions: [ID 'b']
     quasis: [
       type: 'TemplateElement'
       value:
@@ -2699,8 +2698,10 @@ test "AST as expected for StringWithInterpolations node", ->
       tail: yes
     ]
     quote: '"'
+  )
 
-  testExpression '''
+  testExpression(
+    '''
     """
       a
         b#{
@@ -2709,9 +2710,7 @@ test "AST as expected for StringWithInterpolations node", ->
     """
   ''',
     type: 'TemplateLiteral'
-    expressions: [
-      ID 'c'
-    ]
+    expressions: [ID 'c']
     quasis: [
       type: 'TemplateElement'
       value:
@@ -2724,8 +2723,9 @@ test "AST as expected for StringWithInterpolations node", ->
       tail: yes
     ]
     quote: '"""'
+  )
 
-test "AST as expected for For node", ->
+test 'AST as expected for For node', ->
   testStatement 'for x, i in arr when x? then return',
     type: 'For'
     name: ID 'x'
@@ -2735,9 +2735,7 @@ test "AST as expected for For node", ->
     source: ID 'arr'
     body:
       type: 'BlockStatement'
-      body: [
-        type: 'ReturnStatement'
-      ]
+      body: [type: 'ReturnStatement']
     style: 'in'
     own: no
     postfix: no
@@ -2752,9 +2750,7 @@ test "AST as expected for For node", ->
     source: ID 'obj'
     body:
       type: 'BlockStatement'
-      body: [
-        type: 'ReturnStatement'
-      ]
+      body: [type: 'ReturnStatement']
     style: 'of'
     own: no
     postfix: no
@@ -2828,7 +2824,8 @@ test "AST as expected for For node", ->
     postfix: yes
     await: no
 
-  testStatement '''
+  testStatement(
+    '''
     for own x, y of z
       c()
       d
@@ -2853,8 +2850,10 @@ test "AST as expected for For node", ->
     own: yes
     postfix: no
     await: no
+  )
 
-  testExpression '''
+  testExpression(
+    '''
     ->
       for await x from y
         z
@@ -2880,8 +2879,10 @@ test "AST as expected for For node", ->
         postfix: no
         await: yes
       ]
+  )
 
-  testStatement '''
+  testStatement(
+    '''
     for {x} in y
       z
   ''',
@@ -2908,17 +2909,17 @@ test "AST as expected for For node", ->
     style: 'in'
     postfix: no
     await: no
+  )
 
-  testStatement '''
+  testStatement(
+    '''
     for [x] in y
       z
   ''',
     type: 'For'
     name:
       type: 'ArrayPattern'
-      elements: [
-        ID 'x'
-      ]
+      elements: [ID 'x']
     index: null
     body:
       type: 'BlockStatement'
@@ -2932,11 +2933,13 @@ test "AST as expected for For node", ->
     style: 'in'
     postfix: no
     await: no
+  )
 
 #   # TODO: Figure out the purpose of `pattern` and `returns`.
 
-test "AST as expected for Switch node", ->
-  testStatement '''
+test 'AST as expected for Switch node', ->
+  testStatement(
+    '''
     switch x
       when a then a
       when b, c then c
@@ -2987,8 +2990,10 @@ test "AST as expected for Switch node", ->
           value: 42
       ]
     ]
+  )
 
-  testStatement '''
+  testStatement(
+    '''
     switch
       when some(condition)
         doSomething()
@@ -3011,8 +3016,10 @@ test "AST as expected for Switch node", ->
       ]
       trailing: yes
     ]
+  )
 
-  testStatement '''
+  testStatement(
+    '''
     switch a
       when 1, 2, 3, 4
         b
@@ -3068,10 +3075,11 @@ test "AST as expected for Switch node", ->
           type: 'Identifier'
       ]
     ]
+  )
 
 #   # TODO: File issue for compile error when using `then` or `;` where `\n` is rn.
 
-test "AST as expected for If node", ->
+test 'AST as expected for If node', ->
   testStatement 'if maybe then yes',
     type: 'IfStatement'
     test: ID 'maybe'
@@ -3129,7 +3137,8 @@ test "AST as expected for If node", ->
     postfix: no
     inverted: yes
 
-  testStatement '''
+  testStatement(
+    '''
     if a
       b
     else
@@ -3161,8 +3170,10 @@ test "AST as expected for If node", ->
       ]
     postfix: no
     inverted: no
+  )
 
-  testExpression '''
+  testExpression(
+    '''
     a =
       if b then c else if d then e
   ''',
@@ -3180,8 +3191,10 @@ test "AST as expected for If node", ->
         inverted: no
       postfix: no
       inverted: no
+  )
 
-  testExpression '''
+  testExpression(
+    '''
     f(
       if b
         c
@@ -3196,17 +3209,16 @@ test "AST as expected for If node", ->
         type: 'BlockStatement'
         body: [
           type: 'ExpressionStatement'
-          expression:
-            ID 'c'
+          expression: ID 'c'
         ,
           type: 'ExpressionStatement'
-          expression:
-            ID 'd'
+          expression: ID 'd'
         ]
       alternate: null
       postfix: no
       inverted: no
     ]
+  )
 
   testStatement 'a unless b',
     type: 'IfStatement'
@@ -3221,7 +3233,8 @@ test "AST as expected for If node", ->
     postfix: yes
     inverted: yes
 
-  testExpression '''
+  testExpression(
+    '''
     f(
       if b
         c
@@ -3229,18 +3242,20 @@ test "AST as expected for If node", ->
         d
     )
   ''',
-      type: 'CallExpression'
-      arguments: [
-        type: 'ConditionalExpression'
-        test: ID 'b'
-        consequent: ID 'c'
-        alternate: ID 'd'
-        postfix: no
-        inverted: no
-      ]
+    type: 'CallExpression'
+    arguments: [
+      type: 'ConditionalExpression'
+      test: ID 'b'
+      consequent: ID 'c'
+      alternate: ID 'd'
+      postfix: no
+      inverted: no
+    ]
+  )
 
-test "AST as expected for MetaProperty node", ->
-  testExpression '''
+test 'AST as expected for MetaProperty node', ->
+  testExpression(
+    '''
     -> new.target
   ''',
     type: 'FunctionExpression'
@@ -3253,8 +3268,10 @@ test "AST as expected for MetaProperty node", ->
           meta: ID 'new'
           property: ID 'target'
       ]
+  )
 
-  testExpression '''
+  testExpression(
+    '''
     -> new.target.name
   ''',
     type: 'FunctionExpression'
@@ -3271,17 +3288,20 @@ test "AST as expected for MetaProperty node", ->
           property: ID 'name'
           computed: no
       ]
+  )
 
-test "AST as expected for dynamic import", ->
-  testExpression '''
+test 'AST as expected for dynamic import', ->
+  testExpression(
+    '''
     import('a')
   ''',
     type: 'CallExpression'
     callee:
       type: 'Import'
     arguments: [STRING 'a']
+  )
 
-test "AST as expected for RegexLiteral node", ->
+test 'AST as expected for RegexLiteral node', ->
   testExpression '/a/ig',
     type: 'RegExpLiteral'
     pattern: 'a'
@@ -3290,11 +3310,12 @@ test "AST as expected for RegexLiteral node", ->
     delimiter: '/'
     value: undefined
     extra:
-      raw: "/a/ig"
-      originalRaw: "/a/ig"
+      raw: '/a/ig'
+      originalRaw: '/a/ig'
       rawValue: undefined
 
-  testExpression '''
+  testExpression(
+    '''
     ///
       a
     ///i
@@ -3306,9 +3327,10 @@ test "AST as expected for RegexLiteral node", ->
     delimiter: '///'
     value: undefined
     extra:
-      raw: "/a/i"
-      originalRaw: "///\n  a\n///i"
+      raw: '/a/i'
+      originalRaw: '///\n  a\n///i'
       rawValue: undefined
+  )
 
   testExpression '/a\\w\\u1111\\u{11111}/',
     type: 'RegExpLiteral'
@@ -3318,11 +3340,12 @@ test "AST as expected for RegexLiteral node", ->
     delimiter: '/'
     value: undefined
     extra:
-      raw: "/a\\w\\u1111\\ud804\\udd11/"
-      originalRaw: "/a\\w\\u1111\\u{11111}/"
+      raw: '/a\\w\\u1111\\ud804\\udd11/'
+      originalRaw: '/a\\w\\u1111\\u{11111}/'
       rawValue: undefined
 
-  testExpression '''
+  testExpression(
+    '''
     ///
       a
       \\w\\u1111\\u{11111}
@@ -3335,11 +3358,13 @@ test "AST as expected for RegexLiteral node", ->
     delimiter: '///'
     value: undefined
     extra:
-      raw: "/a\\w\\u1111\\ud804\\udd11/"
-      originalRaw: "///\n  a\n  \\w\\u1111\\u{11111}\n///"
+      raw: '/a\\w\\u1111\\ud804\\udd11/'
+      originalRaw: '///\n  a\n  \\w\\u1111\\u{11111}\n///'
       rawValue: undefined
+  )
 
-  testExpression '''
+  testExpression(
+    '''
     ///
       /
       (.+)
@@ -3353,6 +3378,7 @@ test "AST as expected for RegexLiteral node", ->
     delimiter: '///'
     value: undefined
     extra:
-      raw: "/\\/(.+)\\//"
-      originalRaw: "///\n  /\n  (.+)\n  /\n///"
+      raw: '/\\/(.+)\\//'
+      originalRaw: '///\n  /\n  (.+)\n  /\n///'
       rawValue: undefined
+  )

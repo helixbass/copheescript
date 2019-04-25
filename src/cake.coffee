@@ -7,24 +7,23 @@
 # current directory's Cakefile.
 
 # External dependencies.
-fs           = require 'fs'
-path         = require 'path'
-helpers      = require './helpers'
-optparse     = require './optparse'
+fs = require 'fs'
+path = require 'path'
+helpers = require './helpers'
+optparse = require './optparse'
 CoffeeScript = require './'
 
 # Register .coffee extension
 CoffeeScript.register()
 
 # Keep track of the list of defined tasks, the accepted options, and so on.
-tasks     = {}
-options   = {}
-switches  = []
-oparse    = null
+tasks = {}
+options = {}
+switches = []
+oparse = null
 
 # Mixin the top-level Cake functions for Cakefiles to use directly.
 helpers.extend global,
-
   # Define a Cake task with a short name, an optional sentence description,
   # and the function to run as the action itself.
   task: (name, description, action) ->
@@ -54,7 +53,7 @@ exports.run = ->
   oparse = new optparse.OptionParser switches
   return printTasks() unless args.length
   try
-    options = oparse.parse(args)
+    options = oparse.parse args
   catch e
     return fatalError "#{e}"
   invoke arg for arg in options.arguments
@@ -62,12 +61,13 @@ exports.run = ->
 # Display the list of Cake tasks in a format similar to `rake -T`
 printTasks = ->
   relative = path.relative or path.resolve
-  cakefilePath = path.join relative(__originalDirname, process.cwd()), 'Cakefile'
+  cakefilePath =
+    path.join relative(__originalDirname, process.cwd()), 'Cakefile'
   console.log "#{cakefilePath} defines the following tasks:\n"
   for name, task of tasks
     spaces = 20 - name.length
-    spaces = if spaces > 0 then Array(spaces + 1).join(' ') else ''
-    desc   = if task.description then "# #{task.description}" else ''
+    spaces = if spaces > 0 then Array(spaces + 1).join ' ' else ''
+    desc = if task.description then "# #{task.description}" else ''
     console.log "cake #{name}#{spaces} #{desc}"
   console.log oparse.help() if switches.length
 

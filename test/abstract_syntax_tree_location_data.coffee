@@ -13,40 +13,92 @@ testAstNodeLocationData = (node, expected, path = '') ->
     "#{path}.#{additionalPath}"
   ok node?, "Missing expected node at '#{path}'"
   testSingleNodeLocationData node, expected, path if expected.range?
-  for own key, expectedChild of expected when key not in ['start', 'end', 'range', 'loc']
+  for own key, expectedChild of expected when (
+    key not in ['start', 'end', 'range', 'loc']
+  )
     if Array.isArray expectedChild
-      ok Array.isArray(node[key]), "Missing expected array at '#{extendPath key}'"
+      ok(
+        Array.isArray(node[key]),
+        "Missing expected array at '#{extendPath key}'",
+      )
       for expectedItem, index in expectedChild when expectedItem?
-        testAstNodeLocationData node[key][index], expectedItem, extendPath "#{key}[#{index}]"
+        testAstNodeLocationData(
+          node[key][index],
+          expectedItem,
+          extendPath("#{key}[#{index}]"),
+        )
     else if typeof expectedChild is 'object'
-      testAstNodeLocationData node[key], expectedChild, extendPath(key)
+      testAstNodeLocationData node[key], expectedChild, extendPath key
 
 testSingleNodeLocationData = (node, expected, path = '') ->
   # Even though it’s not part of the location data, check the type to ensure
   # that we’re testing the node we think we are.
   if expected.type?
-    eq node.type, expected.type, \
-      "Expected AST node type #{reset}#{node.type}#{red} to equal #{reset}#{expected.type}#{red}"
+    eq(
+      node.type,
+      expected.type,
+      "Expected AST node type #{reset}#{node.type}#{red} to equal #{reset}#{
+        expected.type
+      }#{red}",
+    )
 
-  eq node.start, expected.start, \
-    "Expected #{path}.start: #{reset}#{node.start}#{red} to equal #{reset}#{expected.start}#{red}"
-  eq node.end, expected.end, \
-    "Expected #{path}.end: #{reset}#{node.end}#{red} to equal #{reset}#{expected.end}#{red}"
-  arrayEq node.range, expected.range, \
-    "Expected #{path}.range: #{reset}#{JSON.stringify node.range}#{red} to equal #{reset}#{JSON.stringify expected.range}#{red}"
-  eq node.loc.start.line, expected.loc.start.line, \
-    "Expected #{path}.loc.start.line: #{reset}#{node.loc.start.line}#{red} to equal #{reset}#{expected.loc.start.line}#{red}"
-  eq node.loc.start.column, expected.loc.start.column, \
-    "Expected #{path}.loc.start.column: #{reset}#{node.loc.start.column}#{red} to equal #{reset}#{expected.loc.start.column}#{red}"
-  eq node.loc.end.line, expected.loc.end.line, \
-    "Expected #{path}.loc.end.line: #{reset}#{node.loc.end.line}#{red} to equal #{reset}#{expected.loc.end.line}#{red}"
-  eq node.loc.end.column, expected.loc.end.column, \
-    "Expected #{path}.loc.end.column: #{reset}#{node.loc.end.column}#{red} to equal #{reset}#{expected.loc.end.column}#{red}"
+  eq(
+    node.start,
+    expected.start,
+    "Expected #{path}.start: #{reset}#{node.start}#{red} to equal #{reset}#{
+      expected.start
+    }#{red}",
+  )
+  eq(
+    node.end,
+    expected.end,
+    "Expected #{path}.end: #{reset}#{node.end}#{red} to equal #{reset}#{
+      expected.end
+    }#{red}",
+  )
+  arrayEq(
+    node.range,
+    expected.range,
+    "Expected #{path}.range: #{reset}#{JSON.stringify(
+      node.range,
+    )}#{red} to equal #{reset}#{JSON.stringify expected.range}#{red}",
+  )
+  eq(
+    node.loc.start.line,
+    expected.loc.start.line,
+    "Expected #{path}.loc.start.line: #{reset}#{
+      node.loc.start.line
+    }#{red} to equal #{reset}#{expected.loc.start.line}#{red}",
+  )
+  eq(
+    node.loc.start.column,
+    expected.loc.start.column,
+    "Expected #{path}.loc.start.column: #{reset}#{
+      node.loc.start.column
+    }#{red} to equal #{reset}#{expected.loc.start.column}#{red}",
+  )
+  eq(
+    node.loc.end.line,
+    expected.loc.end.line,
+    "Expected #{path}.loc.end.line: #{reset}#{
+      node.loc.end.line
+    }#{red} to equal #{reset}#{expected.loc.end.line}#{red}",
+  )
+  eq(
+    node.loc.end.column,
+    expected.loc.end.column,
+    "Expected #{path}.loc.end.column: #{reset}#{
+      node.loc.end.column
+    }#{red} to equal #{reset}#{expected.loc.end.column}#{red}",
+  )
 
 if require?
-  {mergeAstLocationData, mergeLocationData} = require './../lib/coffeescript/nodes'
+  {
+    mergeAstLocationData,
+    mergeLocationData,
+  } = require './../lib/coffeescript/nodes'
 
-  test "the `mergeAstLocationData` helper accepts `justLeading` and `justEnding` options", ->
+  test 'the `mergeAstLocationData` helper accepts `justLeading` and `justEnding` options', ->
     first =
       range: [4, 5]
       start: 4
@@ -70,7 +122,8 @@ if require?
           line: 2
           column: 2
     testSingleNodeLocationData mergeAstLocationData(first, second), second
-    testSingleNodeLocationData mergeAstLocationData(first, second, justLeading: yes),
+    testSingleNodeLocationData(
+      mergeAstLocationData(first, second, justLeading: yes),
       range: [1, 5]
       start: 1
       end: 5
@@ -81,7 +134,9 @@ if require?
         end:
           line: 1
           column: 5
-    testSingleNodeLocationData mergeAstLocationData(first, second, justEnding: yes),
+    )
+    testSingleNodeLocationData(
+      mergeAstLocationData(first, second, justEnding: yes),
       range: [4, 10]
       start: 4
       end: 10
@@ -92,8 +147,9 @@ if require?
         end:
           line: 2
           column: 2
+    )
 
-  test "the `mergeLocationData` helper accepts `justLeading` and `justEnding` options", ->
+  test 'the `mergeLocationData` helper accepts `justLeading` and `justEnding` options', ->
     testLocationData = (node, expected) ->
       arrayEq node.range, expected.range
       for field in ['first_line', 'first_column', 'last_line', 'last_column']
@@ -126,7 +182,7 @@ if require?
       last_line: 1
       last_column: 2
 
-test "AST location data as expected for NumberLiteral node", ->
+test 'AST location data as expected for NumberLiteral node', ->
   testAstLocationData '42',
     type: 'NumericLiteral'
     start: 0
@@ -140,7 +196,7 @@ test "AST location data as expected for NumberLiteral node", ->
         line: 1
         column: 2
 
-test "AST location data as expected for InfinityLiteral node", ->
+test 'AST location data as expected for InfinityLiteral node', ->
   testAstLocationData 'Infinity',
     type: 'Identifier'
     start: 0
@@ -167,7 +223,7 @@ test "AST location data as expected for InfinityLiteral node", ->
         line: 1
         column: 5
 
-test "AST location data as expected for NaNLiteral node", ->
+test 'AST location data as expected for NaNLiteral node', ->
   testAstLocationData 'NaN',
     type: 'Identifier'
     start: 0
@@ -181,7 +237,7 @@ test "AST location data as expected for NaNLiteral node", ->
         line: 1
         column: 3
 
-test "AST location data as expected for IdentifierLiteral node", ->
+test 'AST location data as expected for IdentifierLiteral node', ->
   testAstLocationData 'id',
     type: 'Identifier'
     start: 0
@@ -195,7 +251,7 @@ test "AST location data as expected for IdentifierLiteral node", ->
         line: 1
         column: 2
 
-test "AST location data as expected for StatementLiteral node", ->
+test 'AST location data as expected for StatementLiteral node', ->
   testAstLocationData 'break',
     type: 'BreakStatement'
     start: 0
@@ -235,7 +291,7 @@ test "AST location data as expected for StatementLiteral node", ->
         line: 1
         column: 8
 
-test "AST location data as expected for ThisLiteral node", ->
+test 'AST location data as expected for ThisLiteral node', ->
   testAstLocationData 'this',
     type: 'ThisExpression'
     start: 0
@@ -249,7 +305,7 @@ test "AST location data as expected for ThisLiteral node", ->
         line: 1
         column: 4
 
-test "AST location data as expected for UndefinedLiteral node", ->
+test 'AST location data as expected for UndefinedLiteral node', ->
   testAstLocationData 'undefined',
     type: 'Identifier'
     start: 0
@@ -263,7 +319,7 @@ test "AST location data as expected for UndefinedLiteral node", ->
         line: 1
         column: 9
 
-test "AST location data as expected for NullLiteral node", ->
+test 'AST location data as expected for NullLiteral node', ->
   testAstLocationData 'null',
     type: 'NullLiteral'
     start: 0
@@ -277,7 +333,7 @@ test "AST location data as expected for NullLiteral node", ->
         line: 1
         column: 4
 
-test "AST location data as expected for BooleanLiteral node", ->
+test 'AST location data as expected for BooleanLiteral node', ->
   testAstLocationData 'true',
     type: 'BooleanLiteral'
     start: 0
@@ -291,7 +347,7 @@ test "AST location data as expected for BooleanLiteral node", ->
         line: 1
         column: 4
 
-test "AST location data as expected for Access node", ->
+test 'AST location data as expected for Access node', ->
   testAstLocationData 'obj.prop',
     type: 'MemberExpression'
     object:
@@ -374,7 +430,8 @@ test "AST location data as expected for Access node", ->
         line: 1
         column: 4
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     (
       obj
     ).prop
@@ -412,8 +469,9 @@ test "AST location data as expected for Access node", ->
       end:
         line: 3
         column: 6
+  )
 
-test "AST location data as expected for Index node", ->
+test 'AST location data as expected for Index node', ->
   testAstLocationData 'a[b]',
     type: 'MemberExpression'
     object:
@@ -506,7 +564,7 @@ test "AST location data as expected for Index node", ->
         line: 1
         column: 8
 
-test "AST location data as expected for Parens node", ->
+test 'AST location data as expected for Parens node', ->
   testAstLocationData '(hmmmmm)',
     type: 'Identifier'
     start: 1
@@ -533,7 +591,7 @@ test "AST location data as expected for Parens node", ->
         line: 1
         column: 4
 
-test "AST location data as expected for Op node", ->
+test 'AST location data as expected for Op node', ->
   testAstLocationData '1 <= 2',
     type: 'BinaryExpression'
     left:
@@ -698,7 +756,7 @@ test "AST location data as expected for Op node", ->
         line: 1
         column: 11
 
-test "AST location data as expected for Call node", ->
+test 'AST location data as expected for Call node', ->
   testAstLocationData 'fn()',
     type: 'CallExpression'
     start: 0
@@ -747,7 +805,8 @@ test "AST location data as expected for Call node", ->
           line: 1
           column: 8
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     new Old(
       1
     )
@@ -775,6 +834,7 @@ test "AST location data as expected for Call node", ->
           line: 2
           column: 3
     ]
+  )
 
   testAstLocationData 'maybe? 1 + 1',
     type: 'CallExpression'
@@ -801,7 +861,8 @@ test "AST location data as expected for Call node", ->
           column: 12
     ]
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     goDo(this,
       that)
   ''',
@@ -839,6 +900,7 @@ test "AST location data as expected for Call node", ->
           line: 2
           column: 6
     ]
+  )
 
   testAstLocationData 'new Old',
     type: 'NewExpression'
@@ -864,7 +926,7 @@ test "AST location data as expected for Call node", ->
         line: 1
         column: 7
 
-test "AST location data as expected for Range node", ->
+test 'AST location data as expected for Range node', ->
   testAstLocationData '[x..y]',
     type: 'Range'
     from:
@@ -935,7 +997,7 @@ test "AST location data as expected for Range node", ->
         line: 1
         column: 7
 
-test "AST location data as expected for Slice node", ->
+test 'AST location data as expected for Slice node', ->
   testAstLocationData 'x[..y]',
     property:
       to:
@@ -1016,7 +1078,7 @@ test "AST location data as expected for Slice node", ->
         line: 1
         column: 6
 
-test "AST location data as expected for Splat node", ->
+test 'AST location data as expected for Splat node', ->
   testAstLocationData '[a...]',
     type: 'ArrayExpression'
     elements: [
@@ -1091,11 +1153,13 @@ test "AST location data as expected for Splat node", ->
         line: 1
         column: 9
 
-test "AST location data as expected for Elision node", ->
+test 'AST location data as expected for Elision node', ->
   testAstLocationData '[,,,a,, ,b]',
     type: 'ArrayExpression'
     elements: [
-      null,,,
+      null,
+      ,
+      ,
       start: 4
       end: 5
       range: [4, 5]
@@ -1106,7 +1170,9 @@ test "AST location data as expected for Elision node", ->
         end:
           line: 1
           column: 5
-    ,,,
+    ,
+      ,
+      ,
       start: 9
       end: 10
       range: [9, 10]
@@ -1129,7 +1195,7 @@ test "AST location data as expected for Elision node", ->
         line: 1
         column: 11
 
-test "AST location data as expected for ModuleDeclaration node", ->
+test 'AST location data as expected for ModuleDeclaration node', ->
   testAstLocationData 'export {X}',
     type: 'ExportNamedDeclaration'
     specifiers: [
@@ -1213,8 +1279,9 @@ test "AST location data as expected for ModuleDeclaration node", ->
         line: 1
         column: 17
 
-test "AST location data as expected for ImportDeclaration node", ->
-  testAstLocationData '''
+test 'AST location data as expected for ImportDeclaration node', ->
+  testAstLocationData(
+    '''
     import React, {
       Component
     } from "react"
@@ -1275,8 +1342,9 @@ test "AST location data as expected for ImportDeclaration node", ->
       end:
         line: 3
         column: 14
+  )
 
-test "AST location data as expected for ExportNamedDeclaration node", ->
+test 'AST location data as expected for ExportNamedDeclaration node', ->
   testAstLocationData 'export {}',
     type: 'ExportNamedDeclaration'
     start: 0
@@ -1301,7 +1369,8 @@ test "AST location data as expected for ExportNamedDeclaration node", ->
 
   # testAstLocationData 'export class A',
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     export {
       x as y
       z as default
@@ -1385,6 +1454,7 @@ test "AST location data as expected for ExportNamedDeclaration node", ->
       end:
         line: 4
         column: 3
+  )
 
   testAstLocationData 'export {default, default as b} from "./abc"',
     type: 'ExportNamedDeclaration'
@@ -1466,7 +1536,7 @@ test "AST location data as expected for ExportNamedDeclaration node", ->
         line: 1
         column: 43
 
-test "AST location data as expected for ExportDefaultDeclaration node", ->
+test 'AST location data as expected for ExportDefaultDeclaration node', ->
   # testAstLocationData 'export default class',
   #   type: 'ExportDefaultDeclaration'
   #   clause:
@@ -1496,7 +1566,7 @@ test "AST location data as expected for ExportDefaultDeclaration node", ->
         line: 1
         column: 20
 
-test "AST location data as expected for ExportAllDeclaration node", ->
+test 'AST location data as expected for ExportAllDeclaration node', ->
   testAstLocationData 'export * from "module-name"',
     type: 'ExportAllDeclaration'
     source:
@@ -1521,7 +1591,7 @@ test "AST location data as expected for ExportAllDeclaration node", ->
         line: 1
         column: 27
 
-test "AST location data as expected for ImportDefaultSpecifier node", ->
+test 'AST location data as expected for ImportDefaultSpecifier node', ->
   testAstLocationData 'import React from "react"',
     type: 'ImportDeclaration'
     specifiers: [
@@ -1558,7 +1628,7 @@ test "AST location data as expected for ImportDefaultSpecifier node", ->
         line: 1
         column: 25
 
-test "AST location data as expected for ImportNamespaceSpecifier node", ->
+test 'AST location data as expected for ImportNamespaceSpecifier node', ->
   testAstLocationData 'import * as React from "react"',
     type: 'ImportDeclaration'
     specifiers: [
@@ -1653,7 +1723,7 @@ test "AST location data as expected for ImportNamespaceSpecifier node", ->
         line: 1
         column: 41
 
-test "AST location data as expected for Obj node", ->
+test 'AST location data as expected for Obj node', ->
   testAstLocationData "{a: 1, b, [c], @d, [e()]: f, 'g': 2, ...h, i...}",
     type: 'ObjectExpression'
     properties: [
@@ -2001,7 +2071,7 @@ test "AST location data as expected for Obj node", ->
         line: 1
         column: 4
 
-test "AST location data as expected for Assign node", ->
+test 'AST location data as expected for Assign node', ->
   testAstLocationData 'a = b',
     type: 'AssignmentExpression'
     left:
@@ -2154,7 +2224,7 @@ test "AST location data as expected for Assign node", ->
         line: 1
         column: 15
 
-test "AST location data as expected for Expansion node", ->
+test 'AST location data as expected for Expansion node', ->
   testAstLocationData '[..., b] = c',
     type: 'AssignmentExpression'
     left:
@@ -2191,7 +2261,7 @@ test "AST location data as expected for Expansion node", ->
         line: 1
         column: 12
 
-test "AST location data as expected for Throw node", ->
+test 'AST location data as expected for Throw node', ->
   testAstLocationData 'throw new BallError "catch"',
     type: 'ThrowStatement'
     argument:
@@ -2216,7 +2286,7 @@ test "AST location data as expected for Throw node", ->
         line: 1
         column: 27
 
-test "AST location data as expected for Existence node", ->
+test 'AST location data as expected for Existence node', ->
   testAstLocationData 'Ghosts?',
     type: 'UnaryExpression'
     argument:
@@ -2241,7 +2311,7 @@ test "AST location data as expected for Existence node", ->
         line: 1
         column: 7
 
-test "AST location data as expected for JSXTag node", ->
+test 'AST location data as expected for JSXTag node', ->
   testAstLocationData '<CSXY />',
     type: 'JSXElement'
     openingElement:
@@ -2571,7 +2641,8 @@ test "AST location data as expected for JSXTag node", ->
         line: 1
         column: 5
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     <div
       a
       b="c"
@@ -2734,6 +2805,7 @@ test "AST location data as expected for JSXTag node", ->
       end:
         line: 6
         column: 2
+  )
 
   testAstLocationData '<div {f...} />',
     type: 'JSXElement'
@@ -2831,7 +2903,8 @@ test "AST location data as expected for JSXTag node", ->
         line: 1
         column: 14
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     <a>
       {b}
       <c />
@@ -2959,6 +3032,7 @@ test "AST location data as expected for JSXTag node", ->
       end:
         line: 4
         column: 4
+  )
 
   testAstLocationData '<>abc{}</>',
     type: 'JSXFragment'
@@ -3029,7 +3103,8 @@ test "AST location data as expected for JSXTag node", ->
         line: 1
         column: 10
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     <a>{<b />}</a>
   ''',
     type: 'JSXElement'
@@ -3066,8 +3141,9 @@ test "AST location data as expected for JSXTag node", ->
       end:
         line: 1
         column: 14
+  )
 
-test "AST as expected for Try node", ->
+test 'AST as expected for Try node', ->
   testAstLocationData 'try cappuccino',
     type: 'TryStatement'
     block:
@@ -3116,7 +3192,8 @@ test "AST as expected for Try node", ->
         line: 1
         column: 14
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     try
       x = 1
       y()
@@ -3272,8 +3349,10 @@ test "AST as expected for Try node", ->
       end:
         line: 7
         column: 7
+  )
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     try
     catch {e}
       f
@@ -3312,8 +3391,9 @@ test "AST as expected for Try node", ->
         end:
           line: 3
           column: 3
+  )
 
-test "AST location data as expected for Root node", ->
+test 'AST location data as expected for Root node', ->
   testAstRootLocationData '1\n2',
     type: 'File'
     program:
@@ -3434,8 +3514,9 @@ test "AST location data as expected for Root node", ->
         line: 4
         column: 0
 
-test "AST location data as expected for Switch node", ->
-  testAstLocationData '''
+test 'AST location data as expected for Switch node', ->
+  testAstLocationData(
+    '''
     switch x
       when a then a
       when b, c then c
@@ -3599,7 +3680,6 @@ test "AST location data as expected for Switch node", ->
         end:
           line: 4
           column: 9
-    ,
     ]
     start: 0
     end: 53
@@ -3611,8 +3691,10 @@ test "AST location data as expected for Switch node", ->
       end:
         line: 4
         column: 9
+  )
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     switch
       when some(condition)
         doSomething()
@@ -3667,8 +3749,10 @@ test "AST location data as expected for Switch node", ->
               column: 24
       ]
     ]
-test "AST location data as expected for Code node", ->
-  testAstLocationData '''
+  )
+test 'AST location data as expected for Code node', ->
+  testAstLocationData(
+    '''
     (a) ->
       b
       c()
@@ -3720,8 +3804,10 @@ test "AST location data as expected for Code node", ->
         end:
           line: 3
           column: 5
+  )
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     -> a
   ''',
     type: 'FunctionExpression'
@@ -3746,8 +3832,10 @@ test "AST location data as expected for Code node", ->
       end:
         line: 1
         column: 4
+  )
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     (
       a,
       [
@@ -3814,8 +3902,10 @@ test "AST location data as expected for Code node", ->
       end:
         line: 8
         column: 3
+  )
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     ->
   ''',
     type: 'FunctionExpression'
@@ -3840,8 +3930,9 @@ test "AST location data as expected for Code node", ->
       end:
         line: 1
         column: 2
+  )
 
-test "AST location data as expected for Return node", ->
+test 'AST location data as expected for Return node', ->
   testAstLocationData 'return no',
     type: 'ReturnStatement'
     argument:
@@ -3866,7 +3957,8 @@ test "AST location data as expected for Return node", ->
         line: 1
         column: 9
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     (a, b) ->
       return a + b
   ''',
@@ -3915,6 +4007,7 @@ test "AST location data as expected for Return node", ->
       end:
         line: 2
         column: 14
+  )
 
   testAstLocationData '-> return',
     type: 'FunctionExpression'
@@ -3952,7 +4045,7 @@ test "AST location data as expected for Return node", ->
         line: 1
         column: 9
 
-test "AST as expected for YieldReturn node", ->
+test 'AST as expected for YieldReturn node', ->
   testAstLocationData '-> yield return 1',
     type: 'FunctionExpression'
     body:
@@ -4080,7 +4173,7 @@ test "AST as expected for YieldReturn node", ->
         line: 1
         column: 15
 
-test "AST as expected for AwaitReturn node", ->
+test 'AST as expected for AwaitReturn node', ->
   testAstLocationData '-> await return 1',
     type: 'FunctionExpression'
     body:
@@ -4208,7 +4301,7 @@ test "AST as expected for AwaitReturn node", ->
         line: 1
         column: 15
 
-test "AST as expected for If node", ->
+test 'AST as expected for If node', ->
   testAstLocationData 'if maybe then yes',
     type: 'IfStatement'
     test:
@@ -4473,7 +4566,8 @@ test "AST as expected for If node", ->
         line: 1
         column: 39
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     if a
       b
     else
@@ -4604,8 +4698,10 @@ test "AST as expected for If node", ->
       end:
         line: 5
         column: 5
+  )
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     a =
       if b then c else if d then e
   ''',
@@ -4686,8 +4782,10 @@ test "AST as expected for If node", ->
       end:
         line: 2
         column: 30
+  )
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     f(
       if b
         c
@@ -4774,8 +4872,9 @@ test "AST as expected for If node", ->
       end:
         line: 5
         column: 1
+  )
 
-test "AST as expected for While node", ->
+test 'AST as expected for While node', ->
   testAstLocationData 'loop 1',
     type: 'WhileStatement'
     test:
@@ -4927,8 +5026,8 @@ test "AST as expected for While node", ->
         line: 1
         column: 21
 
-
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     x() until y
   ''',
     type: 'WhileStatement'
@@ -4987,8 +5086,10 @@ test "AST as expected for While node", ->
       end:
         line: 1
         column: 11
+  )
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     until x when y
       z++
   ''',
@@ -5059,8 +5160,10 @@ test "AST as expected for While node", ->
       end:
         line: 2
         column: 5
+  )
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     x while y when z
   ''',
     type: 'WhileStatement'
@@ -5130,8 +5233,10 @@ test "AST as expected for While node", ->
       end:
         line: 1
         column: 16
+  )
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     loop
       a()
       b++
@@ -5214,9 +5319,11 @@ test "AST as expected for While node", ->
       end:
         line: 3
         column: 5
+  )
 
-test "AST location data as expected for MetaProperty node", ->
-  testAstLocationData '''
+test 'AST location data as expected for MetaProperty node', ->
+  testAstLocationData(
+    '''
     -> new.target
   ''',
     type: 'FunctionExpression'
@@ -5266,8 +5373,9 @@ test "AST location data as expected for MetaProperty node", ->
       end:
         line: 1
         column: 13
+  )
 
-test "AST location data as expected for For node", ->
+test 'AST location data as expected for For node', ->
   testAstLocationData 'for x, i in arr when x? then return',
     type: 'For'
     name:
@@ -5440,7 +5548,8 @@ test "AST location data as expected for For node", ->
         line: 1
         column: 13
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     for own x, y of z
       c()
       d
@@ -5523,8 +5632,10 @@ test "AST location data as expected for For node", ->
       end:
         line: 3
         column: 3
+  )
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     ->
       for await x from y
         z
@@ -5608,8 +5719,10 @@ test "AST location data as expected for For node", ->
       end:
         line: 3
         column: 5
+  )
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     for {x} in y
       z
   ''',
@@ -5681,8 +5794,9 @@ test "AST location data as expected for For node", ->
       end:
         line: 2
         column: 3
+  )
 
-test "AST location data as expected for StringWithInterpolations node", ->
+test 'AST location data as expected for StringWithInterpolations node', ->
   testAstLocationData '"a#{b}c"',
     type: 'TemplateLiteral'
     expressions: [
@@ -5827,7 +5941,8 @@ test "AST location data as expected for StringWithInterpolations node", ->
         line: 1
         column: 6
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     " a
       #{b}
       c
@@ -5879,8 +5994,10 @@ test "AST location data as expected for StringWithInterpolations node", ->
       end:
         line: 4
         column: 1
+  )
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     """
       a
         b#{
@@ -5934,9 +6051,11 @@ test "AST location data as expected for StringWithInterpolations node", ->
       end:
         line: 6
         column: 3
+  )
 
-test "AST location data as expected for dynamic import", ->
-  testAstLocationData '''
+test 'AST location data as expected for dynamic import', ->
+  testAstLocationData(
+    '''
     import('a')
   ''',
     type: 'CallExpression'
@@ -5973,8 +6092,9 @@ test "AST location data as expected for dynamic import", ->
       end:
         line: 1
         column: 11
+  )
 
-test "AST location data as expected for RegexWithInterpolations node", ->
+test 'AST location data as expected for RegexWithInterpolations node', ->
   testAstLocationData '///^#{flavor}script$///',
     type: 'InterpolatedRegExpLiteral'
     interpolatedPattern:
@@ -6034,7 +6154,8 @@ test "AST location data as expected for RegexWithInterpolations node", ->
         line: 1
         column: 23
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     ///
       a
       #{b}///ig
@@ -6096,8 +6217,9 @@ test "AST location data as expected for RegexWithInterpolations node", ->
       end:
         line: 3
         column: 11
+  )
 
-test "AST location data as expected for RegexLiteral node", ->
+test 'AST location data as expected for RegexLiteral node', ->
   testAstLocationData '/a/ig',
     type: 'RegExpLiteral'
     start: 0
@@ -6111,7 +6233,8 @@ test "AST location data as expected for RegexLiteral node", ->
         line: 1
         column: 5
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     ///
       a
     ///i
@@ -6127,6 +6250,7 @@ test "AST location data as expected for RegexLiteral node", ->
       end:
         line: 3
         column: 4
+  )
 
   testAstLocationData '/a\\w\\u1111\\u{11111}/',
     type: 'RegExpLiteral'
@@ -6141,7 +6265,8 @@ test "AST location data as expected for RegexLiteral node", ->
         line: 1
         column: 20
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     ///
       a
       \\w\\u1111\\u{11111}
@@ -6158,8 +6283,10 @@ test "AST location data as expected for RegexLiteral node", ->
       end:
         line: 4
         column: 3
+  )
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     ///
       /
       (.+)
@@ -6177,8 +6304,9 @@ test "AST location data as expected for RegexLiteral node", ->
       end:
         line: 5
         column: 3
+  )
 
-test "AST as expected for TaggedTemplateCall node", ->
+test 'AST as expected for TaggedTemplateCall node', ->
   testAstLocationData 'func"tagged"',
     type: 'TaggedTemplateExpression'
     tag:
@@ -6296,7 +6424,8 @@ test "AST as expected for TaggedTemplateCall node", ->
         line: 1
         column: 8
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     a"""
       b#{c}
     """
@@ -6369,8 +6498,10 @@ test "AST as expected for TaggedTemplateCall node", ->
       end:
         line: 3
         column: 3
+  )
 
-  testAstLocationData """
+  testAstLocationData(
+    """
     a'''
       b
     '''
@@ -6420,8 +6551,9 @@ test "AST as expected for TaggedTemplateCall node", ->
       end:
         line: 3
         column: 3
+  )
 
-test "AST as expected for Class node", ->
+test 'AST as expected for Class node', ->
   testAstLocationData 'class Klass',
     type: 'ClassDeclaration'
     id:
@@ -6561,7 +6693,8 @@ test "AST as expected for Class node", ->
         line: 1
         column: 32
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     a = class A
       b: ->
         c
@@ -6656,8 +6789,10 @@ test "AST as expected for Class node", ->
       end:
         line: 3
         column: 5
+  )
 
-  testAstLocationData '''
+  testAstLocationData(
+    '''
     class A
       @b: ->
       @c = ->
@@ -7010,3 +7145,4 @@ test "AST as expected for Class node", ->
       end:
         line: 9
         column: 12
+  )

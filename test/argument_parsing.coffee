@@ -11,7 +11,7 @@ sameOptions = (opts1, opts2, msg) ->
     arrayEq opts1[k], opts2[k], msg
   yes
 
-test "combined options are not split after initial file name", ->
+test 'combined options are not split after initial file name', ->
   argv = ['some-file.coffee', '-bc']
   parsed = optionParser.parse argv
   expected = arguments: ['some-file.coffee', '-bc']
@@ -76,7 +76,7 @@ test "options are not split after any '--'", ->
     arguments: ['arg', 'some-file.coffee', '--', '-bc']
   sameOptions parsed, expected
 
-test "any non-option argument stops argument parsing", ->
+test 'any non-option argument stops argument parsing', ->
   argv = ['arg', '-bc']
   parsed = optionParser.parse argv
   expected = arguments: ['arg', '-bc']
@@ -88,7 +88,7 @@ test "later '--' are not removed", ->
   expected = arguments: ['some-file.coffee', '--', '-bc']
   sameOptions parsed, expected
 
-test "throw on invalid options", ->
+test 'throw on invalid options', ->
   argv = ['-k']
   throws -> optionParser.parse argv
 
@@ -112,8 +112,9 @@ test "throw on invalid options", ->
   argv = ['-ok']
   throws (-> optionParser.parse argv), /unrecognized option/
 
-test "has expected help text", ->
-  ok optionParser.help() is '''
+test 'has expected help text', ->
+  ok(
+    optionParser.help() is '''
 
 Usage: coffee [options] path/to/script.coffee [args]
 
@@ -141,4 +142,5 @@ If called without options, `coffee` will run your script.
   -v, --version      display the version number
   -w, --watch        watch scripts for changes and rerun commands
 
-  '''
+  ''',
+  )

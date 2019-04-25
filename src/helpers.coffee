@@ -28,7 +28,7 @@ exports.compact = (array) ->
 # Count the number of occurrences of a string in a string.
 exports.count = (string, substr) ->
   num = pos = 0
-  return 1/0 unless substr.length
+  return 1 / 0 unless substr.length
   num++ while pos = 1 + string.indexOf substr, pos
   num
 
@@ -36,7 +36,7 @@ exports.count = (string, substr) ->
 # Used every time `Base#compile` is called, to allow properties in the
 # options hash to propagate down the tree without polluting other branches.
 exports.merge = (options, overrides) ->
-  extend (extend {}, options), overrides
+  extend extend({}, options), overrides
 
 # Extend a source object with the properties of another object (shallow copy).
 extend = exports.extend = (object, properties) ->
@@ -58,7 +58,7 @@ exports.flatten = flatten = (array) ->
 # Delete a key from an object, returning the value. Useful when a node is
 # looking for a particular method in an options hash.
 exports.del = (obj, key) ->
-  val =  obj[key]
+  val = obj[key]
   delete obj[key]
   val
 
@@ -83,14 +83,14 @@ exports.invertLiterate = (code) ->
     [\ \t]            # followed by a space or a tab.
   ///
   insideComment = no
-  for line in code.split('\n')
-    if blankLine.test(line)
+  for line in code.split '\n'
+    if blankLine.test line
       insideComment = no
       out.push line
-    else if insideComment or listItemStart.test(line)
+    else if insideComment or listItemStart.test line
       insideComment = yes
       out.push "# #{line}"
-    else if not insideComment and indented.test(line)
+    else if not insideComment and indented.test line
       out.push line
     else
       insideComment = yes
@@ -109,10 +109,7 @@ buildLocationData = (first, last) ->
     last_column: last.last_column
     last_line_exclusive: last.last_line_exclusive
     last_column_exclusive: last.last_column_exclusive
-    range: [
-      first.range[0]
-      last.range[1]
-    ]
+    range: [first.range[0], last.range[1]]
 
 # Get a lookup hash for a token based on its location data.
 # Multiple tokens might have the same location hash, but using exclusive
@@ -131,7 +128,9 @@ buildTokenDataDictionary = (parserState) ->
     # `JS` tokens added at the start or end of the token stream to hold
     # comments that start or end a file.
     tokenData[tokenHash] ?= {}
-    if token.comments # `comments` is always an array.
+    if (
+      token.comments # `comments` is always an array.
+    )
       # For “overlapping” tokens, that is tokens with the same location data
       # and therefore matching `tokenHash`es, merge the comments from both/all
       # tokens together into one array, even if there are duplicate comments;
@@ -142,10 +141,20 @@ buildTokenDataDictionary = (parserState) ->
 # This returns a function which takes an object as a parameter, and if that
 # object is an AST node, updates that object's locationData.
 # The object is returned either way.
-exports.addDataToNode = (parserState, firstLocationData, firstValue, lastLocationData, lastValue, forceUpdateLocation = yes) ->
+exports.addDataToNode = (
+  parserState,
+  firstLocationData,
+  firstValue,
+  lastLocationData,
+  lastValue,
+  forceUpdateLocation = yes,
+) ->
   (obj) ->
     # Add location data.
-    locationData = buildLocationData(firstValue?.locationData ? firstLocationData, lastValue?.locationData ? lastLocationData)
+    locationData = buildLocationData(
+      firstValue?.locationData ? firstLocationData,
+      lastValue?.locationData ? lastLocationData,
+    )
     if obj?.updateLocationDataIfMissing? and firstLocationData?
       obj.updateLocationDataIfMissing locationData, forceUpdateLocation
     else
@@ -168,25 +177,27 @@ exports.attachCommentsToNode = attachCommentsToNode = (comments, node) ->
 # Convert jison location data to a string.
 # `obj` can be a token, or a locationData.
 exports.locationDataToString = (obj) ->
-  if ("2" of obj) and ("first_line" of obj[2]) then locationData = obj[2]
-  else if "first_line" of obj then locationData = obj
+  if '2' of obj and 'first_line' of obj[2]
+    locationData = obj[2]
+  else if 'first_line' of obj
+    locationData = obj
 
   if locationData
     "#{locationData.first_line + 1}:#{locationData.first_column + 1}-" +
-    "#{locationData.last_line + 1}:#{locationData.last_column + 1}"
+      "#{locationData.last_line + 1}:#{locationData.last_column + 1}"
   else
-    "No location data"
+    'No location data'
 
 # A `.coffee.md` compatible version of `basename`, that returns the file sans-extension.
 exports.baseFileName = (file, stripExt = no, useWinPathSep = no) ->
   pathSep = if useWinPathSep then /\\|\// else /\//
-  parts = file.split(pathSep)
+  parts = file.split pathSep
   file = parts[parts.length - 1]
   return file unless stripExt and file.indexOf('.') >= 0
-  parts = file.split('.')
+  parts = file.split '.'
   parts.pop()
   parts.pop() if parts[parts.length - 1] is 'coffee' and parts.length > 1
-  parts.join('.')
+  parts.join '.'
 
 # Determine if a filename represents a CoffeeScript file.
 exports.isCoffee = (file) -> /\.((lit)?coffee|coffee\.md)$/.test file
@@ -229,19 +240,21 @@ syntaxErrorToString = ->
 
   filename = @filename or '[stdin]'
   codeLine = @code.split('\n')[first_line]
-  start    = first_column
+  start = first_column
   # Show only the first line on multi-line errors.
-  end      = if first_line is last_line then last_column + 1 else codeLine.length
-  marker   = codeLine[...start].replace(/[^\s]/g, ' ') + repeat('^', end - start)
+  end = if first_line is last_line then last_column + 1 else codeLine.length
+  marker = codeLine[...start].replace(/[^\s]/g, ' ') + repeat '^', end - start
 
   # Check to see if we're running on a color-enabled TTY.
   if process?
-    colorsEnabled = process.stdout?.isTTY and not process.env?.NODE_DISABLE_COLORS
+    colorsEnabled =
+      process.stdout?.isTTY and not process.env?.NODE_DISABLE_COLORS
 
   if @colorful ? colorsEnabled
     colorize = (str) -> "\x1B[1;31m#{str}\x1B[0m"
-    codeLine = codeLine[...start] + colorize(codeLine[start...end]) + codeLine[end..]
-    marker   = colorize marker
+    codeLine =
+      codeLine[...start] + colorize(codeLine[start...end]) + codeLine[end..]
+    marker = colorize marker
 
   """
     #{filename}:#{first_line + 1}:#{first_column + 1}: error: #{@message}
@@ -258,32 +271,51 @@ exports.nameWhitespaceCharacter = (string) ->
     else string
 
 exports.isFunction = (obj) -> Object::toString.call(obj) is '[object Function]'
-exports.isNumber = isNumber = (obj) -> Object::toString.call(obj) is '[object Number]'
-exports.isString = isString = (obj) -> Object::toString.call(obj) is '[object String]'
-exports.isBoolean = isBoolean = (obj) -> obj is yes or obj is no or Object::toString.call(obj) is '[object Boolean]'
-exports.isPlainObject = (obj) -> typeof obj is 'object' and !!obj and not Array.isArray(obj) and not isNumber(obj) and not isString(obj) and not isBoolean(obj)
+exports.isNumber = isNumber = (obj) ->
+  Object::toString.call(obj) is '[object Number]'
+exports.isString = isString = (obj) ->
+  Object::toString.call(obj) is '[object String]'
+exports.isBoolean = isBoolean = (obj) ->
+  obj is yes or obj is no or Object::toString.call(obj) is '[object Boolean]'
+exports.isPlainObject = (obj) ->
+  typeof obj is 'object' and
+  !!obj and
+  not Array.isArray(obj) and
+  not isNumber(obj) and
+  not isString(obj) and
+  not isBoolean obj
 
 unicodeCodePointToUnicodeEscapes = (codePoint) ->
   toUnicodeEscape = (val) ->
     str = val.toString 16
     "\\u#{repeat '0', 4 - str.length}#{str}"
-  return toUnicodeEscape(codePoint) if codePoint < 0x10000
+  return toUnicodeEscape codePoint if codePoint < 0x10000
   # surrogate pair
-  high = Math.floor((codePoint - 0x10000) / 0x400) + 0xD800
-  low = (codePoint - 0x10000) % 0x400 + 0xDC00
-  "#{toUnicodeEscape(high)}#{toUnicodeEscape(low)}"
+  high = Math.floor((codePoint - 0x10000) / 0x400) + 0xd800
+  low = ((codePoint - 0x10000) % 0x400) + 0xdc00
+  "#{toUnicodeEscape high}#{toUnicodeEscape low}"
 
 # Replace `\u{...}` with `\uxxxx[\uxxxx]` in regexes without `u` flag
-exports.replaceUnicodeCodePointEscapes = (str, {flags, error, delimiter = ''} = {}) ->
+exports.replaceUnicodeCodePointEscapes = (
+  str,
+  {flags, error, delimiter = ''} = {},
+) ->
   shouldReplace = flags? and 'u' not in flags
-  str.replace UNICODE_CODE_POINT_ESCAPE, (match, escapedBackslash, codePointHex, offset) ->
+  str.replace UNICODE_CODE_POINT_ESCAPE, (
+    match,
+    escapedBackslash,
+    codePointHex,
+    offset,
+  ) ->
     return escapedBackslash if escapedBackslash
 
     codePointDecimal = parseInt codePointHex, 16
     if codePointDecimal > 0x10ffff
-      error "unicode code point escapes greater than \\u{10ffff} are not allowed",
+      error(
+        'unicode code point escapes greater than \\u{10ffff} are not allowed',
         offset: offset + delimiter.length
         length: codePointHex.length + 4
+      )
     return match unless shouldReplace
 
     unicodeCodePointToUnicodeEscapes codePointDecimal

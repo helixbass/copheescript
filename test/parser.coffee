@@ -1,7 +1,7 @@
 # Parser
 # ---------
 
-test "operator precedence for logical operators", ->
+test 'operator precedence for logical operators', ->
   source = '''
     a or b and c
   '''
@@ -13,7 +13,7 @@ test "operator precedence for logical operators", ->
   eq expression.second.operator, '&&'
   eq expression.second.second.base.value, 'c'
 
-test "operator precedence for bitwise operators", ->
+test 'operator precedence for bitwise operators', ->
   source = '''
     a | b ^ c & d
   '''
@@ -27,7 +27,7 @@ test "operator precedence for bitwise operators", ->
   eq expression.second.second.operator, '&'
   eq expression.second.second.second.base.value, 'd'
 
-test "operator precedence for binary ? operator", ->
+test 'operator precedence for binary ? operator', ->
   source = '''
      a ? b and c
   '''
@@ -39,7 +39,7 @@ test "operator precedence for binary ? operator", ->
   eq expression.second.operator, '&&'
   eq expression.second.second.base.value, 'c'
 
-test "new calls have a range including the new", ->
+test 'new calls have a range including the new', ->
   source = '''
     a = new B().c(d)
   '''
@@ -61,7 +61,7 @@ test "new calls have a range including the new", ->
   assertColumnRange innerValue, 4, 12
   assertColumnRange innerCall, 4, 10
 
-test "location data is properly set for nested `new`", ->
+test 'location data is properly set for nested `new`', ->
   source = '''
     new new A()()
   '''

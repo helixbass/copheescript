@@ -6,64 +6,64 @@
 
 # Note: awkward spacing seen in some tests is likely intentional.
 
-test "comments in objects", ->
-  obj1 = {
-  # comment
+test 'comments in objects', ->
+  obj1 =
     # comment
-      # comment
+    # comment
+    # comment
     one: 1
-  # comment
+    # comment
     two: 2
-      # comment
-  }
+    # comment
 
-  ok Object::hasOwnProperty.call(obj1,'one')
+  ok Object::hasOwnProperty.call obj1, 'one'
   eq obj1.one, 1
-  ok Object::hasOwnProperty.call(obj1,'two')
+  ok Object::hasOwnProperty.call obj1, 'two'
   eq obj1.two, 2
 
-test "comments in YAML-style objects", ->
+test 'comments in YAML-style objects', ->
   obj2 =
-  # comment
     # comment
-      # comment
+    # comment
+    # comment
     three: 3
-  # comment
+    # comment
     four: 4
-      # comment
+    # comment
 
-  ok Object::hasOwnProperty.call(obj2,'three')
+  ok Object::hasOwnProperty.call obj2, 'three'
   eq obj2.three, 3
-  ok Object::hasOwnProperty.call(obj2,'four')
+  ok Object::hasOwnProperty.call obj2, 'four'
   eq obj2.four, 4
 
-test "comments following operators that continue lines", ->
+test 'comments following operators that continue lines', ->
   sum =
     1 +
     1 + # comment
     1
   eq 3, sum
 
-test "comments in functions", ->
+test 'comments in functions', ->
   fn = ->
-  # comment
+    # comment
     false
-    false   # comment
+    false # comment
     false
     # comment
 
-  # comment before return
+    # comment before return
     true
 
   ok fn()
 
-  fn2 = -> #comment
+  fn2 = ->#comment
+
     fn()
     # comment after return
 
   ok fn2()
 
-test "trailing comment before an outdent", ->
+test 'trailing comment before an outdent', ->
   nonce = {}
   fn3 = ->
     if true
@@ -72,9 +72,11 @@ test "trailing comment before an outdent", ->
 
   eq nonce, fn3()
 
-test "comments in a switch", ->
+test 'comments in a switch', ->
   nonce = {}
-  result = switch nonce #comment
+  result = switch (
+    nonce #comment
+  )
     # comment
     when false then undefined
     # comment
@@ -84,31 +86,31 @@ test "comments in a switch", ->
 
   eq nonce, result
 
-test "comment with conditional statements", ->
+test 'comment with conditional statements', ->
   nonce = {}
-  result = if false # comment
+  result = if (
+    false # comment
+  )
     undefined
   #comment
-  else # comment
+  # comment
+  else
     nonce
     # comment
   eq nonce, result
 
-test "spaced comments with conditional statements", ->
+test 'spaced comments with conditional statements', ->
   nonce = {}
   result = if false
     undefined
-
   # comment
   else if false
     undefined
-
   # comment
   else
     nonce
 
   eq nonce, result
-
 
 # Block Comments
 
@@ -117,21 +119,20 @@ test "spaced comments with conditional statements", ->
   Kind of like a heredoc.
 ###
 
-test "block comments in objects", ->
+test 'block comments in objects', ->
   a = {}
   b = {}
-  obj = {
+  obj =
     a: a
     ###
     block comment in object
     ###
     b: b
-  }
 
   eq a, obj.a
   eq b, obj.b
 
-test "block comments in YAML-style", ->
+test 'block comments in YAML-style', ->
   a = {}
   b = {}
   obj =
@@ -144,8 +145,7 @@ test "block comments in YAML-style", ->
   eq a, obj.a
   eq b, obj.b
 
-
-test "block comments in functions", ->
+test 'block comments in functions', ->
   nonce = {}
 
   fn1 = ->
@@ -183,7 +183,7 @@ test "block comments in functions", ->
 
   eq nonce, fn4()()()()
 
-test "block comments inside class bodies", ->
+test 'block comments inside class bodies', ->
   class A
     a: ->
 
@@ -204,59 +204,67 @@ test "block comments inside class bodies", ->
   ok B.prototype.a instanceof Function
 
 test "#2037: herecomments shouldn't imply line terminators", ->
-  do (-> ### ###yes; fail)
+  do ->
+    ### ###
+    yes
+    fail
 
-test "#2916: block comment before implicit call with implicit object", ->
+test '#2916: block comment before implicit call with implicit object', ->
   fn = (obj) -> ok obj.a
   ### ###
-  fn
-    a: yes
+  fn a: yes
 
-test "#3132: Format single-line block comment nicely", ->
-  eqJS """
-  ### Single-line block comment without additional space here => ###""",
-  """
+test '#3132: Format single-line block comment nicely', ->
+  eqJS(
+    '''
+  ### Single-line block comment without additional space here => ###''',
+    '''
   /* Single-line block comment without additional space here => */
-  """
+  ''',
+  )
 
-test "#3132: Format multiline block comment nicely", ->
-  eqJS """
+test '#3132: Format multiline block comment nicely', ->
+  eqJS(
+    '''
   ###
   # Multiline
   # block
   # comment
-  ###""",
-  """
+  ###''',
+    '''
   /*
    * Multiline
    * block
    * comment
    */
-  """
+  ''',
+  )
 
-test "#3132: Format simple block comment nicely", ->
-  eqJS """
+test '#3132: Format simple block comment nicely', ->
+  eqJS(
+    '''
   ###
   No
   Preceding hash
-  ###""",
-  """
+  ###''',
+    '''
   /*
   No
   Preceding hash
   */
-  """
+  ''',
+  )
 
-
-test "#3132: Format indented block-comment nicely", ->
-  eqJS """
+test '#3132: Format indented block-comment nicely', ->
+  eqJS(
+    '''
   fn = ->
     ###
     # Indented
     Multiline
     ###
-    1""",
-  """
+    1''',
+    '''
   var fn;
 
   fn = function() {
@@ -266,20 +274,22 @@ test "#3132: Format indented block-comment nicely", ->
      */
     return 1;
   };
-  """
+  ''',
+  )
 
 # Although adequately working, block comment-placement is not yet perfect.
 # (Considering a case where multiple variables have been declared …)
-test "#3132: Format jsdoc-style block-comment nicely", ->
-  eqJS """
+test '#3132: Format jsdoc-style block-comment nicely', ->
+  eqJS(
+    '''
   ###*
   # Multiline for jsdoc-"@doctags"
   #
   # @type {Function}
   ###
   fn = () -> 1
-  """,
-  """
+  ''',
+    '''
   /**
    * Multiline for jsdoc-"@doctags"
    *
@@ -289,20 +299,22 @@ test "#3132: Format jsdoc-style block-comment nicely", ->
 
   fn = function() {
     return 1;
-  };"""
+  };''',
+  )
 
 # Although adequately working, block comment-placement is not yet perfect.
 # (Considering a case where multiple variables have been declared …)
-test "#3132: Format hand-made (raw) jsdoc-style block-comment nicely", ->
-  eqJS """
+test '#3132: Format hand-made (raw) jsdoc-style block-comment nicely', ->
+  eqJS(
+    '''
   ###*
    * Multiline for jsdoc-"@doctags"
    *
    * @type {Function}
   ###
   fn = () -> 1
-  """,
-  """
+  ''',
+    '''
   /**
    * Multiline for jsdoc-"@doctags"
    *
@@ -312,12 +324,14 @@ test "#3132: Format hand-made (raw) jsdoc-style block-comment nicely", ->
 
   fn = function() {
     return 1;
-  };"""
+  };''',
+  )
 
 # Although adequately working, block comment-placement is not yet perfect.
 # (Considering a case where multiple variables have been declared …)
-test "#3132: Place block-comments nicely", ->
-  eqJS """
+test '#3132: Place block-comments nicely', ->
+  eqJS(
+    '''
   ###*
   # A dummy class definition
   #
@@ -337,8 +351,8 @@ test "#3132: Place block-comments nicely", ->
     ###
     @instance = new DummyClass()
 
-  """,
-  """
+  ''',
+    '''
   /**
    * A dummy class definition
    *
@@ -364,22 +378,24 @@ test "#3132: Place block-comments nicely", ->
 
     return DummyClass;
 
-  }).call(this);"""
+  }).call(this);''',
+  )
 
-test "#3638: Demand a whitespace after # symbol", ->
-  eqJS """
+test '#3638: Demand a whitespace after # symbol', ->
+  eqJS(
+    '''
   ###
   #No
   #whitespace
-  ###""",
-  """
+  ###''',
+    '''
   /*
   #No
   #whitespace
-   */"""
+   */''',
+  )
 
-
-test "#3761: Multiline comment at end of an object", ->
+test '#3761: Multiline comment at end of an object', ->
   anObject =
     x: 3
     ###
@@ -388,34 +404,38 @@ test "#3761: Multiline comment at end of an object", ->
 
   ok anObject.x is 3
 
-test "#4375: UTF-8 characters in comments", ->
+test '#4375: UTF-8 characters in comments', ->
   # 智に働けば角が立つ、情に掉させば流される。
   ok yes
 
-test "#4290: Block comments in array literals", ->
+test '#4290: Block comments in array literals', ->
   arr = [
     ###  ###
-    3
+    3,
     ###
       What is the meaning of life, the universe, and everything?
     ###
-    42
+    42,
   ]
   arrayEq arr, [3, 42]
 
-test "Block comments in array literals are properly indented 1", ->
-  eqJS '''
+test 'Block comments in array literals are properly indented 1', ->
+  eqJS(
+    '''
   arr = [
     ### ! ###
     3
     42
-  ]''', '''
+  ]''',
+    '''
   var arr;
 
-  arr = [/* ! */ 3, 42];'''
+  arr = [/* ! */ 3, 42];''',
+  )
 
-test "Block comments in array literals are properly indented 2", ->
-  eqJS '''
+test 'Block comments in array literals are properly indented 2', ->
+  eqJS(
+    '''
   arr = [
     ###  ###
     3
@@ -423,7 +443,8 @@ test "Block comments in array literals are properly indented 2", ->
       What is the meaning of life, the universe, and everything?
     ###
     42
-  ]''', '''
+  ]''',
+    '''
   var arr;
 
   arr = [
@@ -433,10 +454,12 @@ test "Block comments in array literals are properly indented 2", ->
       What is the meaning of life, the universe, and everything?
     */
     42
-  ];'''
+  ];''',
+  )
 
-test "Block comments in array literals are properly indented 3", ->
-  eqJS '''
+test 'Block comments in array literals are properly indented 3', ->
+  eqJS(
+    '''
   arr = [
     ###
       How many stooges are there?
@@ -444,7 +467,8 @@ test "Block comments in array literals are properly indented 3", ->
     3
     ### Who’s on first? ###
     'Who'
-  ]''', '''
+  ]''',
+    '''
   var arr;
 
   arr = [
@@ -454,10 +478,12 @@ test "Block comments in array literals are properly indented 3", ->
     3,
     /* Who’s on first? */
     'Who'
-  ];'''
+  ];''',
+  )
 
-test "Block comments in array literals are properly indented 4", ->
-  eqJS '''
+test 'Block comments in array literals are properly indented 4', ->
+  eqJS(
+    '''
   if yes
     arr = [
       1
@@ -467,7 +493,8 @@ test "Block comments in array literals are properly indented 4", ->
       3
       ### Who’s on first? ###
       'Who'
-    ]''', '''
+    ]''',
+    '''
   var arr;
 
   if (true) {
@@ -480,16 +507,19 @@ test "Block comments in array literals are properly indented 4", ->
       /* Who’s on first? */
       'Who'
     ];
-  }'''
+  }''',
+  )
 
-test "Line comments in array literals are properly indented 1", ->
-  eqJS '''
+test 'Line comments in array literals are properly indented 1', ->
+  eqJS(
+    '''
   arr = [
     # How many stooges are there?
     3
     # Who’s on first?
     'Who'
-  ]''', '''
+  ]''',
+    '''
   var arr;
 
   arr = [
@@ -497,10 +527,12 @@ test "Line comments in array literals are properly indented 1", ->
     3,
     // Who’s on first?
     'Who'
-  ];'''
+  ];''',
+  )
 
-test "Line comments in array literals are properly indented 2", ->
-  eqJS '''
+test 'Line comments in array literals are properly indented 2', ->
+  eqJS(
+    '''
   arr = [
     # How many stooges are there?
     3
@@ -512,7 +544,8 @@ test "Line comments in array literals are properly indented 2", ->
       secondBase: 'What'
       leftField: 'Why'
     }
-  ]''', '''
+  ]''',
+    '''
   var arr;
 
   arr = [
@@ -526,10 +559,12 @@ test "Line comments in array literals are properly indented 2", ->
       secondBase: 'What',
       leftField: 'Why'
     }
-  ];'''
+  ];''',
+  )
 
-test "Block comments trailing their attached token are properly indented", ->
-  eqJS '''
+test 'Block comments trailing their attached token are properly indented', ->
+  eqJS(
+    '''
   if indented
     if indentedAgain
       a
@@ -538,7 +573,8 @@ test "Block comments trailing their attached token are properly indented", ->
         comment
       ###
     a
-  ''', '''
+  ''',
+    '''
   if (indented) {
     if (indentedAgain) {
       a;
@@ -549,60 +585,74 @@ test "Block comments trailing their attached token are properly indented", ->
     */
     a;
   }
-  '''
+  ''',
+  )
 
-test "Comments in proper order 1", ->
-  eqJS '''
+test 'Comments in proper order 1', ->
+  eqJS(
+    '''
   # 1
   ### 2 ###
   # 3
-  ''', '''
+  ''',
+    '''
   // 1
   /* 2 */
   // 3
-  '''
+  ''',
+  )
 
-test "Comments in proper order 2", ->
-  eqJS '''
+test 'Comments in proper order 2', ->
+  eqJS(
+    '''
   if indented
     # 1
     ### 2 ###
     # 3
     a
-  ''', '''
+  ''',
+    '''
   if (indented) {
     // 1
     /* 2 */
     // 3
     a;
   }
-  '''
+  ''',
+  )
 
-test "Line comment above interpolated string", ->
-  eqJS '''
+test 'Line comment above interpolated string', ->
+  eqJS(
+    '''
   if indented
     # comment
     "#{1}"
-  ''', '''
+  ''',
+    '''
   if (indented) {
     // comment
     `${1}`;
-  }'''
+  }''',
+  )
 
-test "Line comment above interpolated string object key", ->
-  eqJS '''
+test 'Line comment above interpolated string object key', ->
+  eqJS(
+    '''
   {
     # comment
     "#{1}": 2
   }
-  ''', '''
+  ''',
+    '''
   ({
     // comment
     [`${1}`]: 2
-  });'''
+  });''',
+  )
 
-test "Line comments in classes are properly indented", ->
-  eqJS '''
+test 'Line comments in classes are properly indented', ->
+  eqJS(
+    '''
   class A extends B
     # This is a fine class.
     # I could tell you all about it, but what else do you need to know?
@@ -621,7 +671,8 @@ test "Line comments in classes are properly indented", ->
     anotherMethod: ->
       ### Ha! ###
       off
-  ''', '''
+  ''',
+    '''
   var A;
 
   A = class A extends B {
@@ -646,10 +697,12 @@ test "Line comments in classes are properly indented", ->
       return false;
     }
 
-  };'''
+  };''',
+  )
 
-test "Line comments are properly indented", ->
-  eqJS '''
+test 'Line comments are properly indented', ->
+  eqJS(
+    '''
   # Unindented comment
   if yes
     # Comment indented one tab
@@ -666,7 +719,8 @@ test "Line comments are properly indented", ->
     # Yet another comment indented one tab
     4
 
-  # Another unindented comment''', '''
+  # Another unindented comment''',
+    '''
   // Unindented comment
   if (true) {
     // Comment indented one tab
@@ -685,16 +739,19 @@ test "Line comments are properly indented", ->
     4;
   }
 
-  // Another unindented comment'''
+  // Another unindented comment''',
+  )
 
-test "Line comments that trail code, followed by line comments that start a new line", ->
-  eqJS '''
+test 'Line comments that trail code, followed by line comments that start a new line', ->
+  eqJS(
+    '''
   a = ->
     b 1 # Trailing comment
 
   # Comment that starts a new line
   2
-  ''', '''
+  ''',
+    '''
   var a;
 
   a = function() {
@@ -704,68 +761,82 @@ test "Line comments that trail code, followed by line comments that start a new 
 
   // Comment that starts a new line
   2;
-  '''
+  ''',
+  )
 
-test "Empty lines between comments are preserved", ->
-  eqJS '''
+test 'Empty lines between comments are preserved', ->
+  eqJS(
+    '''
   if indented
     # 1
 
     # 2
     3
-  ''', '''
+  ''',
+    '''
   if (indented) {
     // 1
 
     // 2
     3;
-  }'''
+  }''',
+  )
 
-test "Block comment in an interpolated string", ->
+test 'Block comment in an interpolated string', ->
   eqJS '"a#{### Comment ###}b"', '`a${/* Comment */""}b`;'
   eqJS '"a#{### 1 ###}b#{### 2 ###}c"', '`a${/* 1 */""}b${/* 2 */""}c`;'
 
-test "#4629: Block comment in JSX interpolation", ->
+test '#4629: Block comment in JSX interpolation', ->
   eqJS '<div>{### Comment ###}</div>', '<div>{/* Comment */}</div>;'
-  eqJS '''
+  eqJS(
+    '''
   <div>
   {###
     Multiline
     Comment
   ###}
-  </div>''', '''
+  </div>''',
+    '''
   <div>
   {/*
     Multiline
     Comment
   */}
-  </div>;'''
+  </div>;''',
+  )
 
-test "Line comment in an interpolated string", ->
-  eqJS '''
+test 'Line comment in an interpolated string', ->
+  eqJS(
+    '''
   "a#{# Comment
   1}b"
-  ''', '''
+  ''',
+    '''
   `a${// Comment
-  1}b`;'''
+  1}b`;''',
+  )
 
-test "Line comments before `throw`", ->
-  eqJS '''
+test 'Line comments before `throw`', ->
+  eqJS(
+    '''
   if indented
     1/0
     # Uh-oh!
     # You really shouldn’t have done that.
     throw DivideByZeroError()
-  ''', '''
+  ''',
+    '''
   if (indented) {
     1 / 0;
     // Uh-oh!
     // You really shouldn’t have done that.
     throw DivideByZeroError();
-  }'''
+  }''',
+  )
 
-test "Comments before if this exists", ->
-  js = CoffeeScript.compile '''
+test 'Comments before if this exists', ->
+  js =
+    CoffeeScript.compile '''
   1
   # Comment
   if @huh?
@@ -773,8 +844,9 @@ test "Comments before if this exists", ->
   '''
   ok js.includes '// Comment'
 
-test "Comment before unary (`not`)", ->
-  js = CoffeeScript.compile '''
+test 'Comment before unary (`not`)', ->
+  js =
+    CoffeeScript.compile '''
   1
   # Comment
   if not doubleNegative
@@ -782,8 +854,9 @@ test "Comment before unary (`not`)", ->
   '''
   ok js.includes '// Comment'
 
-test "Comments before postfix", ->
-  js = CoffeeScript.compile '''
+test 'Comments before postfix', ->
+  js =
+    CoffeeScript.compile '''
   # 1
   2
 
@@ -796,8 +869,9 @@ test "Comments before postfix", ->
   ok js.includes '// 3'
   ok js.includes '/* 4 */'
 
-test "Comments before assignment if", ->
-  js = CoffeeScript.compile '''
+test 'Comments before assignment if', ->
+  js =
+    CoffeeScript.compile '''
   1
   # Line comment
   a = if b
@@ -812,8 +886,9 @@ test "Comments before assignment if", ->
   ok js.includes '// Line comment'
   ok js.includes '/* Block comment */'
 
-test "Comments before for loop", ->
-  js = CoffeeScript.compile '''
+test 'Comments before for loop', ->
+  js =
+    CoffeeScript.compile '''
   1
   # Comment
   for drop in ocean
@@ -821,8 +896,9 @@ test "Comments before for loop", ->
   '''
   ok js.includes '// Comment'
 
-test "Comments after for loop", ->
-  js = CoffeeScript.compile '''
+test 'Comments after for loop', ->
+  js =
+    CoffeeScript.compile '''
   for drop in ocean # Comment after source variable
     drink drop
   for i in [1, 2] # Comment after array literal element
@@ -834,8 +910,9 @@ test "Comments after for loop", ->
   ok js.includes '// Comment after array literal element'
   ok js.includes '// Comment after object literal'
 
-test "Comments before soak", ->
-  js = CoffeeScript.compile '''
+test 'Comments before soak', ->
+  js =
+    CoffeeScript.compile '''
   # 1
   2
 
@@ -848,16 +925,18 @@ test "Comments before soak", ->
   ok js.includes '// 3'
   ok js.includes '/* 4 */'
 
-test "Comments before splice", ->
-  js = CoffeeScript.compile '''
+test 'Comments before splice', ->
+  js =
+    CoffeeScript.compile '''
   1
   # Comment
   a[1..2] = [1, 2, 3]
   '''
   ok js.includes '// Comment'
 
-test "Comments before object destructuring", ->
-  js = CoffeeScript.compile '''
+test 'Comments before object destructuring', ->
+  js =
+    CoffeeScript.compile '''
   1
   # Comment before splat token
   { x... } = { a: 1, b: 2 }
@@ -868,35 +947,41 @@ test "Comments before object destructuring", ->
   ok js.includes 'Comment before splat token'
   ok js.includes 'Comment before destructured token'
 
-test "Comment before splat function parameter", ->
-  js = CoffeeScript.compile '''
+test 'Comment before splat function parameter', ->
+  js =
+    CoffeeScript.compile '''
   1
   # Comment
   (blah..., yadda) ->
   '''
   ok js.includes 'Comment'
 
-test "Comments before static method", ->
-  eqJS '''
+test 'Comments before static method', ->
+  eqJS(
+    '''
   class Child extends Base
     # Static method:
     @method = ->
-  ''', '''
+  ''',
+    '''
   var Child;
 
   Child = class Child extends Base {
     // Static method:
     static method() {}
 
-  };'''
+  };''',
+  )
 
-test "Comment before method that calls `super()`", ->
-  eqJS '''
+test 'Comment before method that calls `super()`', ->
+  eqJS(
+    '''
   class Dismissed
     # Before a method calling `super`
     method: ->
       super()
-  ''', '''
+  ''',
+    '''
   var Dismissed;
 
   Dismissed = class Dismissed {
@@ -906,10 +991,12 @@ test "Comment before method that calls `super()`", ->
     }
 
   };
-  '''
+  ''',
+  )
 
-test "Comment in interpolated regex", ->
-  js = CoffeeScript.compile '''
+test 'Comment in interpolated regex', ->
+  js =
+    CoffeeScript.compile '''
   1
   ///
     #{1}
@@ -918,88 +1005,111 @@ test "Comment in interpolated regex", ->
   '''
   ok js.includes 'Comment'
 
-test "Line comment after line continuation", ->
-  eqJS '''
+test 'Line comment after line continuation', ->
+  eqJS(
+    '''
   1 + \\ # comment
     2
-  ''', '''
+  ''',
+    '''
   1 + 2; // comment
-  '''
+  ''',
+  )
 
-test "Comments appear above scope `var` declarations", ->
-  eqJS '''
+test 'Comments appear above scope `var` declarations', ->
+  eqJS(
+    '''
   # @flow
 
   fn = (str) -> str
-  ''', '''
+  ''',
+    '''
   // @flow
   var fn;
 
   fn = function(str) {
     return str;
-  };'''
+  };''',
+  )
 
-test "Block comments can appear with function arguments", ->
-  eqJS '''
+test 'Block comments can appear with function arguments', ->
+  eqJS(
+    '''
   fn = (str ###: string ###, num ###: number ###) -> str + num
-  ''', '''
+  ''',
+    '''
   var fn;
 
   fn = function(str/*: string */, num/*: number */) {
     return str + num;
-  };'''
+  };''',
+  )
 
-test "Block comments can appear between function parameters and function opening brace", ->
-  eqJS '''
+test 'Block comments can appear between function parameters and function opening brace', ->
+  eqJS(
+    '''
   fn = (str ###: string ###, num ###: number ###) ###: string ### ->
     str + num
-  ''', '''
+  ''',
+    '''
   var fn;
 
   fn = function(str/*: string */, num/*: number */)/*: string */ {
     return str + num;
-  };'''
+  };''',
+  )
 
-test "Flow comment-based syntax support", ->
-  eqJS '''
+test 'Flow comment-based syntax support', ->
+  eqJS(
+    '''
   # @flow
 
   fn = (str ###: string ###, num ###: number ###) ###: string ### ->
     str + num
-  ''', '''
+  ''',
+    '''
   // @flow
   var fn;
 
   fn = function(str/*: string */, num/*: number */)/*: string */ {
     return str + num;
-  };'''
+  };''',
+  )
 
-test "#4706: Flow comments around function parameters", ->
-  eqJS '''
+test '#4706: Flow comments around function parameters', ->
+  eqJS(
+    '''
   identity = ###::<T>### (value ###: T ###) ###: T ### ->
     value
-  ''', '''
+  ''',
+    '''
   var identity;
 
   identity = function/*::<T>*/(value/*: T */)/*: T */ {
     return value;
-  };'''
+  };''',
+  )
 
-test "#4706: Flow comments around function parameters", ->
-  eqJS '''
+test '#4706: Flow comments around function parameters', ->
+  eqJS(
+    '''
   copy = arr.map(###:: <T> ###(item ###: T ###) ###: T ### => item)
-  ''', '''
+  ''',
+    '''
   var copy;
 
   copy = arr.map(/*:: <T> */(item/*: T */)/*: T */ => {
     return item;
-  });'''
+  });''',
+  )
 
-test "#4706: Flow comments after class name", ->
-  eqJS '''
+test '#4706: Flow comments after class name', ->
+  eqJS(
+    '''
   class Container ###::<T> ###
     method: ###::<U> ### () -> true
-  ''', '''
+  ''',
+    '''
   var Container;
 
   Container = class Container/*::<T> */ {
@@ -1007,24 +1117,27 @@ test "#4706: Flow comments after class name", ->
       return true;
     }
 
-  };'''
+  };''',
+  )
 
-test "#4706: Identifiers with comments wrapped in parentheses remain wrapped", ->
+test '#4706: Identifiers with comments wrapped in parentheses remain wrapped', ->
   eqJS '(arr ###: Array<number> ###)', '(arr/*: Array<number> */);'
   eqJS 'other = (arr ###: any ###)', '''
   var other;
 
   other = (arr/*: any */);'''
 
-test "#4706: Flow comments before class methods", ->
-  eqJS '''
+test '#4706: Flow comments before class methods', ->
+  eqJS(
+    '''
   class Container
     ###::
     method: (number) => string;
     method: (string) => number;
     ###
     method: -> true
-  ''', '''
+  ''',
+    '''
   var Container;
 
   Container = class Container {
@@ -1036,13 +1149,16 @@ test "#4706: Flow comments before class methods", ->
       return true;
     }
 
-  };'''
+  };''',
+  )
 
-test "#4706: Flow comments for class method params", ->
-  eqJS '''
+test '#4706: Flow comments for class method params', ->
+  eqJS(
+    '''
   class Container
     method: (param ###: string ###) -> true
-  ''', '''
+  ''',
+    '''
   var Container;
 
   Container = class Container {
@@ -1050,13 +1166,16 @@ test "#4706: Flow comments for class method params", ->
       return true;
     }
 
-  };'''
+  };''',
+  )
 
-test "#4706: Flow comments for class method returns", ->
-  eqJS '''
+test '#4706: Flow comments for class method returns', ->
+  eqJS(
+    '''
   class Container
     method: () ###: string ### -> true
-  ''', '''
+  ''',
+    '''
   var Container;
 
   Container = class Container {
@@ -1064,41 +1183,50 @@ test "#4706: Flow comments for class method returns", ->
       return true;
     }
 
-  };'''
+  };''',
+  )
 
-test "#4706: Flow comments for function spread", ->
-  eqJS '''
+test '#4706: Flow comments for function spread', ->
+  eqJS(
+    '''
   method = (...rest ###: Array<string> ###) =>
-  ''', '''
+  ''',
+    '''
   var method;
 
-  method = (...rest/*: Array<string> */) => {};'''
+  method = (...rest/*: Array<string> */) => {};''',
+  )
 
-test "#4747: Flow comments for local variable declaration", ->
+test '#4747: Flow comments for local variable declaration', ->
   eqJS 'a ###: number ### = 1', '''
   var a/*: number */;
 
   a = 1;
   '''
 
-test "#4747: Flow comments for local variable declarations", ->
-  eqJS '''
+test '#4747: Flow comments for local variable declarations', ->
+  eqJS(
+    '''
   a ###: number ### = 1
   b ###: string ### = 'c'
-  ''', '''
+  ''',
+    '''
   var a/*: number */, b/*: string */;
 
   a = 1;
 
   b = 'c';
-  '''
+  ''',
+  )
 
-test "#4747: Flow comments for local variable declarations with reassignment", ->
-  eqJS '''
+test '#4747: Flow comments for local variable declarations with reassignment', ->
+  eqJS(
+    '''
   a ###: number ### = 1
   b ###: string ### = 'c'
   a ### some other comment ### = 2
-  ''', '''
+  ''',
+    '''
   var a/*: number */, b/*: string */;
 
   a = 1;
@@ -1106,17 +1234,21 @@ test "#4747: Flow comments for local variable declarations with reassignment", -
   b = 'c';
 
   a/* some other comment */ = 2;
-  '''
+  ''',
+  )
 
-test "#4756: Comment before ? operation", ->
-  eqJS '''
+test '#4756: Comment before ? operation', ->
+  eqJS(
+    '''
   do ->
     ### Comment ###
     @foo ? 42
-  ''', '''
+  ''',
+    '''
   (function() {
     var ref;
     /* Comment */
     return (ref = this.foo) != null ? ref : 42;
   })();
-  '''
+  ''',
+  )

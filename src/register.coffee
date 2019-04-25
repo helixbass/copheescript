@@ -1,7 +1,7 @@
-CoffeeScript  = require './'
+CoffeeScript = require './'
 child_process = require 'child_process'
-helpers       = require './helpers'
-path          = require 'path'
+helpers = require './helpers'
+path = require 'path'
 
 # Load and run a CoffeeScript file for Node, stripping any `BOM`s.
 loadFile = (module, filename) ->
@@ -33,7 +33,7 @@ if require.extensions
     @filename = filename
     @paths = Module._nodeModulePaths path.dirname filename
     extension = findExtension filename
-    Module._extensions[extension](this, filename)
+    Module._extensions[extension] this, filename
     @loaded = true
 
 # If we're on Node, patch `child_process.fork` so that Coffee scripts are able

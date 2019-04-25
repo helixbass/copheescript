@@ -7,53 +7,53 @@
 # * Strings
 # * Heredocs
 
-test "backslash escapes", ->
-  eq "\\/\\\\", /\/\\/.source
+test 'backslash escapes', ->
+  eq '\\/\\\\', /\/\\/.source
 
 eq '(((dollars)))', '\(\(\(dollars\)\)\)'
-eq 'one two three', "one
+eq 'one two three', 'one
  two
- three"
-eq "four five", 'four
+ three'
+eq 'four five', 'four
 
  five'
 
-test "#3229, multiline strings", ->
+test '#3229, multiline strings', ->
   # Separate lines by default by a single space in literal strings.
   eq 'one
       two', 'one two'
-  eq "one
-      two", 'one two'
+  eq 'one
+      two', 'one two'
   eq '
         a
         b
     ', 'a b'
-  eq "
+  eq '
         a
         b
-    ", 'a b'
+    ', 'a b'
   eq 'one
 
         two', 'one two'
-  eq "one
+  eq 'one
 
-        two", 'one two'
-  eq '
+        two', 'one two'
+  eq "
     indentation
-      doesn\'t
-  matter', 'indentation doesn\'t matter'
-  eq 'trailing ws      
-    doesn\'t matter', 'trailing ws doesn\'t matter'
+      doesn't
+  matter", "indentation doesn't matter"
+  eq "trailing ws      
+    doesn't matter", "trailing ws doesn't matter"
 
   # Use backslashes at the end of a line to specify whitespace between lines.
   eq 'a \
       b\
       c  \
       d', 'a bc  d'
-  eq "a \
+  eq 'a \
       b\
       c  \
-      d", 'a bc  d'
+      d', 'a bc  d'
   eq 'ignore  \  
       trailing whitespace', 'ignore  trailing whitespace'
 
@@ -73,40 +73,65 @@ test "#3229, multiline strings", ->
   eq '   ', '   '
 
   # Same behavior in interpolated strings.
-  eq "interpolation #{1}
+  eq(
+    "interpolation #{1}
       follows #{2}  \
       too #{3}\
-      !", 'interpolation 1 follows 2  too 3!'
-  eq "a #{
-    'string ' + "inside
-                 interpolation"
-    }", "a string inside interpolation"
-  eq "
+      !",
+    'interpolation 1 follows 2  too 3!',
+  )
+  eq(
+    "a #{'string ' + 'inside
+                 interpolation'}",
+    'a string inside interpolation',
+  )
+  eq(
+    "
       #{1}
-     ", '1'
+     ",
+    '1',
+  )
 
   # Handle escaped backslashes correctly.
   eq '\\', `'\\'`
-  eq 'escaped backslash at EOL\\
-      next line', 'escaped backslash at EOL\\ next line'
+  eq(
+    'escaped backslash at EOL\\
+      next line',
+    'escaped backslash at EOL\\ next line',
+  )
   eq '\\
       next line', '\\ next line'
   eq '\\
      ', '\\'
   eq '\\\\\\
      ', '\\\\\\'
-  eq "#{1}\\
-      after interpolation", '1\\ after interpolation'
-  eq 'escaped backslash before slash\\  \
-      next line', 'escaped backslash before slash\\  next line'
+  eq(
+    "#{1}\\
+      after interpolation",
+    '1\\ after interpolation',
+  )
+  eq(
+    'escaped backslash before slash\\  \
+      next line',
+    'escaped backslash before slash\\  next line',
+  )
   eq 'triple backslash\\\
       next line', 'triple backslash\\next line'
-  eq 'several escaped backslashes\\\\\\
-      ok', 'several escaped backslashes\\\\\\ ok'
-  eq 'several escaped backslashes slash\\\\\\\
-      ok', 'several escaped backslashes slash\\\\\\ok'
-  eq 'several escaped backslashes with trailing ws \\\\\\   
-      ok', 'several escaped backslashes with trailing ws \\\\\\ ok'
+  eq(
+    'several escaped backslashes\\\\\\
+      ok',
+    'several escaped backslashes\\\\\\ ok',
+  )
+  eq(
+    'several escaped backslashes slash\\\\\\\
+      ok',
+    'several escaped backslashes slash\\\\\\ok',
+  )
+  eq(
+    'several escaped backslashes with trailing ws \\\\\\   
+      ok',
+    'several escaped backslashes with trailing ws \\\\\\ ok',
+  )
 
   # Backslashes at beginning of lines.
   eq 'first line
@@ -137,164 +162,222 @@ test "#3229, multiline strings", ->
 
         backslash', 'lone backslash'
 
-test "#3249, escape newlines in heredocs with backslashes", ->
+test '#3249, escape newlines in heredocs with backslashes', ->
   # Ignore escaped newlines
-  eq '''
+  eq(
+    '''
     Set whitespace      \
        <- this is ignored\  
            none
       normal indentation
-    ''', 'Set whitespace      <- this is ignorednone\n  normal indentation'
-  eq """
+    ''',
+    'Set whitespace      <- this is ignorednone\n  normal indentation',
+  )
+  eq(
+    '''
     Set whitespace      \
        <- this is ignored\  
            none
       normal indentation
-    """, 'Set whitespace      <- this is ignorednone\n  normal indentation'
+    ''',
+    'Set whitespace      <- this is ignorednone\n  normal indentation',
+  )
 
   # Changed from #647, trailing backslash.
-  eq '''
+  eq(
+    '''
   Hello, World\
 
-  ''', 'Hello, World'
-  eq '''
+  ''',
+    'Hello, World',
+  )
+  eq(
+    '''
     \\
-  ''', '\\'
+  ''',
+    '\\',
+  )
 
   # Backslash at the beginning of a literal string.
-  eq '''\
-      ok''', 'ok'
-  eq '''  \
-      ok''', '  ok'
+  eq(
+    '''\
+      ok''',
+    'ok',
+  )
+  eq(
+    '''  \
+      ok''',
+    '  ok',
+  )
 
   # Same behavior in interpolated strings.
-  eq """
+  eq(
+    """
     interpolation #{1}
       follows #{2}  \
         too #{3}\
     !
-  """, 'interpolation 1\n  follows 2  too 3!'
-  eq """
+  """,
+    'interpolation 1\n  follows 2  too 3!',
+  )
+  eq(
+    """
 
     #{1} #{2}
 
-    """, '\n1 2\n'
+    """,
+    '\n1 2\n',
+  )
 
   # Handle escaped backslashes correctly.
-  eq '''
+  eq(
+    '''
     escaped backslash at EOL\\
       next line
-  ''', 'escaped backslash at EOL\\\n  next line'
-  eq '''\\
+  ''',
+    'escaped backslash at EOL\\\n  next line',
+  )
+  eq(
+    '''\\
 
-     ''', '\\\n'
+     ''',
+    '\\\n',
+  )
 
   # Backslashes at beginning of lines.
-  eq '''first line
-      \   backslash at BOL''', 'first line\n\   backslash at BOL'
-  eq """first line\
-      \   backslash at BOL""", 'first line\   backslash at BOL'
+  eq(
+    '''first line
+      \   backslash at BOL''',
+    'first line\n\   backslash at BOL',
+  )
+  eq(
+    '''first line\
+      \   backslash at BOL''',
+    'first line\   backslash at BOL',
+  )
 
   # Backslashes at end of strings.
   eq '''first line \ ''', 'first line  '
-  eq '''
+  eq(
+    '''
     first line
     second line \
-  ''', 'first line\nsecond line '
-  eq '''
+  ''',
+    'first line\nsecond line ',
+  )
+  eq(
+    '''
     first line
     second line
     \
-  ''', 'first line\nsecond line'
-  eq '''
+  ''',
+    'first line\nsecond line',
+  )
+  eq(
+    '''
     first line
     second line
 
       \
 
-  ''', 'first line\nsecond line\n'
+  ''',
+    'first line\nsecond line\n',
+  )
 
   # Edge cases.
-  eq '''lone
+  eq(
+    '''lone
 
           \
 
 
 
-        backslash''', 'lone\n\n  backslash'
-  eq '''\
-     ''', ''
+        backslash''',
+    'lone\n\n  backslash',
+  )
+  eq(
+    '''\
+     ''',
+    '',
+  )
 
 test '#2388: `"""` in heredoc interpolations', ->
-  eq """a heredoc #{
-      "inside \
-        interpolation"
-    }""", "a heredoc inside interpolation"
-  eq """a#{"""b"""}c""", 'abc'
-  eq """#{""""""}""", ''
+  eq(
+    """a heredoc #{'inside \
+        interpolation'}""",
+    'a heredoc inside interpolation',
+  )
+  eq """a#{'''b'''}c""", 'abc'
+  eq """#{''''''}""", ''
 
-test "trailing whitespace", ->
+test 'trailing whitespace', ->
   testTrailing = (str, expected) ->
     eq CoffeeScript.eval(str.replace /\|$/gm, ''), expected
-  testTrailing '''"   |
+  testTrailing(
+    '''"   |
       |
     a   |
            |
-  "''', 'a'
-  testTrailing """'''   |
+  "''',
+    'a',
+  )
+  testTrailing(
+    """'''   |
       |
     a   |
            |
-  '''""", '  \na   \n       '
+  '''""",
+    '  \na   \n       ',
+  )
 
 #647
 eq "''Hello, World\\''", '''
 '\'Hello, World\\\''
 '''
-eq '""Hello, World\\""', """
+eq '""Hello, World\\""', '''
 "\"Hello, World\\\""
-"""
+'''
 
-test "#1273, escaping quotes at the end of heredocs.", ->
+test '#1273, escaping quotes at the end of heredocs.', ->
   # """\""" no longer compiles
-  eq """\\""", '\\'
-  eq """\\\"""", '\\\"'
+  eq '''\\''', '\\'
+  eq '''\\\"''', '\\"'
 
-a = """
+a = '''
     basic heredoc
     on two lines
-    """
-ok a is "basic heredoc\non two lines"
+    '''
+ok a is 'basic heredoc\non two lines'
 
 a = '''
     a
       "b
     c
     '''
-ok a is "a\n  \"b\nc"
+ok a is 'a\n  "b\nc'
 
-a = """
+a = '''
 a
  b
   c
-"""
-ok a is "a\n b\n  c"
+'''
+ok a is 'a\n b\n  c'
 
 a = '''one-liner'''
 ok a is 'one-liner'
 
-a = """
+a = '''
       out
       here
-"""
-ok a is "out\nhere"
+'''
+ok a is 'out\nhere'
 
 a = '''
        a
      b
    c
     '''
-ok a is "    a\n  b\nc"
+ok a is '    a\n  b\nc'
 
 a = '''
 a
@@ -302,7 +385,7 @@ a
 
 b c
 '''
-ok a is "a\n\n\nb c"
+ok a is 'a\n\n\nb c'
 
 a = '''more"than"one"quote'''
 ok a is 'more"than"one"quote'
@@ -310,88 +393,105 @@ ok a is 'more"than"one"quote'
 a = '''here's an apostrophe'''
 ok a is "here's an apostrophe"
 
-a = """""surrounded by two quotes"\""""
+a = '''""surrounded by two quotes"\"'''
 ok a is '""surrounded by two quotes""'
 
 a = '''''surrounded by two apostrophes'\''''
 ok a is "''surrounded by two apostrophes''"
 
 # The indentation detector ignores blank lines without trailing whitespace
-a = """
+a = '''
     one
     two
 
-    """
-ok a is "one\ntwo\n"
+    '''
+ok a is 'one\ntwo\n'
 
-eq ''' line 0
+eq(
+  ''' line 0
   should not be relevant
     to the indent level
-''', ' line 0\nshould not be relevant\n  to the indent level'
+''',
+  ' line 0\nshould not be relevant\n  to the indent level',
+)
 
-eq """
-  interpolation #{
- "contents"
- }
+eq(
+  """
+  interpolation #{'contents'}
   should not be relevant
     to the indent level
-""", 'interpolation contents\nshould not be relevant\n  to the indent level'
+""",
+  'interpolation contents\nshould not be relevant\n  to the indent level',
+)
 
 eq ''' '\\\' ''', " '\\' "
-eq """ "\\\" """, ' "\\" '
+eq ''' "\\\" ''', ' "\\" '
 
 eq '''  <- keep these spaces ->  ''', '  <- keep these spaces ->  '
 
 eq '''undefined''', 'undefined'
-eq """undefined""", 'undefined'
+eq '''undefined''', 'undefined'
 
+test '#1046, empty string interpolations', ->
+  eq "#{}", ''
 
-test "#1046, empty string interpolations", ->
-  eq "#{ }", ''
-
-test "strings are not callable", ->
+test 'strings are not callable', ->
   throws -> CoffeeScript.compile '"a"()'
   throws -> CoffeeScript.compile '"a#{b}"()'
   throws -> CoffeeScript.compile '"a" 1'
   throws -> CoffeeScript.compile '"a#{b}" 1'
-  throws -> CoffeeScript.compile '''
+  throws ->
+    CoffeeScript.compile '''
     "a"
        k: v
   '''
-  throws -> CoffeeScript.compile '''
+  throws ->
+    CoffeeScript.compile '''
     "a#{b}"
        k: v
   '''
 
-test "#3795: Escape otherwise invalid characters", ->
+test '#3795: Escape otherwise invalid characters', ->
   eq ' ', '\u2028'
   eq ' ', '\u2029'
   eq '\0\
       1', '\x001'
-  eq " ", '\u2028'
-  eq " ", '\u2029'
-  eq "\0\
-      1", '\x001'
+  eq ' ', '\u2028'
+  eq ' ', '\u2029'
+  eq '\0\
+      1', '\x001'
   eq ''' ''', '\u2028'
   eq ''' ''', '\u2029'
-  eq '''\0\
-      1''', '\x001'
-  eq """ """, '\u2028'
-  eq """ """, '\u2029'
-  eq """\0\
-      1""", '\x001'
+  eq(
+    '''\0\
+      1''',
+    '\x001',
+  )
+  eq ''' ''', '\u2028'
+  eq ''' ''', '\u2029'
+  eq(
+    '''\0\
+      1''',
+    '\x001',
+  )
 
   a = 'a'
   eq "#{a} ", 'a\u2028'
   eq "#{a} ", 'a\u2029'
-  eq "#{a}\0\
-      1", 'a\0' + '1'
+  eq(
+    "#{a}\0\
+      1",
+    'a\0' + '1',
+  )
   eq """#{a} """, 'a\u2028'
   eq """#{a} """, 'a\u2029'
-  eq """#{a}\0\
-      1""", 'a\0' + '1'
+  eq(
+    """#{a}\0\
+      1""",
+    'a\0' + '1',
+  )
 
-test "#4314: Whitespace less than or equal to stripped indentation", ->
+test '#4314: Whitespace less than or equal to stripped indentation', ->
   # The odd indentation is intentional here, to test 1-space indentation.
   eq ' ', """
  #{} #{}
@@ -401,30 +501,34 @@ test "#4314: Whitespace less than or equal to stripped indentation", ->
     #{1} #{2}  #{3}   #{4}    #{5}     end
     a #{0}     b"""
 
-test "#4248: Unicode code point escapes", ->
+test '#4248: Unicode code point escapes', ->
   eq '\u01ab\u00cd', '\u{1ab}\u{cd}'
   eq '\u01ab', '\u{000001ab}'
-  eq 'a\u01ab', "#{ 'a' }\u{1ab}"
+  eq 'a\u01ab', "#{'a'}\u{1ab}"
   eq '\u01abc', '''\u{01ab}c'''
-  eq '\u01abc', """\u{1ab}#{ 'c' }"""
+  eq '\u01abc', """\u{1ab}#{'c'}"""
   eq '\udab3\uddef', '\u{bcdef}'
   eq '\udab3\uddef', '\u{0000bcdef}'
-  eq 'a\udab3\uddef', "#{ 'a' }\u{bcdef}"
+  eq 'a\udab3\uddef', "#{'a'}\u{bcdef}"
   eq '\udab3\uddefc', '''\u{0bcdef}c'''
-  eq '\udab3\uddefc', """\u{bcdef}#{ 'c' }"""
+  eq '\udab3\uddefc', """\u{bcdef}#{'c'}"""
   eq '\\u{123456}', "#{'\\'}#{'u{123456}'}"
 
   # don't rewrite code point escapes
-  eqJS """
+  eqJS(
+    '''
     '\\u{bcdef}\\u{abc}'
-  """,
-  """
+  ''',
+    '''
     '\\u{bcdef}\\u{abc}';
-  """
+  ''',
+  )
 
-  eqJS """
-    "#{ 'a' }\\u{bcdef}"
+  eqJS(
+    """
+    "#{'a'}\\u{bcdef}"
   """,
-  """
+    '''
     "a\\u{bcdef}";
-  """
+  ''',
+  )

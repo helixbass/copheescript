@@ -9,7 +9,7 @@ sawSIGINT = no
 transpile = no
 
 replDefaults =
-  prompt: 'coffee> ',
+  prompt: 'coffee> '
   historyFile: do ->
     historyPath = process.env.XDG_CACHE_HOME or process.env.HOME
     path.join historyPath, '.coffee_history' if historyPath
@@ -31,25 +31,40 @@ replDefaults =
       # Tokenize the clean input.
       tokens = CoffeeScript.tokens input
       # Filter out tokens generated just to hold comments.
-      if tokens.length >= 2 and tokens[0].generated and
-         tokens[0].comments?.length isnt 0 and "#{tokens[0][1]}" is '' and
-         tokens[1][0] is 'TERMINATOR'
+      if (
+        tokens.length >= 2 and
+        tokens[0].generated and
+        tokens[0].comments?.length isnt 0 and
+        "#{tokens[0][1]}" is '' and
+        tokens[1][0] is 'TERMINATOR'
+      )
         tokens = tokens[2...]
-      if tokens.length >= 1 and tokens[tokens.length - 1].generated and
-         tokens[tokens.length - 1].comments?.length isnt 0 and "#{tokens[tokens.length - 1][1]}" is ''
+      if (
+        tokens.length >= 1 and
+        tokens[tokens.length - 1].generated and
+        tokens[tokens.length - 1].comments?.length isnt 0 and
+        "#{tokens[tokens.length - 1][1]}" is ''
+      )
         tokens.pop()
       # Collect referenced variable names just like in `CoffeeScript.compile`.
-      referencedVars = (token[1] for token in tokens when token[0] is 'IDENTIFIER')
+      referencedVars =
+        token[1] for token in tokens when token[0] is 'IDENTIFIER'
       # Generate the AST of the tokens.
       ast = CoffeeScript.nodes tokens
       # Add assignment to `__` variable to force the input to be an expression.
-      ast = new Block [new Assign (new Value new Literal '__'), ast, '=']
+      ast = new Block [new Assign new Value(new Literal('__')), ast, '=']
       # Wrap the expression in a closure to support top-level `await`.
-      ast     = new Code [], ast
+      ast = new Code [], ast
       isAsync = ast.isAsync
       # Invoke the wrapping closure.
-      ast    = new Block [new Call ast]
-      js     = ast.compile {bare: yes, locals: Object.keys(context), referencedVars, sharedScope: yes}
+      ast = new Block [new Call ast]
+      js =
+        ast.compile {
+          bare: yes,
+          locals: Object.keys(context),
+          referencedVars,
+          sharedScope: yes,
+        }
       if transpile
         js = transpile.transpile(js, transpile.options).code
         # Strip `"use strict"`, to avoid an exception on assigning to
@@ -100,7 +115,13 @@ addMultilineHandler = (repl) ->
 
   # Handle Ctrl-v
   inputStream.on 'keypress', (char, key) ->
-    return unless key and key.ctrl and not key.meta and not key.shift and key.name is 'v'
+    return unless (
+      key and
+      key.ctrl and
+      not key.meta and
+      not key.shift and
+      key.name is 'v'
+    )
     if multiline.enabled
       # allow arbitrarily switching between modes any time before multiple lines are entered
       unless multiline.buffer.match /\n/
@@ -139,7 +160,11 @@ addHistory = (repl, filename, maxSize) ->
     fs.readSync readFd, buffer, 0, size, stat.size - size
     fs.closeSync readFd
     # Set the history on the interpreter
-    repl.history = buffer.toString().split('\n').reverse()
+    repl.history =
+      buffer
+      .toString()
+      .split '\n'
+      .reverse()
     # If the history file was truncated we should pop off a potential partial line
     repl.history.pop() if stat.size > maxSize
     # Shift off the final blank newline
@@ -150,7 +175,13 @@ addHistory = (repl, filename, maxSize) ->
   fd = fs.openSync filename, 'a'
 
   repl.addListener 'line', (code) ->
-    if code and code.length and code isnt '.history' and code isnt '.exit' and lastLine isnt code
+    if (
+      code and
+      code.length and
+      code isnt '.history' and
+      code isnt '.exit' and
+      lastLine isnt code
+    )
       # Save the latest command in the file
       fs.writeSync fd, "#{code}\n"
       lastLine = code
@@ -160,7 +191,7 @@ addHistory = (repl, filename, maxSize) ->
   repl.on 'exit', -> fs.closeSync fd
 
   # Add a command to show the history stack
-  repl.commands[getCommandId(repl, 'history')] =
+  repl.commands[getCommandId repl, 'history'] =
     help: 'Show command history'
     action: ->
       repl.outputStream.write "#{repl.history[..].reverse().join '\n'}\n"
@@ -173,10 +204,13 @@ getCommandId = (repl, commandName) ->
 
 module.exports =
   start: (opts = {}) ->
-    [major, minor, build] = process.versions.node.split('.').map (n) -> parseInt(n, 10)
+    [major, minor, build] =
+      process.versions.node
+      .split '.'
+      .map (n) -> parseInt n, 10
 
     if major < 6
-      console.warn "Node 6+ required for CoffeeScript REPL"
+      console.warn 'Node 6+ required for CoffeeScript REPL'
       process.exit 1
 
     CoffeeScript.register()
@@ -198,8 +232,7 @@ module.exports =
             See https://coffeescript.org/#transpilation
           '''
           process.exit 1
-      transpile.options =
-        filename: path.resolve process.cwd(), '<repl>'
+      transpile.options = filename: path.resolve process.cwd(), '<repl>'
       # Since the REPL compilation path is unique (in `eval` above), we need
       # another way to get the `options` object attached to a module so that
       # it knows later on whether it needs to be transpiled. In the case of
@@ -212,9 +245,13 @@ module.exports =
     opts = merge replDefaults, opts
     repl = nodeREPL.start opts
     runInContext opts.prelude, repl.context, 'prelude' if opts.prelude
-    repl.on 'exit', -> repl.outputStream.write '\n' if not repl.closed
+    repl.on 'exit', ->
+      repl.outputStream.write '\n' if not repl.closed
     addMultilineHandler repl
-    addHistory repl, opts.historyFile, opts.historyMaxInputSize if opts.historyFile
+    addHistory repl, opts.historyFile, opts.historyMaxInputSize if (
+      opts.historyFile
+    )
     # Adapt help inherited from the node REPL
-    repl.commands[getCommandId(repl, 'load')].help = 'Load code from a file into this REPL session'
+    repl.commands[getCommandId repl, 'load'].help =
+      'Load code from a file into this REPL session'
     repl

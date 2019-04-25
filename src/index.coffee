@@ -1,10 +1,10 @@
 # Node.js Implementation
-CoffeeScript  = require './coffeescript'
-fs            = require 'fs'
-vm            = require 'vm'
-path          = require 'path'
+CoffeeScript = require './coffeescript'
+fs = require 'fs'
+vm = require 'vm'
+path = require 'path'
 
-helpers       = CoffeeScript.helpers
+helpers = CoffeeScript.helpers
 
 CoffeeScript.transpile = (js, options) ->
   try
@@ -15,7 +15,9 @@ CoffeeScript.transpile = (js, options) ->
     catch
       # This error is only for Node, as CLI users will see a different error
       # earlier if they don’t have Babel installed.
-      throw new Error 'To use the transpile option, you must have the \'@babel/core\' module installed'
+      throw new Error(
+        "To use the transpile option, you must have the '@babel/core' module installed",
+      )
   babel.transform js, options
 
 # The `compile` method shared by the CLI, Node and browser APIs.
@@ -36,8 +38,10 @@ CoffeeScript.run = (code, options = {}) ->
   mainModule = require.main
 
   # Set the filename.
-  mainModule.filename = process.argv[1] =
-    if options.filename then fs.realpathSync(options.filename) else '<anonymous>'
+  mainModule.filename = process.argv[1] = if options.filename
+    fs.realpathSync options.filename
+  else
+    '<anonymous>'
 
   # Clear the module cache.
   mainModule.moduleCache and= {}
@@ -74,25 +78,27 @@ CoffeeScript.eval = (code, options = {}) ->
         sandbox = options.sandbox
       else
         sandbox = createContext()
-        sandbox[k] = v for own k, v of options.sandbox
+        (sandbox[k] = v) for own k, v of options.sandbox
       sandbox.global = sandbox.root = sandbox.GLOBAL = sandbox
     else
       sandbox = global
     sandbox.__filename = options.filename || 'eval'
-    sandbox.__dirname  = path.dirname sandbox.__filename
+    sandbox.__dirname = path.dirname sandbox.__filename
     # define module/require only if they chose not to specify their own
     unless sandbox isnt global or sandbox.module or sandbox.require
       Module = require 'module'
-      sandbox.module  = _module  = new Module(options.modulename || 'eval')
-      sandbox.require = _require = (path) ->  Module._load path, _module, true
+      sandbox.module = _module = new Module options.modulename || 'eval'
+      sandbox.require = _require = (path) -> Module._load path, _module, true
       _module.filename = sandbox.__filename
-      for r in Object.getOwnPropertyNames require when r not in ['paths', 'arguments', 'caller']
+      for r in Object.getOwnPropertyNames require when (
+        r not in ['paths', 'arguments', 'caller']
+      )
         _require[r] = require[r]
       # use the same hack node currently uses for their own REPL
       _require.paths = _module.paths = Module._nodeModulePaths process.cwd()
       _require.resolve = (request) -> Module._resolveFilename request, _module
   o = {}
-  o[k] = v for own k, v of options
+  (o[k] = v) for own k, v of options
   o.bare = on # ensure return value
   js = CoffeeScript.compile code, o
   if sandbox is global
@@ -111,9 +117,8 @@ if require.extensions
       """
 
 CoffeeScript._compileRawFileContent = (raw, filename, options = {}) ->
-
   # Strip the Unicode byte order mark, if this file begins with one.
-  stripped = if raw.charCodeAt(0) is 0xFEFF then raw.substring 1 else raw
+  stripped = if raw.charCodeAt(0) is 0xfeff then raw.substring 1 else raw
 
   options = Object.assign {}, options,
     filename: filename
