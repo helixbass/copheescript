@@ -571,7 +571,7 @@ exports.Rewriter = class Rewriter
       )
       # dump {token, precedingComment, prevLocationData, useNextToken, next: tokens[i + 1]}
       if token[0] is 'INDENT'
-        return 1 unless precedingComment?
+        return 1 unless precedingComment?.newLine
       # We don't want eg an implicit call at the end of an `if` condition to include a following indented comment
       return 1 if token.generated and token[0] is 'CALL_END' and precedingComment?.indented
       prevLocationData = precedingComment.locationData if precedingComment?
