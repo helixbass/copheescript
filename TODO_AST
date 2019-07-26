@@ -4,7 +4,7 @@
 - location data for ClassMethod for static method should include @
 - StringLiteral extra.raw escaping - seems like maybe extra.raw should include triple quotes if it's a heredoc and then not escape the quote (in makeDelimitedLiteral())?
 - alternate location data includes "else" for inline eg if a then b else c
-- (implicit?) object location data should include trailing indented comma? eg
+- (implicit?) object location data should include trailing indented comment? eg
   obj =
     a: 1
     # comment
@@ -24,11 +24,9 @@
     '"interpolations"' # <- Prettier was parenthesizing, implying no returns: true
   }"} work"""
 
-- should update to OptionalCallExpression/OptionalMemberExpression? Is that where babel 7 landed?
 - sourceType
 - ESLint plugin to catch grammar rules that wouldn't allow passing along necessary location data? Eg check for rules that return something other than a new object/array and which are then used in a LOC() call (an explicit one or implicitly by being the first/last thing in the production)
 - make assertErrorFormat() check AST by default
-- chained Ops eg a < b < c
 - distinguish Infinity from 2e308
 - literate?
 - TemplateElement.value.cooked?
