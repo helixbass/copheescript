@@ -3812,6 +3812,8 @@ exports.ClassProperty = class ClassProperty extends Base
 
   children: ['name', 'value']
 
+  isStatementAst: YES
+
   astProperties: (o) ->
     Object.assign
       key: @name.ast o, LEVEL_LIST
