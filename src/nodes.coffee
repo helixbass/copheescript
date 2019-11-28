@@ -1356,6 +1356,10 @@ exports.Block = class Block extends Base
       body, @directives
     }
 
+  astLocationData: ->
+    return if @isRootBlock and not @locationData?
+    super()
+
 #### Literal
 
 # `Literal` is a base class for static values that can be passed through

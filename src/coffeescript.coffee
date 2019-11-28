@@ -131,6 +131,7 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
     ast.start = ast.program.start = range[0]
     ast.end = ast.program.end = range[1]
     ast.range = ast.program.range = range
+    ast.loc.start = ast.program.loc.start = {line: 1, column: 0}
     ast.loc.end.line = ast.program.loc.end.line = sourceCodeNumberOfLines
     ast.loc.end.column = ast.program.loc.end.column = sourceCodeLastLine.length
     return ast
