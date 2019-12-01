@@ -34,3 +34,7 @@
 - StringLiteral escaping (eg "\u2017" un-escapes the unicode escape for value/extra.rawValue)
 - ClassProperty variance field?
 - namespace JSX tags eg <a:b> or <a:b.d>
+
+- guide to working on the AST (Github wiki page?)
+  - explain that AST nodes need to represent real chunks of source code/have accurate/sequential location data
+- automated tests for those assumptions? (https://github.com/jashkenas/coffeescript/pull/5247#issuecomment-560044121)
