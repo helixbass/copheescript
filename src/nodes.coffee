@@ -232,18 +232,20 @@ exports.Base = class Base
   cacheToCodeFragments: (cacheValues) ->
     [fragmentsToText(cacheValues[0]), fragmentsToText(cacheValues[1])]
 
-  # Construct a node that returns the current node's result.
+  # Construct a node that returns the current node’s result.
   # Note that this is overridden for smarter behavior for
-  # many statement nodes (e.g. If, For)...
-  makeReturn: ({accumulator, mark} = {}) ->
+  # many statement nodes (e.g. `If`, `For`).
+  makeReturn: (results, mark) ->
     if mark
+      # Mark this node as implicitly returned, so that it can be part of the
+      # node metadata returned in the AST.
       @canBeReturned = yes
       return
-    me = @unwrapAll()
-    if accumulator
-      new Call new Literal("#{accumulator}.push"), [me]
+    node = @unwrapAll()
+    if results
+      new Call new Literal("#{results}.push"), [node]
     else
-      new Return me
+      new Return node
 
   # Does this node, or any of its children, contain a node of a certain kind?
   # Recursively traverses down the *children* nodes and returns the first one
@@ -276,40 +278,35 @@ exports.Base = class Base
   ast: (o, level) ->
     o = Object.assign {}, o
     o.level = level if level?
-    @makeReturn mark: yes if @isStatement(o) and o.level isnt LEVEL_TOP and o.scope?
-
-    fullAst = @astNode o
-    return fullAst unless fullAst?
-    Object.assign fullAst, @astReturns()
-
-  astNode: (o) ->
     # Every abstract syntax tree node object has four categories of properties:
     # - type, stored in the `type` field and a string like `NumberLiteral`.
-    # - location data, stored in the `loc`, `start`, `end` and `range` fields.
+    # - whether this node is implicitly returned, stored as `returns`.
     # - properties specific to this node, like `parsedValue`.
     # - properties that are themselves child nodes, like `body`.
+    # - location data, stored in the `loc`, `start`, `end` and `range` fields.
     # These fields are all intermixed in the Babel spec; `type` and `start` and
     # `parsedValue` are all top level fields in the AST node object. We have
     # separate methods for returning each category, that we merge together here.
-    Object.assign {}, {type: @astType(o)}, @astProperties(o), @astLocationData()
-
-  # By default, a node class has no specific properties.
-  astProperties: -> {}
+    Object.assign {}, {type: @astType(o)}, @astReturns(o), @astProperties(o, level), @astLocationData()
 
   # By default, a node class’s AST `type` is its class name.
   astType: -> @constructor.name
+
+  # Mark AST nodes that correspond to expressions that (implicitly) return.
+  astReturns: (o) ->
+    if @isStatement(o) and o.level isnt LEVEL_TOP and o.scope?
+      # Call `@makeReturn`, rather than simply returning, in case the node
+      # overrides `@makeReturn`.
+      @makeReturn null, yes
+    if @canBeReturned then {returns: yes} else {}
+
+  # By default, a node class has no specific properties.
+  astProperties: -> {}
 
   # The AST location data is a rearranged version of our Jison location data,
   # mutated into the structure that the Babel spec uses.
   astLocationData: ->
     jisonLocationDataToAstLocationData @locationData
-
-  # Mark AST nodes that correspond to expressions that (implicitly) return.
-  astReturns: ->
-    if @canBeReturned
-      returns: yes
-    else
-      {}
 
   # Determines whether an AST node needs an `ExpressionStatement` wrapper.
   # Typically matches our `isStatement()` logic but this allows overriding.
@@ -586,7 +583,7 @@ exports.Block = class Block extends Base
 
   # A Block node does not return its entire body, rather it
   # ensures that the final expression is returned.
-  makeReturn: (opts) ->
+  makeReturn: (results, mark) ->
     len = @expressions.length
     [..., lastExp] = @expressions
     lastExp = lastExp?.unwrap() or no
@@ -599,12 +596,12 @@ exports.Block = class Block extends Base
       last = last.unwrap()
       if penult instanceof JSXElement and last instanceof JSXElement
         expressions[expressions.length - 1].error 'Adjacent JSX elements must be wrapped in an enclosing tag'
-    if opts?.mark
-      @expressions[len - 1]?.makeReturn opts
+    if mark
+      @expressions[len - 1]?.makeReturn results, mark
       return
     while len--
       expr = @expressions[len]
-      @expressions[len] = expr.makeReturn opts
+      @expressions[len] = expr.makeReturn results
       @expressions.splice(len, 1) if expr instanceof Return and not expr.expression
       break
     this
@@ -819,11 +816,11 @@ exports.Block = class Block extends Base
     return nodes[0] if nodes.length is 1 and nodes[0] instanceof Block
     new Block nodes
 
-  astNode: (o) ->
-    if (o.level? and o.level isnt LEVEL_TOP) and @expressions.length
-      return (new Sequence(@expressions).withLocationDataFrom @).ast o
+  ast: (o, level) ->
+    if (level? and level isnt LEVEL_TOP) and @expressions.length
+      return (new Sequence(@expressions).withLocationDataFrom @).ast o, level
 
-    super o
+    super o, level
 
   astType: ->
     if @isRootBlock
@@ -833,14 +830,14 @@ exports.Block = class Block extends Base
     else
       'BlockStatement'
 
-  astProperties: (o) ->
+  astProperties: (o, level) ->
     checkForDirectives = del o, 'checkForDirectives'
 
     sniffDirectives @expressions, notFinalExpression: checkForDirectives if @isRootBlock or checkForDirectives
     directives = []
     body = []
     for expression in @expressions
-      expressionAst = expression.ast o
+      expressionAst = expression.ast o, level
       # Ignore generated PassthroughLiteral
       if not expressionAst?
         continue
@@ -853,9 +850,9 @@ exports.Block = class Block extends Base
       else
         body.push Object.assign
             type: 'ExpressionStatement'
+          , expression.astReturns(o),
             expression: expressionAst
-          ,
-            expression.astLocationData()
+          , expression.astLocationData()
 
     return {
       # For now, we’re not including `sourceType` on the `Program` AST node.
@@ -1059,9 +1056,9 @@ exports.StringLiteral = class StringLiteral extends Literal
   shouldGenerateTemplateLiteral: ->
     @isFromHeredoc()
 
-  astNode: (o) ->
-    return StringWithInterpolations.fromStringLiteral(@).ast o if @shouldGenerateTemplateLiteral()
-    super o
+  ast: (o, level) ->
+    return StringWithInterpolations.fromStringLiteral(@).ast(o, level) if @shouldGenerateTemplateLiteral()
+    super o, level
 
   astProperties: ->
     return
@@ -1110,9 +1107,9 @@ exports.PassthroughLiteral = class PassthroughLiteral extends Literal
       # By reducing it to its latter half, we turn '\`' to '`', '\\\`' to '\`', etc.
       string[-Math.ceil(string.length / 2)..]
 
-  astNode: (o) ->
+  ast: (o, level) ->
     return null if @generated
-    super o
+    super o, level
 
   astProperties: ->
     return {
@@ -1155,8 +1152,8 @@ exports.ComputedPropertyName = class ComputedPropertyName extends PropertyName
   compileNode: (o) ->
     [@makeCode('['), @value.compileToFragments(o, LEVEL_LIST)..., @makeCode(']')]
 
-  astNode: (o) ->
-    @value.ast o
+  ast: (o, level) ->
+    @value.ast o, level
 
 exports.StatementLiteral = class StatementLiteral extends Literal
   isStatement: YES
@@ -1284,7 +1281,7 @@ exports.FuncDirectiveReturn = class FuncDirectiveReturn extends Return
 
   isStatementAst: NO
 
-  astNode: (o) ->
+  ast: (o, level) ->
     @checkScope o
 
     new Op @keyword,
@@ -1296,7 +1293,7 @@ exports.FuncDirectiveReturn = class FuncDirectiveReturn extends Return
           @returnKeyword
       )
     .withLocationDataFrom @
-    .astNode o
+    .ast o, level
 
 # `yield return` works exactly like `return`, except that it turns the function
 # into a generator.
@@ -1488,13 +1485,16 @@ exports.Value = class Value extends Base
 
     no
 
-  astNode: (o) ->
+  ast: (o, level) ->
     # If the `Value` has no properties, the AST node is just whatever this
-    # node’s `base` is.
-    return @base.ast o unless @hasProperties()
+    # node’s `base` is (but with this node’s `returns` value).
+    unless @hasProperties()
+      baseAst = @base.ast o, level
+      Object.assign baseAst, @astReturns(o) if baseAst
+      return baseAst
     # Otherwise, call `Base::ast` which in turn calls the `astType` and
     # `astProperties` methods below.
-    super o
+    super o, level
 
   astType: ->
     if @isJSXTag()
@@ -1741,8 +1741,8 @@ exports.JSXAttributes = class JSXAttributes extends Base
       fragments.push attribute.compileToFragments(o, LEVEL_TOP)...
     fragments
 
-  astNode: (o) ->
-    attribute.ast(o) for attribute in @attributes
+  ast: (o, level) ->
+    attribute.ast(o, level) for attribute in @attributes
 
 exports.JSXNamespacedName = class JSXNamespacedName extends Base
   constructor: (tag) ->
@@ -1782,7 +1782,7 @@ exports.JSXElement = class JSXElement extends Base
   isFragment: ->
     !@tagName.base.value.length
 
-  astNode: (o) ->
+  ast: (o, level) ->
     # The location data spanning the opening element < ... > is captured by
     # the generated Arr which contains the element's attributes
     @openingElementLocationData = jisonLocationDataToAstLocationData @attributes.locationData
@@ -1795,7 +1795,7 @@ exports.JSXElement = class JSXElement extends Base
         jisonLocationDataToAstLocationData tagName.closingTagClosingBracketLocationData
       )
 
-    super o
+    super o, level
 
   astType: ->
     if @isFragment()
@@ -1886,7 +1886,7 @@ exports.JSXElement = class JSXElement extends Base
                 openingBrace: '{'
                 closingBrace: '}'
               }
-              
+
               new JSXExpressionContainer emptyExpression, locationData: element.locationData
             else
               unwrapped = expression.unwrapAll()
@@ -2122,16 +2122,16 @@ exports.Super = class Super extends Base
     attachCommentsToNode salvagedComments, @accessor.name if salvagedComments
     fragments
 
-  astNode: (o) ->
+  ast: (o, level) ->
     if @accessor?
       return (
         new Value(
           new Super().withLocationDataFrom (@superLiteral ? @)
           [@accessor]
         ).withLocationDataFrom @
-      ).ast o
+      ).ast o, level
 
-    super o
+    super o, level
 
 #### RegexWithInterpolations
 
@@ -2210,11 +2210,11 @@ exports.Access = class Access extends Base
 
   shouldCache: NO
 
-  astNode: (o) ->
+  ast: (o, level) ->
     # Babel doesn’t have an AST node for `Access`, but rather just includes
     # this Access node’s child `name` Identifier node as the `property` of
     # the `MemberExpression` node.
-    @name.ast o
+    @name.ast o, level
 
 #### Index
 
@@ -2231,13 +2231,13 @@ exports.Index = class Index extends Base
   shouldCache: ->
     @index.shouldCache()
 
-  astNode: (o) ->
+  ast: (o, level) ->
     # Babel doesn’t have an AST node for `Index`, but rather just includes
     # this Index node’s child `index` Identifier node as the `property` of
     # the `MemberExpression` node. The fact that the `MemberExpression`’s
     # `property` is an Index means that `computed` is `true` for the
     # `MemberExpression`.
-    @index.ast o
+    @index.ast o, level
 
 #### Range
 
@@ -2360,7 +2360,7 @@ exports.Range = class Range extends Base
 
 #### Slice
 
-# An array slice literal. Unlike JavaScript's `Array#slice`, the second parameter
+# An array slice literal. Unlike JavaScript’s `Array#slice`, the second parameter
 # specifies the index of the end of the slice, just as the first parameter
 # is the index of the beginning.
 exports.Slice = class Slice extends Base
@@ -2394,8 +2394,8 @@ exports.Slice = class Slice extends Base
           "+#{fragmentsToText compiled} + 1 || 9e9"
     [@makeCode ".slice(#{ fragmentsToText fromCompiled }#{ toStr or '' })"]
 
-  astNode: (o) ->
-    @range.ast o
+  ast: (o, level) ->
+    @range.ast o, level
 
 #### Obj
 
@@ -2955,7 +2955,7 @@ exports.Class = class Class extends Base
 
   isStatementAst: -> yes
 
-  astNode: (o) ->
+  ast: (o, level) ->
     @declareName o
     @name = @determineName()
     @body.isClassBody = yes
@@ -2964,7 +2964,7 @@ exports.Class = class Class extends Base
     sniffDirectives @body.expressions
     @ctor?.noReturn = yes
 
-    super o
+    super o, level
 
   astType: (o) ->
     if o.level is LEVEL_TOP
@@ -3187,12 +3187,12 @@ exports.ImportClause = class ImportClause extends Base
 
     code
 
-  astNode: (o) ->
+  ast: (o, level) ->
     # The AST for `ImportClause` is the non-nested list of import specifiers
     # that will be the `specifiers` property of an `ImportDeclaration` AST
     compact flatten [
-      @defaultBinding?.ast o
-      @namedImports?.ast o
+      @defaultBinding?.ast o, level
+      @namedImports?.ast o, level
     ]
 
 exports.ExportDeclaration = class ExportDeclaration extends ModuleDeclaration
@@ -3267,8 +3267,8 @@ exports.ModuleSpecifierList = class ModuleSpecifierList extends Base
       code.push @makeCode '{}'
     code
 
-  astNode: (o) ->
-    specifier.ast(o) for specifier in @specifiers
+  ast: (o, level) ->
+    specifier.ast(o, level) for specifier in @specifiers
 
 exports.ImportSpecifierList = class ImportSpecifierList extends ModuleSpecifierList
 
@@ -3658,7 +3658,7 @@ exports.Assign = class Assign extends Base
     [left, right] = @variable.cacheReference o
     new Assign(left, new Op(@context[...-1], right, @value)).compileToFragments o
 
-  # Compile the assignment from an array splice literal, using JavaScript's
+  # Compile the assignment from an array splice literal, using JavaScript’s
   # `Array#splice` method.
   compileSplice: (o) ->
     {range: {from, to, exclusive}} = @variable.properties.pop()
@@ -3698,9 +3698,9 @@ exports.Assign = class Assign extends Base
 
   isStatementAst: NO
 
-  astNode: (o) ->
+  ast: (o, level) ->
     @addScopeVariables o, checkAssignability: no
-    super o
+    super o, level
 
   astType: ->
     if @isDefaultAssignment()
@@ -4046,11 +4046,11 @@ exports.Code = class Code extends Base
     for {name} in @params when name instanceof Arr or name instanceof Obj
       name.propagateLhs yes
 
-  astNode: (o) ->
+  ast: (o, level) ->
     @updateOptions o
-    @body.makeReturn mark: yes unless @body.isEmpty() or @noReturn
+    @body.makeReturn(null, yes) unless @body.isEmpty() or @noReturn
 
-    super o
+    super o, level
 
   astType: ->
     if @isMethod
@@ -4305,7 +4305,7 @@ exports.Elision = class Elision extends Base
 
   eachName: (iterator) ->
 
-  astNode: ->
+  ast: ->
     null
 
 #### While
@@ -4321,11 +4321,11 @@ exports.While = class While extends Base
 
   isStatement: YES
 
-  makeReturn: (opts) ->
-    return super opts if opts?.accumulator
+  makeReturn: (results, mark) ->
+    return super(results, mark) if results
     @returns = not @jumps()
-    if opts?.mark
-      @body.makeReturn opts if @returns
+    if mark
+      @body.makeReturn(results, mark) if @returns
       return
     this
 
@@ -4350,7 +4350,7 @@ exports.While = class While extends Base
       body = @makeCode ''
     else
       if @returns
-        body.makeReturn accumulator: rvar = o.scope.freeVariable 'results'
+        body.makeReturn rvar = o.scope.freeVariable 'results'
         set  = "#{@tab}#{rvar} = [];\n"
       if @guard
         if body.expressions.length > 1
@@ -4597,9 +4597,9 @@ exports.Op = class Op extends Base
   toString: (idt) ->
     super idt, @constructor.name + ' ' + @operator
 
-  astNode: (o) ->
+  ast: (o, level) ->
     @checkContinuation o if @isYield() or @isAwait()
-    super o
+    super o, level
 
   astType: ->
     return 'AwaitExpression' if @isAwait()
@@ -4711,13 +4711,13 @@ exports.Try = class Try extends Base
 
   jumps: (o) -> @attempt.jumps(o) or @catch?.jumps(o)
 
-  makeReturn: (opts) ->
-    if opts?.mark
-      @attempt?.makeReturn opts
-      @catch?.makeReturn opts
+  makeReturn: (results, mark) ->
+    if mark
+      @attempt?.makeReturn results, mark
+      @catch?.makeReturn results, mark
       return
-    @attempt = @attempt.makeReturn opts if @attempt
-    @catch   = @catch  .makeReturn opts if @catch
+    @attempt = @attempt.makeReturn results if @attempt
+    @catch   = @catch  .makeReturn results if @catch
     this
 
   # Compilation is more or less as you would expect -- the *finally* clause
@@ -4770,9 +4770,9 @@ exports.Catch = class Catch extends Base
 
   jumps: (o) -> @recovery.jumps(o)
 
-  makeReturn: (opts) ->
-    ret = @recovery.makeReturn opts
-    return if opts?.mark
+  makeReturn: (results, mark) ->
+    ret = @recovery.makeReturn results, mark
+    return if mark
     @recovery = ret
     this
 
@@ -4787,12 +4787,12 @@ exports.Catch = class Catch extends Base
     [].concat @makeCode(" catch ("), placeholder.compileToFragments(o), @makeCode(") {\n"),
       @recovery.compileToFragments(o, LEVEL_TOP), @makeCode("\n#{@tab}}")
 
-  astNode: (o) ->
+  ast: (o, level) ->
     @errorVariable?.eachName (name) ->
       alreadyDeclared = o.scope.find name.value
       name.isDeclaration = not alreadyDeclared
 
-    super o
+    super o, level
 
   astType: -> 'CatchClause'
 
@@ -4916,7 +4916,7 @@ exports.Parens = class Parens extends Base
     return @wrapInBraces fragments if @jsxAttribute
     if bare then fragments else @wrapInParentheses fragments
 
-  astNode: (o) -> @body.unwrap().ast o, LEVEL_PAREN
+  ast: (o, level) -> @body.unwrap().ast o, LEVEL_PAREN
 
 #### StringWithInterpolations
 
@@ -5197,7 +5197,7 @@ exports.For = class For extends While
     if @returns
       resultPart   = "#{@tab}#{rvar} = [];\n"
       returnResult = "\n#{@tab}return #{rvar};"
-      body.makeReturn accumulator: rvar
+      body.makeReturn rvar
     if @guard
       if body.expressions.length > 1
         body.expressions.unshift new If (new Parens @guard).invert(), new StatementLiteral "continue"
@@ -5230,13 +5230,13 @@ exports.For = class For extends While
     fragments.push @makeCode(returnResult) if returnResult
     fragments
 
-  astNode: (o) ->
+  ast: (o, level) ->
     addToScope = (name) ->
       alreadyDeclared = o.scope.find name.value
       name.isDeclaration = not alreadyDeclared
     @name?.eachName addToScope
     @index?.eachName addToScope
-    super o
+    super o, level
 
   astType: -> 'For'
 
@@ -5273,10 +5273,10 @@ exports.Switch = class Switch extends Base
       return jumpNode if jumpNode = block.jumps o
     @otherwise?.jumps o
 
-  makeReturn: (opts) ->
-    block.makeReturn opts for {block} in @cases
-    @otherwise or= new Block [new Literal 'void 0'] if opts?.accumulator
-    @otherwise?.makeReturn opts
+  makeReturn: (results, mark) ->
+    block.makeReturn(results, mark) for {block} in @cases
+    @otherwise or= new Block [new Literal 'void 0'] if results
+    @otherwise?.makeReturn results, mark
     this
 
   compileNode: (o) ->
@@ -5393,14 +5393,14 @@ exports.If = class If extends Base
   compileNode: (o) ->
     if @isStatement o then @compileStatement o else @compileExpression o
 
-  makeReturn: (opts) ->
-    if opts?.mark
-      @body?.makeReturn opts
-      @elseBody?.makeReturn opts
+  makeReturn: (results, mark) ->
+    if mark
+      @body?.makeReturn results, mark
+      @elseBody?.makeReturn results, mark
       return
-    @elseBody  or= new Block [new Literal 'void 0'] if opts?.accumulator
-    @body     and= new Block [@body.makeReturn opts]
-    @elseBody and= new Block [@elseBody.makeReturn opts]
+    @elseBody  or= new Block [new Literal 'void 0'] if results
+    @body     and= new Block [@body.makeReturn results]
+    @elseBody and= new Block [@elseBody.makeReturn results]
     this
 
   ensureBlock: (node) ->
@@ -5480,9 +5480,9 @@ exports.Sequence = class Sequence extends Base
   constructor: (@expressions) ->
     super()
 
-  astNode: (o) ->
-    return @expressions[0].ast(o) if @expressions.length is 1
-    super o
+  ast: (o, level) ->
+    return @expressions[0].ast(o, level) if @expressions.length is 1
+    super o, level
 
   astType: -> 'SequenceExpression'
 
