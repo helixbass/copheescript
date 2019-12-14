@@ -1,9 +1,3 @@
-- directives
-- check makeReturn() more thoroughly eg is ctor.body.makeReturn() desirable when generating AST?
-- should test that all expected errors (that would occur when compiling) occur when generating AST
-- location data for ClassMethod for static method should include @
-- StringLiteral extra.raw escaping - seems like maybe extra.raw should include triple quotes if it's a heredoc and then not escape the quote (in makeDelimitedLiteral())?
-- alternate location data includes "else" for inline eg if a then b else c
 - (implicit?) object location data should include trailing indented comment? eg
   obj =
     a: 1
@@ -12,28 +6,18 @@
   obj =
     ### comment ###
     a: 1
-- use ClassProperty for static class fields eg @a: 2?
-- is returns wrong/missing here?
-  try
-    yes
-  finally
-    'nothing' # <- Prettier was parenthesizing, implying no returns: true
 
-  """multiline #{"nested #{
-    ok true
-    '"interpolations"' # <- Prettier was parenthesizing, implying no returns: true
-  }"} work"""
+- StringLiteral extra.raw escaping - seems like maybe extra.raw should include triple quotes if it's a heredoc and then not escape the quote (in makeDelimitedLiteral())?
+- TemplateElement.value.cooked?
+- StringLiteral escaping (eg "\u2017" un-escapes the unicode escape for value/extra.rawValue)
+- ClassProperty variance field?
+
+- should test that all expected errors (that would occur when compiling) occur when generating AST
+- add tests for unicode code point escapes etc for interpolated heregex (like there are some for non-interpolated regex/heregex)
 
 - sourceType
 - ESLint plugin to catch grammar rules that wouldn't allow passing along necessary location data? Eg check for rules that return something other than a new object/array and which are then used in a LOC() call (an explicit one or implicitly by being the first/last thing in the production)
-- make assertErrorFormat() check AST by default
-- distinguish Infinity from 2e308
 - literate?
-- TemplateElement.value.cooked?
-- add tests for unicode code point escapes etc for interpolated heregex (like there are some for non-interpolated regex/heregex)
-- StringLiteral escaping (eg "\u2017" un-escapes the unicode escape for value/extra.rawValue)
-- ClassProperty variance field?
-- namespace JSX tags eg <a:b> or <a:b.d>
 
 - guide to working on the AST (Github wiki page?)
   - explain that AST nodes need to represent real chunks of source code/have accurate/sequential location data
