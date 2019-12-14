@@ -12,7 +12,6 @@
 - StringLiteral escaping (eg "\u2017" un-escapes the unicode escape for value/extra.rawValue)
 - ClassProperty variance field?
 
-- should test that all expected errors (that would occur when compiling) occur when generating AST
 - add tests for unicode code point escapes etc for interpolated heregex (like there are some for non-interpolated regex/heregex)
 
 - sourceType
