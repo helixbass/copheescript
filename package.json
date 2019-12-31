@@ -31,7 +31,8 @@
   ],
   "scripts": {
     "test": "node ./bin/cake test",
-    "test-harmony": "node --harmony ./bin/cake test"
+    "test-harmony": "node --harmony ./bin/cake test",
+    "lint": "eslint '**/*.coffee'"
   },
   "homepage": "https://coffeescript.org",
   "bugs": "https://github.com/jashkenas/coffeescript/issues",
@@ -44,7 +45,11 @@
     "@babel/preset-env": "^7.4.2",
     "babel-preset-minify": "^0.5.0",
     "codemirror": "^5.45.0",
+    "coffeescript": "github:jashkenas/coffeescript#05d45e9b",
     "docco": "~0.8.0",
+    "eslint": "^6.7.2",
+    "eslint-config-prettier": "^6.7.0",
+    "eslint-plugin-coffee": "^0.1.10",
     "highlight.js": "~9.15.6",
     "jison": "^0.4.18",
     "markdown-it": "~8.4.2",

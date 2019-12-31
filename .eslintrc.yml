@@ -1,0 +1,92 @@
+extends:
+  - plugin:coffee/all
+  - plugin:coffee/prettier
+  # - plugin:coffee/prettier-run-as-rule
+rules:
+#   coffee/prefer-destructuring: [error, {object: true}]
+#   coffee/no-unused-vars: [error, {varsIgnorePattern: ^_+$}]
+#   require-jsdoc: error
+#   prefer-rest-params: error
+#   # no-else-return: error
+#   # id-length: error
+#   # no-multi-assign: error
+#   no-self-compare: error
+  coffee/no-magic-numbers: off
+#   coffee/no-implicit-coercion: off
+  coffee/vars-on-top: off
+#   coffee/max-depth: off
+  coffee/complexity: off
+  coffee/max-lines-per-function: off
+  coffee/max-len: off
+  coffee/capitalized-comments: off
+  coffee/spaced-comment: off
+  coffee/no-underscore-dangle: off
+  coffee/no-implicit-coercion: off
+  coffee/implicit-arrow-linebreak: off
+  coffee/implicit-call: off
+  coffee/implicit-object: off
+  coffee/no-multi-spaces: off
+  # coffee/array-element-newline: [error, consistent]
+  # coffee/object-property-newline: [error, {allowAllPropertiesOnSameLine: true}]
+  quote-props: [error, as-needed]
+  no-process-env: off
+  comma-spacing: off
+  new-parens: off
+#   coffee/no-commonjs: off
+#   coffee/valid-jsdoc: off
+  coffee/multiline-comment-style: off
+#   coffee/no-return-assign: off
+#   # coffee/no-overwrite: [error, sameScope: false]
+#   coffee/block-scoped-var: off
+#   coffee/wrap-regex: off
+#   no-sparse-arrays: off
+#   coffee/no-cond-assign: off
+  coffee/spread-direction: [error, 'postfix']
+  sort-keys: off
+  coffee/no-unnecessary-double-quotes: off
+  # coffee/object-shorthand: off
+#   global-require: off
+  max-lines: off
+  require-unicode-regexp: off
+  no-inline-comments: off
+  line-comment-position: off
+  max-statements: off
+  coffee/id-length: off
+  coffee/prefer-template: off
+  coffee/dot-location: [error, 'property']
+  coffee/prefer-object-spread: off
+  coffee/lines-between-class-members: off
+  coffee/class-methods-use-this: off
+  no-plusplus: off
+  max-classes-per-file: off
+  coffee/no-empty-function: off
+  coffee/shorthand-this: off
+#   no-param-reassign: off
+  no-continue: off
+  default-case: off
+  no-warning-comments: off
+  max-params: off
+  no-sync: off
+  no-multi-assign: off
+  no-bitwise: off
+  coffee/guard-for-in: off
+env:
+  node: true
+  es6: true
+globals:
+  test: false
+  eq: false
+  ok: false
+  reset: false
+  red: false
+  yellow: false
+  CoffeeScript: false
+  throws: false
+  doesNotThrow: false
+  eqJS: false
+  throwsCompileError: false
+  doesNotThrowCompileError: false
+  deepEqual: false
+  arrayEq: false
+  fail: false
+  inspect: false
