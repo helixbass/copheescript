@@ -1963,12 +1963,12 @@ exports.Call = class Call extends Base
     if @variable instanceof Value and @variable.isNotCallable()
       @variable.error "literal is not a function"
 
-    if @variable.base instanceof JSXTag
-      return new JSXElement(
-        tagName: @variable
-        attributes: new JSXAttributes @args[0].base
-        content: @args[1]
-      )
+    # if @variable.base instanceof JSXTag
+    #   return new JSXElement(
+    #     tagName: @variable
+    #     attributes: new JSXAttributes @args[0].base
+    #     content: @args[1]
+    #   )
 
     # `@variable` never gets output as a result of this node getting created as
     # part of `RegexWithInterpolations`, so for that case move any comments to
