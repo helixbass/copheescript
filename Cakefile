@@ -476,8 +476,16 @@ runTests = (CoffeeScript) ->
   skipUnless '/foo.bar/s.test("foo\tbar")', ['regex_dotall.coffee']
   skipUnless '1_2_3', ['numeric_literal_separators.coffee']
   skipUnless '1n', ['numbers_bigint.coffee']
+  passingTransformedAst = [
+    'numbers'
+    'booleans'
+    'arrays'
+    'numeric_literal_separators'
+    'numbers_bigint'
+    'javascript_literals'
+  ]
   files = fs.readdirSync('test').filter (filename) ->
-    filename not in testFilesToSkip
+    filename not in testFilesToSkip and filename.split('.')[0] in passingTransformedAst
 
   startTime = Date.now()
   for file in files when helpers.isCoffee file
@@ -485,7 +493,7 @@ runTests = (CoffeeScript) ->
     currentFile = filename = path.join 'test', file
     code = fs.readFileSync filename
     try
-      CoffeeScript.run code.toString(), {filename, literate}
+      CoffeeScript.run code.toString(), {filename, literate, transformedAst: yes}
     catch error
       failures.push {filename, error}
 

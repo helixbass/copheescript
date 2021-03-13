@@ -11,6 +11,8 @@ SourceMap     = require './sourcemap'
 # evaluated from `lib/coffeescript`.
 packageJson   = require '../../package.json'
 
+{getTransformedAst} = require '../../../coffeescript-ast-transformer'
+
 # The current CoffeeScript version number.
 exports.VERSION = packageJson.version
 
@@ -112,20 +114,25 @@ exports.compile = compile = withPrettyErrors (code, options = {}) ->
   # (after fixing the location data for the root/`File`»`Program` node,
   # which might’ve gotten misaligned from the original source due to the
   # `clean` function in the lexer).
-  if options.ast
-    nodes.allCommentTokens = helpers.extractAllCommentTokens tokens
-    sourceCodeNumberOfLines = (code.match(/\r?\n/g) or '').length + 1
-    sourceCodeLastLine = /.*$/.exec(code)[0] # `.*` matches all but line break characters.
-    ast = nodes.ast options
-    range = [0, code.length]
-    ast.start = ast.program.start = range[0]
-    ast.end = ast.program.end = range[1]
-    ast.range = ast.program.range = range
-    ast.loc.start = ast.program.loc.start = {line: 1, column: 0}
-    ast.loc.end.line = ast.program.loc.end.line = sourceCodeNumberOfLines
-    ast.loc.end.column = ast.program.loc.end.column = sourceCodeLastLine.length
-    ast.tokens = tokens
-    return ast
+  if options.ast or options.transformedAst
+    ast = do ->
+      nodes.allCommentTokens = helpers.extractAllCommentTokens tokens
+      sourceCodeNumberOfLines = (code.match(/\r?\n/g) or '').length + 1
+      sourceCodeLastLine = /.*$/.exec(code)[0] # `.*` matches all but line break characters.
+      ast = nodes.ast options
+      range = [0, code.length]
+      ast.start = ast.program.start = range[0]
+      ast.end = ast.program.end = range[1]
+      ast.range = ast.program.range = range
+      ast.loc.start = ast.program.loc.start = {line: 1, column: 0}
+      ast.loc.end.line = ast.program.loc.end.line = sourceCodeNumberOfLines
+      ast.loc.end.column = ast.program.loc.end.column = sourceCodeLastLine.length
+      ast.tokens = tokens
+      ast
+    if options.ast
+      return ast
+    printed = getTransformedAst ast, print: yes
+    return printed
 
   fragments = nodes.compileToFragments options
 
