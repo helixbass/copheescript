@@ -261,6 +261,17 @@ test "AST as expected for StringLiteral node", ->
     ]
     quote: "'''"
 
+  # escaped quotes
+  testExpression "b '\\'cheese string\\''",
+    type: 'CallExpression'
+    arguments: [
+      type: 'StringLiteral'
+      value: "'cheese string'"
+      extra:
+        raw: "\\'cheese string\\'"
+    ]
+
+
 test "AST as expected for PassthroughLiteral node", ->
   code = 'const CONSTANT = "unreassignable!"'
   testExpression "`#{code}`",
