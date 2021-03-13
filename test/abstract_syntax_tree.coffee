@@ -282,7 +282,7 @@ test "AST as expected for PassthroughLiteral node", ->
   # escaped backticks
   testExpression "`\\`abc\\``",
     type: 'PassthroughLiteral'
-    value: '\\`abc\\`'
+    value: '`abc`'
     here: no
 
 test "AST as expected for IdentifierLiteral node", ->

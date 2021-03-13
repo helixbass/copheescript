@@ -1147,7 +1147,7 @@ exports.PassthroughLiteral = class PassthroughLiteral extends Literal
 
   astProperties: ->
     return {
-      value: @originalValue
+      @value
       here: !!@here
     }
 
