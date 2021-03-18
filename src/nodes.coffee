@@ -5894,14 +5894,28 @@ makeDelimitedLiteral = (body, {delimiter: delimiterOption, escapeNewlines, doubl
   "#{printedDelimiter}#{body}#{printedDelimiter}"
 
 STRING_ESCAPES = ///
-  (\\[^nrxutbvf\n#{' '}])
+    ((?:\\\\)+)      # Consume (and preserve) an even number of backslashes.
+  | (\\u{[\da-fA-F]+})
+  | (\\u[\da-fA-F]{4})
+  | (\\x[\da-fA-F]{2})
+  | (\\[^\n#{' '}])
 ///g
 
 processEscapes = (string) ->
-  string.replace STRING_ESCAPES, (match, escape) ->
+  string.replace STRING_ESCAPES, (match, doubleBackslashes, unicodeCodePointEscape, unicodeEscape, hexEscape, escape) ->
+    return '\\' if doubleBackslashes
+    return String.fromCodePoint parseInt(unicodeCodePointEscape[3..(unicodeCodePointEscape.length - 2)], 16) if unicodeCodePointEscape
+    return String.fromCodePoint parseInt(unicodeEscape[2..6], 16) if unicodeEscape
+    return String.fromCodePoint parseInt(hexEscape[2..4], 16) if hexEscape
     escapedCharacter = escape[1]
-    escapedCharacter
-
+    switch escapedCharacter
+      when 'n' then '\n'
+      when 'r' then '\r'
+      when 't' then '\t'
+      when 'b' then '\b'
+      when 'f' then '\f'
+      when 'v' then '\u000b'
+      else escapedCharacter
 
 sniffDirectives = (expressions, {notFinalExpression} = {}) ->
   index = 0
