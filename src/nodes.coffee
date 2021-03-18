@@ -1096,7 +1096,7 @@ exports.StringLiteral = class StringLiteral extends Literal
 
   astProperties: ->
     return
-      value: @originalValue
+      value: processEscapes @originalValue
       extra:
         raw: "#{@delimiter}#{@originalValue}#{@delimiter}"
 
@@ -5892,6 +5892,18 @@ makeDelimitedLiteral = (body, {delimiter: delimiterOption, escapeNewlines, doubl
       when other                then (if double then "\\#{other}" else other)
   printedDelimiter = if includeDelimiters then delimiterOption else ''
   "#{printedDelimiter}#{body}#{printedDelimiter}"
+
+STRING_ESCAPES = ///
+    ((?:\\\\)+)
+  | (\\[^nrxutbvf])
+///g
+
+processEscapes = (string) ->
+  string.replace STRING_ESCAPES, (match, doubleBackslash, escape) ->
+    return doubleBackslash if doubleBackslash
+    escapedCharacter = escape[1]
+    escapedCharacter
+
 
 sniffDirectives = (expressions, {notFinalExpression} = {}) ->
   index = 0

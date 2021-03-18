@@ -261,14 +261,14 @@ test "AST as expected for StringLiteral node", ->
     ]
     quote: "'''"
 
-  # escaped quotes
+  # escapes
   testExpression "b '\\'cheese string\\''",
     type: 'CallExpression'
     arguments: [
       type: 'StringLiteral'
       value: "'cheese string'"
       extra:
-        raw: "\\'cheese string\\'"
+        raw: "'\\'cheese string\\''"
     ]
 
 
