@@ -5895,7 +5895,7 @@ makeDelimitedLiteral = (body, {delimiter: delimiterOption, escapeNewlines, doubl
 
 STRING_ESCAPES = ///
     ((?:\\\\)+)
-  | (\\[^nrxutbvf\n])
+  | (\\[^nrxutbvf\n#{' '}])
 ///g
 
 processEscapes = (string) ->
