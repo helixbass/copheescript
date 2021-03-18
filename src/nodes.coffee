@@ -5894,13 +5894,11 @@ makeDelimitedLiteral = (body, {delimiter: delimiterOption, escapeNewlines, doubl
   "#{printedDelimiter}#{body}#{printedDelimiter}"
 
 STRING_ESCAPES = ///
-    ((?:\\\\)+)
-  | (\\[^nrxutbvf\n#{' '}])
+  (\\[^nrxutbvf\n#{' '}])
 ///g
 
 processEscapes = (string) ->
-  string.replace STRING_ESCAPES, (match, doubleBackslash, escape) ->
-    return doubleBackslash if doubleBackslash
+  string.replace STRING_ESCAPES, (match, escape) ->
     escapedCharacter = escape[1]
     escapedCharacter
 

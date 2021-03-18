@@ -271,6 +271,15 @@ test "AST as expected for StringLiteral node", ->
         raw: "'\\'cheese string\\''"
     ]
 
+  testExpression "b '\\\\/\\\\'",
+    type: 'CallExpression'
+    arguments: [
+      type: 'StringLiteral'
+      value: '\\/\\'
+      extra:
+        raw: "'\\\\/\\\\'"
+    ]
+
 
 test "AST as expected for PassthroughLiteral node", ->
   code = 'const CONSTANT = "unreassignable!"'
