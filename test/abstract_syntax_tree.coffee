@@ -289,6 +289,29 @@ test "AST as expected for StringLiteral node", ->
         raw: "'abc\\ndef'"
     ]
 
+  testExpression """
+    b 'abc
+      d'
+  """,
+    type: 'CallExpression'
+    arguments: [
+      type: 'StringLiteral'
+      value: 'abc d'
+      extra:
+        raw: "'abc\n  d'"
+    ]
+
+  testExpression """
+    b 'abc\\
+      d'
+  """,
+    type: 'CallExpression'
+    arguments: [
+      type: 'StringLiteral'
+      value: 'abcd'
+      extra:
+        raw: "'abc\\\n  d'"
+    ]
 
 test "AST as expected for PassthroughLiteral node", ->
   code = 'const CONSTANT = "unreassignable!"'
