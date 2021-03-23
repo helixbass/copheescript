@@ -1024,12 +1024,7 @@ exports.StringLiteral = class StringLiteral extends Literal
           val = val.replace TRAILING_BLANK_LINE, '' if @finalChunk
           val
         else
-          val.replace SIMPLE_STRING_OMIT, (match, offset) =>
-            if (@initialChunk and offset is 0) or
-               (@finalChunk and offset + match.length is val.length)
-              ''
-            else
-              ' '
+          @collapseNewlines val
     @delimiter = @quote.charAt 0
     @value = makeDelimitedLiteral val, {
       @delimiter
@@ -1090,13 +1085,21 @@ exports.StringLiteral = class StringLiteral extends Literal
   shouldGenerateTemplateLiteral: ->
     @isFromHeredoc()
 
+  collapseNewlines: (value) ->
+    value.replace STRING_COLLAPSIBLE_NEWLINE, (match, offset) =>
+      if (@initialChunk and offset is 0) or
+         (@finalChunk and offset + match.length is value.length)
+        ''
+      else
+        ' '
+
   astNode: (o) ->
     return StringWithInterpolations.fromStringLiteral(@).ast o if @shouldGenerateTemplateLiteral()
     super o
 
   astProperties: ->
     return
-      value: processEscapes @originalValue
+      value: processEscapes @collapseNewlines @originalValue
       extra:
         raw: "#{@delimiter}#{@originalValue}#{@delimiter}"
 
@@ -5749,7 +5752,7 @@ LEVEL_ACCESS = 6  # ...[0]
 TAB = '  '
 
 SIMPLENUM = /^[+-]?\d+$/
-SIMPLE_STRING_OMIT = /\s*\n\s*/g
+STRING_COLLAPSIBLE_NEWLINE = /\s*\n\s*/g
 LEADING_BLANK_LINE  = /^[^\n\S]*\n/
 TRAILING_BLANK_LINE = /\n[^\n\S]*$/
 STRING_OMIT    = ///
