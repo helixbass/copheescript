@@ -5898,15 +5898,17 @@ STRING_ESCAPES = ///
   | (\\u{[\da-fA-F]+})
   | (\\u[\da-fA-F]{4})
   | (\\x[\da-fA-F]{2})
-  | (\\[^\n#{' '}])
+  | (\\[^\S\n]*\n\s*)  # Remove escaped newlines.
+  | (\\.)
 ///g
 
 processEscapes = (string) ->
-  string.replace STRING_ESCAPES, (match, doubleBackslashes, unicodeCodePointEscape, unicodeEscape, hexEscape, escape) ->
+  string.replace STRING_ESCAPES, (match, doubleBackslashes, unicodeCodePointEscape, unicodeEscape, hexEscape, escapedNewline, escape) ->
     return '\\' if doubleBackslashes
     return String.fromCodePoint parseInt(unicodeCodePointEscape[3..(unicodeCodePointEscape.length - 2)], 16) if unicodeCodePointEscape
     return String.fromCodePoint parseInt(unicodeEscape[2..6], 16) if unicodeEscape
     return String.fromCodePoint parseInt(hexEscape[2..4], 16) if hexEscape
+    return '' if escapedNewline
     escapedCharacter = escape[1]
     switch escapedCharacter
       when 'n' then '\n'
