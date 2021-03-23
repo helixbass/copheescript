@@ -1012,7 +1012,7 @@ exports.StringLiteral = class StringLiteral extends Literal
       val = val.replace HEREGEX_OMIT, '$1$2'
       val = replaceUnicodeCodePointEscapes val, flags: @heregex.flags
     else
-      val = val.replace STRING_OMIT, '$1'
+      val = @removeEscapedNewlines val
       val =
         unless @fromSourceString
           val
@@ -1085,6 +1085,9 @@ exports.StringLiteral = class StringLiteral extends Literal
   shouldGenerateTemplateLiteral: ->
     @isFromHeredoc()
 
+  removeEscapedNewlines: (value) ->
+    value.replace STRING_ESCAPED_NEWLINE, '$1'
+
   collapseNewlines: (value) ->
     value.replace STRING_COLLAPSIBLE_NEWLINE, (match, offset) =>
       if (@initialChunk and offset is 0) or
@@ -1099,7 +1102,7 @@ exports.StringLiteral = class StringLiteral extends Literal
 
   astProperties: ->
     return
-      value: processEscapes @collapseNewlines @originalValue
+      value: processEscapes @collapseNewlines @removeEscapedNewlines @originalValue
       extra:
         raw: "#{@delimiter}#{@originalValue}#{@delimiter}"
 
@@ -5755,7 +5758,7 @@ SIMPLENUM = /^[+-]?\d+$/
 STRING_COLLAPSIBLE_NEWLINE = /\s*\n\s*/g
 LEADING_BLANK_LINE  = /^[^\n\S]*\n/
 TRAILING_BLANK_LINE = /\n[^\n\S]*$/
-STRING_OMIT    = ///
+STRING_ESCAPED_NEWLINE = ///
     ((?:\\\\)+)      # Consume (and preserve) an even number of backslashes.
   | \\[^\S\n]*\n\s*  # Remove escaped newlines.
 ///g
