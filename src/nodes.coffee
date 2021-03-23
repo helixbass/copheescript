@@ -5900,21 +5900,23 @@ makeDelimitedLiteral = (body, {delimiter: delimiterOption, escapeNewlines, doubl
   "#{printedDelimiter}#{body}#{printedDelimiter}"
 
 STRING_ESCAPES = ///
-    ((?:\\\\)+)      # Consume (and preserve) an even number of backslashes.
+    ((?:\\\\)+)        # Consume (and preserve) an even number of backslashes.
   | (\\u{[\da-fA-F]+})
   | (\\u[\da-fA-F]{4})
   | (\\x[\da-fA-F]{2})
   | (\\[^\S\n]*\n\s*)  # Remove escaped newlines.
+  | (\\0(?=\d))        # Null character mistaken as octal escape.
   | (\\.)
 ///g
 
 processEscapes = (string) ->
-  string.replace STRING_ESCAPES, (match, doubleBackslashes, unicodeCodePointEscape, unicodeEscape, hexEscape, escapedNewline, escape) ->
+  string.replace STRING_ESCAPES, (match, doubleBackslashes, unicodeCodePointEscape, unicodeEscape, hexEscape, escapedNewline, nul, escape) ->
     return '\\' if doubleBackslashes
     return String.fromCodePoint parseInt(unicodeCodePointEscape[3..(unicodeCodePointEscape.length - 2)], 16) if unicodeCodePointEscape
     return String.fromCodePoint parseInt(unicodeEscape[2..6], 16) if unicodeEscape
     return String.fromCodePoint parseInt(hexEscape[2..4], 16) if hexEscape
     return '' if escapedNewline
+    return '\x00' if nul
     escapedCharacter = escape[1]
     switch escapedCharacter
       when 'n' then '\n'
