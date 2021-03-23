@@ -5905,18 +5905,16 @@ STRING_ESCAPES = ///
   | (\\u[\da-fA-F]{4})
   | (\\x[\da-fA-F]{2})
   | (\\[^\S\n]*\n\s*)  # Remove escaped newlines.
-  | (\\0(?=\d))        # Null character mistaken as octal escape.
   | (\\.)
 ///g
 
 processEscapes = (string) ->
-  string.replace STRING_ESCAPES, (match, doubleBackslashes, unicodeCodePointEscape, unicodeEscape, hexEscape, escapedNewline, nul, escape) ->
+  string.replace STRING_ESCAPES, (match, doubleBackslashes, unicodeCodePointEscape, unicodeEscape, hexEscape, escapedNewline, escape) ->
     return '\\' if doubleBackslashes
     return String.fromCodePoint parseInt(unicodeCodePointEscape[3..(unicodeCodePointEscape.length - 2)], 16) if unicodeCodePointEscape
     return String.fromCodePoint parseInt(unicodeEscape[2..6], 16) if unicodeEscape
     return String.fromCodePoint parseInt(hexEscape[2..4], 16) if hexEscape
     return '' if escapedNewline
-    return '\x00' if nul
     escapedCharacter = escape[1]
     switch escapedCharacter
       when 'n' then '\n'
@@ -5925,6 +5923,7 @@ processEscapes = (string) ->
       when 'b' then '\b'
       when 'f' then '\f'
       when 'v' then '\u000b'
+      when '0' then '\x00'
       else escapedCharacter
 
 sniffDirectives = (expressions, {notFinalExpression} = {}) ->
